@@ -156,47 +156,55 @@ def main():
     try:
         while not shutting_down:
             try:
-                data = ipc_socket.recv(4096)
-            except socket.timeout:
-                continue
+                try:
+                    data = ipc_socket.recv(4096)
+                except socket.timeout:
+                    continue
+                except ConnectionResetError:
+                    add_execution_log("Core disconnected", "error")
+                    break
+                except OSError:
+                    break
 
-            if not data:
-                add_execution_log("IPC disconnected. Reconnecting...", "error")
-                ipc_socket.close()
-                ipc_socket = connect_ipc()
-                continue
-
-            buffer += data.decode()
-
-            while "\n" in buffer:
-                line, buffer = buffer.split("\n", 1)
-
-                if not line.strip():
+                if not data:
+                    add_execution_log("IPC disconnected. Reconnecting...", "error")
+                    ipc_socket.close()
+                    ipc_socket = connect_ipc()
                     continue
 
-                try:
-                    raw = json.loads(line)
+                buffer += data.decode()
 
-                    # --- CONFIRMATION REQUEST FROM RUST ---
-                    if raw.get("type") == "confirm_required":
-                        add_execution_log(
-                            f"Confirmation required (id={raw['command_id']})",
-                            "action",
-                        )
-                        update_state(
-                            {
-                                "confirm_required": True,
-                                "command_id": raw["command_id"],
-                            }
-                        )
+                while "\n" in buffer:
+                    line, buffer = buffer.split("\n", 1)
+
+                    if not line.strip():
                         continue
 
-                    payload = raw.get("payload", raw)
-                    handle_message(payload)
+                    try:
+                        raw = json.loads(line)
 
-                except json.JSONDecodeError as e:
-                    print(f"[JSON ERROR] {e}", file=sys.stderr)
+                        # --- CONFIRMATION REQUEST FROM RUST ---
+                        if raw.get("type") == "confirm_required":
+                            add_execution_log(
+                                f"Confirmation required (id={raw['command_id']})",
+                                "action",
+                            )
+                            update_state(
+                                {
+                                    "confirm_required": True,
+                                    "command_id": raw["command_id"],
+                                }
+                            )
+                            continue
 
+                        payload = raw.get("payload", raw)
+                        handle_message(payload)
+
+                    except json.JSONDecodeError as e:
+                        print(f"[JSON ERROR] {e}", file=sys.stderr)
+            except Exception as e:
+                add_execution_log(f"Error in main loop: {e}", "error")
+                break
     finally:
         shutdown()
 
