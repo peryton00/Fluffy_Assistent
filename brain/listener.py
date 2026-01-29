@@ -10,6 +10,7 @@ import json
 import sys
 import signal
 import time
+import copy
 
 IPC_HOST = "127.0.0.1"
 IPC_PORT = 9001
@@ -20,7 +21,7 @@ ipc_socket = None
 
 
 # -----------------------------
-# IPC CONNECTION (NEW)
+# IPC CONNECTION
 # -----------------------------
 def connect_ipc():
     while True:
@@ -29,7 +30,6 @@ def connect_ipc():
             s.connect((IPC_HOST, IPC_PORT))
             s.settimeout(1.0)
             return s
-
         except (ConnectionRefusedError, TimeoutError):
             time.sleep(0.5)
 
@@ -54,23 +54,100 @@ def shutdown(signum=None, frame=None):
 
 
 # -----------------------------
+# SIGNAL COMPUTATION (AUTHORITATIVE)
+# -----------------------------
+def compute_signals(msg):
+    system = msg.get("system", {})
+    ram = system.get("ram", {})
+    cpu = system.get("cpu", {})
+    processes = system.get("processes", {}).get("top_ram", [])
+
+    signals = {}
+
+    # Memory pressure
+    if ram and ram.get("total_mb", 0) > 0:
+        usage = (ram["used_mb"] / ram["total_mb"]) * 100
+        if usage < 60:
+            signals["memory_pressure"] = "LOW"
+        elif usage < 75:
+            signals["memory_pressure"] = "MEDIUM"
+        elif usage < 90:
+            signals["memory_pressure"] = "HIGH"
+        else:
+            signals["memory_pressure"] = "CRITICAL"
+
+    # CPU pressure
+    if cpu:
+        u = cpu.get("usage_percent", 0)
+        if u < 40:
+            signals["cpu_pressure"] = "NORMAL"
+        elif u < 70:
+            signals["cpu_pressure"] = "BUSY"
+        else:
+            signals["cpu_pressure"] = "OVERLOADED"
+
+    # Offenders (NO SORTING / NO FILTERING)
+    if processes:
+        signals["top_ram_offender"] = max(processes, key=lambda p: p.get("ram_mb", 0))
+        signals["top_cpu_offender"] = max(
+            processes, key=lambda p: p.get("cpu_percent", 0)
+        )
+
+    return signals
+
+
+# -----------------------------
+# MESSAGE HANDLER
+# -----------------------------
+def handle_message(raw_msg):
+    # Work on a clean copy to avoid race conditions
+    msg = copy.deepcopy(raw_msg)
+
+    signals = compute_signals(msg)
+    msg["signals"] = signals
+
+    interpretations = interpret(msg)
+    recommendations = recommend(msg)
+
+    msg["_insights"] = interpretations
+    msg["_recommendations"] = recommendations
+
+    add_execution_log("Telemetry received from core", "system")
+
+    mem_level = signals.get("memory_pressure", "LOW")
+    cpu_level = signals.get("cpu_pressure", "NORMAL")
+    tray_level = mem_level if mem_level in ("HIGH", "CRITICAL") else cpu_level
+
+    tray.set_status(tray_level)
+
+    # Push ONE complete snapshot to UI
+    update_state(msg)
+
+    if interpretations:
+        print("\n[Fluffy Insight]")
+        for line in interpretations:
+            print(f"• {line}")
+
+    if recommendations:
+        print("\n[Fluffy Suggestion]")
+        for rec in recommendations:
+            print(f"→ {rec}")
+
+
+# -----------------------------
 # MAIN LOOP
 # -----------------------------
 def main():
     global tray, ipc_socket
 
-    # Start Web API
     Thread(target=start_api, daemon=True).start()
 
-    # Signals
     signal.signal(signal.SIGINT, shutdown)
     signal.signal(signal.SIGTERM, shutdown)
 
-    # Tray
     tray = FluffyTray()
     tray.run()
 
-    # Connect to Rust IPC
     ipc_socket = connect_ipc()
     print("[Fluffy Brain] Connected to IPC", file=sys.stderr)
 
@@ -84,10 +161,9 @@ def main():
                 continue
 
             if not data:
-                add_execution_log("IPC disconnected. Waiting for core...", "error")
+                add_execution_log("IPC disconnected. Reconnecting...", "error")
                 ipc_socket.close()
                 ipc_socket = connect_ipc()
-                add_execution_log("Reconnected to IPC", "system")
                 continue
 
             buffer += data.decode()
@@ -100,46 +176,29 @@ def main():
 
                 try:
                     raw = json.loads(line)
-                    msg = raw.get("payload", raw)
 
-                    handle_message(msg)
-                    update_state(msg)
+                    # --- CONFIRMATION REQUEST FROM RUST ---
+                    if raw.get("type") == "confirm_required":
+                        add_execution_log(
+                            f"Confirmation required (id={raw['command_id']})",
+                            "action",
+                        )
+                        update_state(
+                            {
+                                "confirm_required": True,
+                                "command_id": raw["command_id"],
+                            }
+                        )
+                        continue
+
+                    payload = raw.get("payload", raw)
+                    handle_message(payload)
 
                 except json.JSONDecodeError as e:
                     print(f"[JSON ERROR] {e}", file=sys.stderr)
 
     finally:
         shutdown()
-
-
-# -----------------------------
-# MESSAGE HANDLER (UNCHANGED LOGIC)
-# -----------------------------
-def handle_message(msg):
-    interpretations = interpret(msg)
-    recommendations = recommend(msg)
-    add_execution_log("Telemetry received from core", "system")
-
-    # Expose to UI
-    msg["_insights"] = interpretations
-    msg["_recommendations"] = recommendations
-
-    signals = msg.get("signals", {})
-    mem_level = signals.get("memory_pressure", "LOW")
-    cpu_level = signals.get("cpu_pressure", "NORMAL")
-
-    tray_level = mem_level if mem_level in ("HIGH", "CRITICAL") else cpu_level
-    tray.set_status(tray_level)
-
-    if interpretations:
-        print("\n[Fluffy Insight]")
-        for line in interpretations:
-            print(f"• {line}")
-
-    if recommendations:
-        print("\n[Fluffy Suggestion]")
-        for rec in recommendations:
-            print(f"→ {rec}")
 
 
 if __name__ == "__main__":

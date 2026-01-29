@@ -111,7 +111,8 @@ fn main() {
         system.refresh_cpu_all();
         system.refresh_processes(ProcessesToUpdate::All, false);
 
-        let processes = collect_processes(&system, &mut cpu_cache);
+        let mut processes = collect_processes(&system, &mut cpu_cache);
+        processes.sort_by(|a, b| b.ram_mb.cmp(&a.ram_mb));
 
         let total_mb = kib_to_mb(system.total_memory());
         let free_mb = kib_to_mb(system.available_memory());

@@ -8,15 +8,13 @@ use once_cell::sync::Lazy;
 use uuid::Uuid;
 
 use crate::ipc::command::Command as IpcCommand;
-use crate::permissions::policy::evaluate;
 use crate::permissions::decision::PermissionDecision;
+use crate::permissions::policy::evaluate;
 
-static PENDING: Lazy<Mutex<HashMap<String, IpcCommand>>> =
-    Lazy::new(|| Mutex::new(HashMap::new()));
+static PENDING: Lazy<Mutex<HashMap<String, IpcCommand>>> = Lazy::new(|| Mutex::new(HashMap::new()));
 
 pub fn start_command_server(port: u16) {
-    let listener = TcpListener::bind(("127.0.0.1", port))
-        .expect("Failed to bind command port");
+    let listener = TcpListener::bind(("127.0.0.1", port)).expect("Failed to bind command port");
 
     std::thread::spawn(move || {
         for stream in listener.incoming() {
@@ -50,7 +48,15 @@ fn handle_command(cmd: IpcCommand) {
             PermissionDecision::RequireConfirmation { .. } => {
                 let id = Uuid::new_v4().to_string();
                 PENDING.lock().unwrap().insert(id.clone(), other);
-                println!("[CONFIRM REQUIRED] id={}", id);
+
+                // Send confirmation request as JSON over IPC stdout
+                println!(
+                    "{}",
+                    serde_json::json!({
+                        "type": "confirm_required",
+                        "command_id": id
+                    })
+                );
             }
 
             PermissionDecision::Deny { reason } => {
@@ -63,16 +69,33 @@ fn handle_command(cmd: IpcCommand) {
 fn execute(cmd: IpcCommand) {
     match cmd {
         IpcCommand::KillProcess { pid } => {
-            println!("[EXECUTE] Kill tree for PID {}", pid);
-
             #[cfg(target_os = "windows")]
             {
-                let _ = Command::new("taskkill")
+                let result = std::process::Command::new("taskkill")
                     .args(["/PID", &pid.to_string(), "/T", "/F"])
                     .output();
+
+                let status = match result {
+                    Ok(out) if out.status.success() => "success",
+                    Ok(out) => {
+                        eprintln!("{:?}", out.stderr);
+                        "failed"
+                    }
+                    Err(_) => "failed",
+                };
+
+                println!(
+                    "{}",
+                    serde_json::json!({
+                        "type": "execution_result",
+                        "command": "KillProcess",
+                        "pid": pid,
+                        "status": status
+                    })
+                );
             }
         }
-
         _ => {}
     }
 }
+

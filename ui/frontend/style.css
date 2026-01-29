@@ -5,8 +5,118 @@ body {
   padding: 20px;
 }
 
-pre {
+div {
   background: #181b21;
   padding: 10px;
   border-radius: 5px;
+}
+
+#processes div {
+  background: #20232a;
+  padding: 6px;
+  border-radius: 4px;
+}
+
+button {
+  background: #ff4d4d;
+  border: none;
+  color: white;
+  padding: 4px 8px;
+  border-radius: 3px;
+  cursor: pointer;
+}
+
+button:hover {
+  opacity: 0.85;
+}
+#logs {
+  max-height: 300px;
+  overflow-y: auto;
+  margin-top: 20px;
+}
+.process-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  background: #181b21;
+  padding: 4px 8px;
+  border-radius: 4px;
+  margin-bottom: 4px;
+}
+
+.process-row button {
+  margin-right: 6px;
+  cursor: pointer;
+}
+
+.depth-1 {
+  margin-left: 16px;
+}
+.depth-2 {
+  margin-left: 32px;
+}
+.depth-3 {
+  margin-left: 48px;
+}
+.depth-4 {
+  margin-left: 64px;
+}
+
+.log-error {
+  color: #ff5f5f;
+}
+.log-action {
+  color: #ffa500;
+}
+.log-system {
+  color: #888;
+}
+
+.log-entry {
+  background: #1e2127;
+  padding: 8px;
+  margin-bottom: 6px;
+  border-radius: 4px;
+  font-family: monospace;
+  font-size: 14px;
+}
+
+#controls {
+  margin-top: 20px;
+}
+#controls button {
+  margin-right: 10px;
+}
+#controls button:last-child {
+  margin-right: 0;
+}
+#status {
+  margin-top: 20px;
+  font-size: 16px;
+}
+#status span {
+  font-weight: bold;
+}
+#status .active {
+  color: #4caf50;
+}
+#status .inactive {
+  color: #f44336;
+}
+#processes {
+  margin-top: 20px;
+}
+#processes h2 {
+  margin-bottom: 10px;
+}
+.log-error {
+  color: #ff5f5f;
+}
+
+.log-action {
+  color: #ffa500;
+}
+
+.log-system {
+  color: #999;
 }
