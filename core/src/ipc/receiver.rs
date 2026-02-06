@@ -45,18 +45,22 @@ fn handle_command(cmd: IpcCommand) {
         other => match evaluate(&other) {
             PermissionDecision::Allow => execute(other),
 
-            PermissionDecision::RequireConfirmation { .. } => {
+            PermissionDecision::RequireConfirmation { reason } => {
                 let id = Uuid::new_v4().to_string();
-                PENDING.lock().unwrap().insert(id.clone(), other);
+                PENDING.lock().unwrap().insert(id.clone(), other.clone());
 
-                // Send confirmation request as JSON over IPC stdout
-                println!(
-                    "{}",
-                    serde_json::json!({
-                        "type": "confirm_required",
-                        "command_id": id
-                    })
-                );
+                // Broadcast confirmation request as JSON over IPC
+                let payload = serde_json::json!({
+                    "type": "confirm_required",
+                    "command_id": id,
+                    "command_name": format!("{:?}", other),
+                    "details": reason
+                });
+
+                crate::ipc::server::IpcServer::broadcast_global(&crate::ipc::protocol::IpcMessage {
+                    schema_version: "1.0".to_string(),
+                    payload,
+                });
             }
 
             PermissionDecision::Deny { reason } => {

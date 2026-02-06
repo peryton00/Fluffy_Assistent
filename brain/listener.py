@@ -126,12 +126,12 @@ def handle_message(raw_msg):
     if interpretations:
         print("\n[Fluffy Insight]")
         for line in interpretations:
-            print(f"• {line}")
+            print(f"* {line}")
 
     if recommendations:
         print("\n[Fluffy Suggestion]")
         for rec in recommendations:
-            print(f"→ {rec}")
+            print(f"-> {rec}")
 
 
 # -----------------------------
@@ -185,17 +185,26 @@ def main():
 
                         # --- CONFIRMATION REQUEST FROM RUST ---
                         if raw.get("type") == "confirm_required":
+                            cmd_id = raw.get("command_id")
+                            cmd_name = raw.get("command_name", "Unknown Command")
+                            details = raw.get("details", "")
+                            
+                            from state import add_confirmation
+                            add_confirmation(cmd_id, cmd_name, details)
+                            
                             add_execution_log(
-                                f"Confirmation required (id={raw['command_id']})",
+                                f"Confirmation required for {cmd_name} (id={cmd_id})",
                                 "action",
                             )
-                            update_state(
-                                {
-                                    "confirm_required": True,
-                                    "command_id": raw["command_id"],
-                                }
-                            )
                             continue
+
+                        # --- EXECUTION RESULT FROM RUST ---
+                        if raw.get("type") == "execution_result":
+                             add_execution_log(
+                                f"Command {raw.get('command')} {raw.get('status')}",
+                                "info"
+                            )
+                             continue
 
                         payload = raw.get("payload", raw)
                         handle_message(payload)
@@ -203,6 +212,7 @@ def main():
                     except json.JSONDecodeError as e:
                         print(f"[JSON ERROR] {e}", file=sys.stderr)
             except Exception as e:
+                print(f"[ERROR] Error in main loop: {e}", file=sys.stderr)
                 add_execution_log(f"Error in main loop: {e}", "error")
                 break
     finally:

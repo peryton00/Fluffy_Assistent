@@ -17,7 +17,7 @@ use std::{
 };
 use sysinfo::{ProcessesToUpdate, System};
 
-type CpuCache = HashMap<u32, f32>;
+type CpuHistory = HashMap<u32, f32>;
 
 #[derive(Serialize, Clone)]
 struct ProcessInfo {
@@ -70,14 +70,18 @@ fn unix_timestamp() -> u64 {
         .as_secs()
 }
 
-fn collect_processes(system: &System, cpu_cache: &mut CpuCache) -> Vec<ProcessInfo> {
+fn collect_processes(system: &System, cpu_history: &mut CpuHistory) -> Vec<ProcessInfo> {
     system
         .processes()
         .iter()
         .map(|(pid, p)| {
             let pid_u32 = pid.as_u32();
             let cpu = p.cpu_usage();
-            let smoothed = cpu_cache.insert(pid_u32, cpu).unwrap_or(cpu);
+            
+            // Explicit smoothing: 70% new, 30% old
+            let old_cpu = cpu_history.get(&pid_u32).cloned().unwrap_or(cpu);
+            let smoothed = (cpu * 0.7) + (old_cpu * 0.3);
+            cpu_history.insert(pid_u32, smoothed);
 
             ProcessInfo {
                 pid: pid_u32,
@@ -104,14 +108,14 @@ fn main() {
     .expect("Failed to set Ctrl+C handler");
 
     let mut system = System::new_all();
-    let mut cpu_cache = HashMap::new();
+    let mut cpu_history = CpuHistory::new();
 
     while running.load(Ordering::SeqCst) {
         system.refresh_memory();
         system.refresh_cpu_all();
         system.refresh_processes(ProcessesToUpdate::All, false);
 
-        let mut processes = collect_processes(&system, &mut cpu_cache);
+        let mut processes = collect_processes(&system, &mut cpu_history);
         processes.sort_by(|a, b| b.ram_mb.cmp(&a.ram_mb));
 
         let total_mb = kib_to_mb(system.total_memory());

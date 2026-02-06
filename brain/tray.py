@@ -20,7 +20,7 @@ class FluffyTray:
             menu=Menu(
                 MenuItem("Status: Running", self.noop, enabled=False),
                 Menu.SEPARATOR,
-                MenuItem("Open Dashboard (soon)", self.noop),
+                MenuItem("Open Dashboard", self.open_dashboard),
                 MenuItem("Quit Fluffy", self.quit),
             ),
         )
@@ -45,6 +45,10 @@ class FluffyTray:
 
     def noop(self):
         pass
+
+    def open_dashboard(self, icon=None, item=None):
+        import webbrowser
+        webbrowser.open("http://127.0.0.1:5123/")
 
     def quit(self, icon=None, item=None):
         self.icon.stop()
