@@ -5,6 +5,7 @@ pub enum Command {
     KillProcess { pid: u32 },
     RequestCleanup,
     OpenPath { path: String },
+    NormalizeSystem,
 
     // Confirmation flow
     Confirm { command_id: String },

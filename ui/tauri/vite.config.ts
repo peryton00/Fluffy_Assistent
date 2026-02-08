@@ -30,6 +30,10 @@ export default defineConfig(async () => ({
       '/status': 'http://127.0.0.1:5123',
       '/logs': 'http://127.0.0.1:5123',
       '/command': 'http://127.0.0.1:5123',
+      '/normalize': 'http://127.0.0.1:5123',
+      '/ui_connected': 'http://127.0.0.1:5123',
+      '/ui_disconnected': 'http://127.0.0.1:5123',
+      '/security_action': 'http://127.0.0.1:5123',
     }
   },
 }));

@@ -32,5 +32,10 @@ pub fn evaluate(cmd: &Command) -> PermissionDecision {
 
         // Safe operation
         &Command::OpenPath { .. } => PermissionDecision::Allow,
+
+        // System actions - Direct allow for the dashboard experience
+        &Command::NormalizeSystem => {
+            PermissionDecision::Allow
+        }
     }
 }

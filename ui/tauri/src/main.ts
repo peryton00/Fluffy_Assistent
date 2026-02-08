@@ -17,23 +17,57 @@ const statHistory = {
 /* =========================
    UTILITIES
 ========================= */
-async function apiRequest(url: string, options: any = {}) {
+async function apiRequest(url: string, options: any = {}, retries = 3): Promise<any> {
   const headers = {
     "Content-Type": "application/json",
     "X-Fluffy-Token": FLUFFY_TOKEN,
     ...(options.headers || {})
   };
-  try {
-    const res = await fetch(url, { ...options, headers });
-    if (!res.ok) {
-      const err = await res.json();
-      throw new Error(err.error || "Request failed");
+
+  for (let i = 0; i < retries; i++) {
+    const start = performance.now();
+    try {
+      const res = await fetch(url, { ...options, headers });
+      const latency = performance.now() - start;
+      updatePing(latency);
+
+      const contentType = res.headers.get("content-type");
+      const isJson = contentType && contentType.includes("application/json");
+
+      if (!res.ok) {
+        let message = "Request failed";
+        if (isJson) {
+          const err = await res.json();
+          message = err.error || message;
+        } else {
+          message = `Server error: ${res.status} ${res.statusText}`;
+        }
+
+        // If 403, we might be desynced on UI_ACTIVE
+        if (res.status === 403 && url !== "/ui_connected") {
+          console.warn("UI Disconnected from backend. Re-syncing...");
+          await apiRequest("/ui_connected", { method: "POST" });
+        }
+
+        throw new Error(message);
+      }
+
+      if (isJson) return await res.json();
+      return null;
+    } catch (err: any) {
+      const isConnError = err.message.includes("Failed to fetch") || err.message.includes("ECONNREFUSED");
+      if (isConnError && i < retries - 1) {
+        console.warn(`Connection refused for ${url}, retrying in 1s... (${i + 1}/${retries})`);
+        await new Promise(r => setTimeout(r, 1000));
+        continue;
+      }
+
+      console.error(`API Error (${url}):`, err);
+      if (url !== "/status" && url !== "/logs") { // Don't spam logs for background polls
+        addLog(err.message, "error");
+      }
+      return null;
     }
-    return await res.json();
-  } catch (err: any) {
-    console.error(`API Error (${url}):`, err);
-    addLog(err.message, "error");
-    return null;
   }
 }
 
@@ -45,6 +79,20 @@ function addLog(message: string, level: string = "info") {
   li.className = `log-${level}`;
   ul.prepend(li);
   while (ul.children.length > 50 && ul.lastChild) ul.removeChild(ul.lastChild);
+}
+
+function updatePing(ms: number) {
+  const dot = document.getElementById("ping-dot");
+  const value = document.getElementById("ping-value");
+  if (!value || !dot) return;
+
+  const latency = Math.round(ms);
+  value.innerText = `${latency} ms`;
+
+  // Update status color based on latency
+  dot.className = "ping-dot";
+  if (latency > 500) dot.classList.add("error");
+  else if (latency > 150) dot.classList.add("warning");
 }
 
 /* =========================
@@ -82,13 +130,26 @@ function setupNavigation() {
     }
   });
 
-  const searchInput = document.getElementById("search-input") as HTMLInputElement;
+  const searchInput = document.getElementById("process-search-input") as HTMLInputElement;
+  const clearBtn = document.getElementById("clear-search");
+
+  const clearSearch = () => {
+    searchQuery = "";
+    if (searchInput) searchInput.value = "";
+    if (lastData) renderUI(lastData);
+  };
+
   if (searchInput) {
     searchInput.oninput = (e) => {
       searchQuery = (e.target as HTMLInputElement).value.toLowerCase();
       if (lastData) renderUI(lastData);
     };
   }
+
+  if (clearBtn) {
+    clearBtn.onclick = clearSearch;
+  }
+
 
   const refreshBtn = document.getElementById("refresh-tree");
   if (refreshBtn) {
@@ -97,6 +158,7 @@ function setupNavigation() {
       refreshBtn.innerText = "Refreshing...";
       (refreshBtn as HTMLButtonElement).disabled = true;
 
+      clearSearch(); // Reset search when refreshing the tree
       await fetchData();
 
       refreshBtn.innerText = originalText;
@@ -111,6 +173,117 @@ function setupNavigation() {
       document.body.classList.toggle("light-mode", !themeToggle.checked);
     };
   }
+
+  setupModal();
+
+  const normalizeBtn = document.getElementById("btn-normalize");
+  if (normalizeBtn) {
+    normalizeBtn.onclick = () => normalizeSystem();
+  }
+
+  // Setup Result Modal
+  const resultModal = document.getElementById("result-modal");
+  const closeResultBtn = document.getElementById("close-result-modal");
+  const okResultBtn = document.getElementById("result-ok");
+  if (resultModal && closeResultBtn && okResultBtn) {
+    const hide = () => resultModal.classList.remove("active");
+    closeResultBtn.onclick = hide;
+    okResultBtn.onclick = hide;
+  }
+}
+
+async function normalizeSystem() {
+  const btn = document.getElementById("btn-normalize") as HTMLButtonElement;
+  if (!btn) return;
+
+  const originalText = btn.innerText;
+  btn.innerText = "Normalizing...";
+  btn.disabled = true;
+
+  addLog("Normalization pulse starting...", "action");
+  const data = await apiRequest("/normalize", { method: "POST" });
+
+  if (data && data.ok) {
+    let detailsHtml = `
+      <ul>
+        <li>Volume reset to 50%</li>
+        <li>Brightness optimized to 70%</li>
+        <li>Temp directories purged</li>
+      </ul>
+    `;
+
+    if (data.unusual_processes && data.unusual_processes.length > 0) {
+      const processList = data.unusual_processes.map((p: any) => `<li>${p.name} (PID: ${p.pid})</li>`).join("");
+      detailsHtml += `
+        <div style="margin-top:15px; border-top:1px solid rgba(255,255,255,0.1); padding-top:10px;">
+          <p style="color:#f59e0b; margin-bottom:5px;">⚠️ <strong>${data.unusual_processes.length} Unusual Process(es) Detected:</strong></p>
+          <ul style="color:#e2e8f0; font-size:0.9em;">${processList}</ul>
+        </div>
+      `;
+    } else {
+      detailsHtml += `<p style="margin-top:10px; color:#10b981; font-size:0.9em;">✅ No unusual processes detected.</p>`;
+    }
+
+    showResultModal(
+      "Normalization Success",
+      "System has been successfully optimized.",
+      "✅",
+      detailsHtml
+    );
+  } else {
+    showResultModal(
+      "Normalization Failed",
+      data?.error || "An unknown error occurred during normalization.",
+      "❌",
+      ""
+    );
+  }
+
+  btn.innerText = originalText;
+  btn.disabled = false;
+  await fetchData();
+}
+
+function showResultModal(title: string, message: string, icon: string, detailsHtml: string) {
+  const modal = document.getElementById("result-modal");
+  const titleEl = document.getElementById("result-title");
+  const messageEl = document.getElementById("result-message");
+  const iconEl = document.getElementById("result-icon");
+  const detailsEl = document.getElementById("result-details");
+
+  if (!modal || !titleEl || !messageEl || !iconEl || !detailsEl) return;
+
+  titleEl.innerText = title;
+  messageEl.innerText = message;
+  iconEl.innerText = icon;
+  detailsEl.innerHTML = detailsHtml;
+
+  modal.classList.add("active");
+}
+
+function setupModal() {
+  const modal = document.getElementById("security-modal");
+  const detailsBtn = document.querySelector(".upgrade-btn") as HTMLButtonElement;
+  const closeBtn = document.getElementById("close-modal");
+  const okBtn = document.getElementById("modal-ok");
+
+  if (!modal || !detailsBtn || !closeBtn || !okBtn) return;
+
+  const show = () => modal.classList.add("active");
+  const hide = () => modal.classList.remove("active");
+
+  detailsBtn.onclick = (e) => {
+    e.preventDefault();
+    show();
+  };
+
+  closeBtn.onclick = hide;
+  okBtn.onclick = hide;
+
+  // Close on outside click
+  modal.onclick = (e) => {
+    if (e.target === modal) hide();
+  };
 }
 
 function switchView(viewId: string) {
@@ -210,17 +383,27 @@ function updateChart(cpu: number, ramUsagePercent: number) {
 /* =========================
    TREE RENDERING
 ========================= */
-function buildTree(processes: any[]) {
+function buildTree(processes: any[]): any[] {
   const map: any = {};
   const roots: any[] = [];
+
   processes.forEach(p => map[p.pid] = { ...p, children: [] });
   processes.forEach(p => {
-    if (p.parent_pid && map[p.parent_pid]) {
+    // Check if parent_pid is explicitly not null/undefined (handle PID 0)
+    if (p.parent_pid !== null && p.parent_pid !== undefined && map[p.parent_pid]) {
       map[p.parent_pid].children.push(map[p.pid]);
     } else {
       roots.push(map[p.pid]);
     }
   });
+
+  // Sort children by RAM by default to keep tree organized
+  Object.values(map).forEach((node: any) => {
+    if (node.children.length > 0) {
+      node.children.sort((a: any, b: any) => b.ram_mb - a.ram_mb);
+    }
+  });
+
   return roots;
 }
 
@@ -250,20 +433,20 @@ function renderNode(node: any, container: HTMLElement) {
   const nodeEl = document.createElement("div");
   nodeEl.className = "tree-node";
 
-  const hasChildren = node.children.length > 0;
+  const hasChildren = node.children && node.children.length > 0;
 
   // Auto-expand if searching and branch matches
   const shouldExpand = (searchQuery && subTreeMatches && hasChildren) || expandedPids.has(node.pid);
 
   const ramDisplay = hasChildren
-    ? `<span class="tree-ram-total" title="Total Tree Memory">${node.total_ram_mb} MB total</span>`
+    ? `<span class="tree-ram">${node.ram_mb} MB</span> <span class="tree-ram-total" title="Total Tree Memory">(Σ ${node.total_ram_mb} MB)</span>`
     : `<span class="tree-ram">${node.ram_mb} MB</span>`;
 
   const row = document.createElement("div");
   row.className = `tree-row ${matches && searchQuery ? 'search-match' : ''}`;
   row.innerHTML = `
     <div class="tree-left">
-      <div class="tree-toggle ${shouldExpand ? "expanded" : ""}">${hasChildren ? "▶" : ""}</div>
+      <div class="tree-toggle ${shouldExpand ? "expanded" : ""}">${hasChildren ? (shouldExpand ? "−" : "+") : "•"}</div>
       <span class="tree-label">${node.name}</span>
       <span class="tree-pid">${node.pid}</span>
     </div>
@@ -348,6 +531,12 @@ function renderDashboard(data: any) {
   // Active Sessions (Placeholder/Sync)
   const sessionCountEl = document.getElementById("session-count");
   if (sessionCountEl) sessionCountEl.innerText = (data.active_sessions || 1).toString();
+
+  const healthEl = document.getElementById("health-status");
+  if (healthEl && sys.health) {
+    healthEl.innerText = sys.health.charAt(0).toUpperCase() + sys.health.slice(1).toLowerCase();
+    healthEl.className = sys.health.toLowerCase(); // Optional: color text too
+  }
 
   updateChart(cpu, ramPercent);
 
@@ -459,11 +648,7 @@ function renderUI(data: any) {
   // Status Dot (Tray Color Sync)
   const statusDot = document.getElementById("system-status-dot");
   if (statusDot && data.system && data.system.health) {
-    statusDot.className = "status-dot"; // Reset classes
-    const health = data.system.health.toLowerCase();
-    if (health.includes("healthy")) statusDot.classList.add("healthy");
-    else if (health.includes("warning")) statusDot.classList.add("warning");
-    else if (health.includes("critical") || health.includes("error")) statusDot.classList.add("critical");
+    statusDot.className = "status-dot " + data.system.health.toLowerCase();
   }
 
   // Confirmations (global layer)
@@ -522,18 +707,45 @@ async function fetchLogs() {
 }
 
 setupNavigation();
-setInterval(fetchData, 2000);
-setInterval(fetchLogs, 5000);
+let dataInterval: any = null;
+let logsInterval: any = null;
+
+function startPolling() {
+  if (dataInterval) clearInterval(dataInterval);
+  if (logsInterval) clearInterval(logsInterval);
+
+  dataInterval = setInterval(fetchData, 2000);
+  logsInterval = setInterval(fetchLogs, 5000);
+
+  fetchData();
+  fetchLogs();
+}
+
+function stopPolling() {
+  if (dataInterval) clearInterval(dataInterval);
+  if (logsInterval) clearInterval(logsInterval);
+  dataInterval = null;
+  logsInterval = null;
+}
 
 // Listen for visibility changes from Rust
-listen('ui-active', (event) => {
+listen('ui-active', async (event) => {
   console.log('UI Active State Changed:', event.payload);
   uiActive = event.payload as boolean;
   if (uiActive) {
-    fetchData();
-    fetchLogs();
+    const connected = await apiRequest("/ui_connected", { method: "POST" });
+    if (connected) startPolling();
+  } else {
+    stopPolling();
+    await apiRequest("/ui_disconnected", { method: "POST" });
   }
 });
 
-fetchData();
-fetchLogs();
+// Initial connection attempt with higher retry for boot up
+console.log("Initializing Fluffy Dashboard connection...");
+apiRequest("/ui_connected", { method: "POST" }, 10).then((res) => {
+  if (res) {
+    console.log("Dashboard connected to brain.");
+    startPolling();
+  }
+});

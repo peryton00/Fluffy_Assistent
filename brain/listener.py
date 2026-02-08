@@ -96,6 +96,22 @@ def compute_signals(msg):
     return signals
 
 
+def compute_health(signals, security_alerts):
+    # Determine overall system health based on resource pressure and security threats
+    if security_alerts:
+        return "CRITICAL" # Security threats are always critical
+    
+    cpu = signals.get("cpu_pressure", "NORMAL")
+    ram = signals.get("memory_pressure", "LOW")
+
+    if cpu == "OVERLOADED" or ram == "CRITICAL":
+        return "CRITICAL"
+    if cpu == "BUSY" or ram == "HIGH":
+        return "WARNING"
+    
+    return "HEALTHY"
+
+
 # -----------------------------
 # MESSAGE HANDLER
 # -----------------------------
@@ -122,6 +138,9 @@ def handle_message(raw_msg, monitor):
 
     msg["_insights"] = interpretations
     msg["_recommendations"] = recommendations
+    
+    # Authoritative health status
+    msg["system"]["health"] = compute_health(signals, security_alerts)
 
     add_execution_log("Telemetry received from core", "system")
 

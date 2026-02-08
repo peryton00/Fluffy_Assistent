@@ -46,12 +46,15 @@
         <div class="header-left">
           <h1 id="view-title">Dashboard</h1>
         </div>
-        <div class="header-right">
-          <div class="search-bar">
-            <span>🔍</span>
-            <input type="text" id="search-input" placeholder="Search...">
+        <div class="top-nav">
+          <div class="ping-container" title="Latency to Python Brain">
+            <span class="ping-dot" id="ping-dot"></span>
+            <span class="ping-label">Latency:</span>
+            <span id="ping-value">-- ms</span>
           </div>
-          <div id="system-status-dot" class="status-dot"></div>
+          <div class="user-profile">
+            <div id="system-status-dot" class="status-dot"></div>
+          </div>
         </div>
       </header>
 
@@ -94,6 +97,9 @@
             </div>
             <p class="card-label">Health Score</p>
             <h2 id="health-status">Healthy</h2>
+            <div class="card-actions">
+              <button class="btn-primary btn-sm" id="btn-normalize">Normalize</button>
+            </div>
             <p class="card-comparison">Optimized</p>
           </div>
 
@@ -114,6 +120,8 @@
             <h2 id="session-count">--</h2>
             <p class="card-comparison">Live interactions</p>
           </div>
+
+
 
           <!-- Chart & Top Offenders -->
           <div class="card chart-card">
@@ -156,7 +164,14 @@
         <div class="card full-width">
           <div class="card-header">
             <h3>Process Hierarchy</h3>
-            <button class="btn-outline" id="refresh-tree">Refresh Tree</button>
+            <div class="header-actions">
+              <div class="inline-search">
+                <span>🔍</span>
+                <input type="text" id="process-search-input" placeholder="Search by name or PID...">
+                <button id="clear-search" class="clear-search-btn" title="Clear Search">&times;</button>
+              </div>
+              <button class="btn-outline" id="refresh-tree">Refresh Tree</button>
+            </div>
           </div>
           <div id="processes-tree" class="process-tree-container">
             <!-- Hierarchical tree populated via JS -->
@@ -210,6 +225,74 @@
   </div>
 
   <div id="toast-container" class="toast-container"></div>
+
+  <!-- Security Details Modal -->
+  <div id="security-modal" class="modal-overlay">
+    <div class="modal-card">
+      <div class="modal-header">
+        <h3>System Protection Details</h3>
+        <button id="close-modal" class="close-btn">&times;</button>
+      </div>
+      <div class="modal-body">
+        <div class="protection-status-header">
+          <div class="pulse-ring healthy"></div>
+          <span>Active Behavioral Monitoring</span>
+        </div>
+        <div class="details-grid">
+          <div class="detail-item">
+            <span class="detail-icon">📁</span>
+            <div class="detail-text">
+              <strong>Path Integrity</strong>
+              <p>Detects processes executing from temporary or suspicious locations.</p>
+            </div>
+          </div>
+          <div class="detail-item">
+            <span class="detail-icon">⚡</span>
+            <div class="detail-text">
+              <strong>Resource Anomaly</strong>
+              <p>Flags sudden CPU, RAM, or Disk spikes that don't match user activity.</p>
+            </div>
+          </div>
+          <div class="detail-item">
+            <span class="detail-icon">🌿</span>
+            <div class="detail-text">
+              <strong>Child Spawning</strong>
+              <p>Monitors for rapid creation of sub-processes, a common malware indicator.</p>
+            </div>
+          </div>
+          <div class="detail-item">
+            <span class="detail-icon">🔑</span>
+            <div class="detail-text">
+              <strong>Persistence Guard</strong>
+              <p>Watches Registry and Startup entries for unauthorized auto-run attempts.</p>
+            </div>
+          </div>
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button class="btn-primary" id="modal-ok">Got it</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Result Modal -->
+  <div id="result-modal" class="modal-overlay">
+    <div class="modal-card result-card">
+      <div class="modal-header">
+        <h3 id="result-title">Normalization Success</h3>
+        <button id="close-result-modal" class="close-btn">&times;</button>
+      </div>
+      <div class="modal-body text-center">
+        <div id="result-icon" class="status-icon large">✅</div>
+        <p id="result-message" class="result-text">System has been successfully optimized.</p>
+        <div id="result-details" class="result-details-box"></div>
+      </div>
+      <div class="modal-footer">
+        <button class="btn-primary" id="result-ok">Close</button>
+      </div>
+    </div>
+  </div>
+
   <script type="module" src="/src/main.ts"></script>
 </body>
 

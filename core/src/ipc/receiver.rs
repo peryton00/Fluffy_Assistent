@@ -15,14 +15,17 @@ static PENDING: Lazy<Mutex<HashMap<String, IpcCommand>>> = Lazy::new(|| Mutex::n
 
 pub fn start_command_server(port: u16) {
     let listener = TcpListener::bind(("127.0.0.1", port)).expect("Failed to bind command port");
+    println!("[Fluffy Core] Command server listening on port {}", port);
 
     std::thread::spawn(move || {
         for stream in listener.incoming() {
             if let Ok(stream) = stream {
                 let reader = BufReader::new(stream);
                 for line in reader.lines().flatten() {
-                    if let Ok(cmd) = serde_json::from_str::<IpcCommand>(&line) {
-                        handle_command(cmd);
+                    println!("[Fluffy Core] Received command line: {}", line);
+                    match serde_json::from_str::<IpcCommand>(&line) {
+                        Ok(cmd) => handle_command(cmd),
+                        Err(e) => eprintln!("[Fluffy Core] Failed to parse command: {}", e),
                     }
                 }
             }
@@ -99,6 +102,63 @@ fn execute(cmd: IpcCommand) {
                 });
             }
         }
+        IpcCommand::NormalizeSystem => {
+            #[cfg(target_os = "windows")]
+            {
+                let mut status = "success";
+                let mut details = "Volume reset (50%), Brightness optimized (70%), Temp files purged".to_string();
+
+                // 1. Volume (50%) - Simpler Wscript.Shell method
+                let vol_script = "$obj = new-object -com wscript.shell; for($i=0;$i-lt 50;$i++){$obj.SendKeys([char]174)}; for($i=0;$i-lt 25;$i++){$obj.SendKeys([char]175)}";
+                
+                let vol_res = std::process::Command::new("powershell")
+                    .args(["-Command", vol_script])
+                    .output();
+
+                if let Err(e) = vol_res {
+                    eprintln!("[Fluffy Core] Volume reset error: {}", e);
+                    status = "partial_failure";
+                    details = format!("Volume error: {}", e);
+                }
+
+                // 2. Brightness (70%) - WMI Method (Robust Pipeline)
+                // Use Invoke-CimMethod to handle arrays (multiple monitors) and single instances correctly
+                let bright_script = "
+                    $target = 70;
+                    $m = Get-CimInstance -Namespace root/WMI -ClassName WmiMonitorBrightnessMethods -ErrorAction SilentlyContinue;
+                    if($m){ 
+                        $m | Invoke-CimMethod -MethodName WmiSetBrightness -Arguments @{ Timeout = 0; Brightness = $target } 
+                    } else {
+                        $w = Get-WmiObject -Namespace root/WMI -Class WmiMonitorBrightnessMethods -ErrorAction SilentlyContinue;
+                        if($w){ $w.WmiSetBrightness(1, $target) }
+                    }
+                ";
+                let _ = std::process::Command::new("powershell")
+                    .args(["-Command", bright_script])
+                    .output();
+
+                // 3. Temp Cleanup
+                let temp_res = std::process::Command::new("powershell")
+                    .args(["-Command", "Remove-Item -Path $env:TEMP\\* -Recurse -Force -ErrorAction SilentlyContinue; Remove-Item -Path C:\\Windows\\Temp\\* -Recurse -Force -ErrorAction SilentlyContinue"])
+                    .output();
+                if let Err(e) = temp_res {
+                    eprintln!("[Fluffy Core] Temp cleanup error: {}", e);
+                    status = "partial_failure";
+                    details.push_str(&format!("; Temp error: {}", e));
+                }
+
+                crate::ipc::server::IpcServer::broadcast_global(&crate::ipc::protocol::IpcMessage {
+                    schema_version: "1.0".to_string(),
+                    payload: serde_json::json!({
+                        "type": "execution_result",
+                        "command": "NormalizeSystem",
+                        "status": status,
+                        "details": details
+                    }),
+                });
+            }
+        }
+
         _ => {}
     }
 }

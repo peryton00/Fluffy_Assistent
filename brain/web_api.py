@@ -2,6 +2,8 @@ from flask import Flask, jsonify, send_from_directory, request
 import state
 from commands import send_command
 import os
+import socket
+import json
 
 app = Flask(__name__)
 
@@ -106,6 +108,36 @@ def security_action():
             state.add_execution_log(f"Process {pid} marked as trusted", "info")
             
     return jsonify({"ok": True})
+
+
+
+
+
+@app.route("/normalize", methods=["POST"])
+def normalize_system():
+    # 1. Trigger Rust Normalization via IPC
+    try:
+        s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+        s.connect(("127.0.0.1", 9002))
+        s.sendall((json.dumps("NormalizeSystem") + "\n").encode())
+        s.close()
+    except Exception as e:
+        state.add_execution_log(f"Normalization failed: {e}", "error")
+        return jsonify({"error": f"Failed to reach core: {e}"}), 500
+
+    # 2. Check for unusual processes
+    unusual = []
+    if state.MONITOR:
+        unusual = state.MONITOR.get_unusual_processes()
+
+    state.add_execution_log("System normalization initiated", "action")
+    
+    return jsonify({
+        "ok": True,
+        "cleanup": "Temp files cleanup triggered",
+        "settings": "Volume (50%), Brightness (70%) reset",
+        "unusual_processes": unusual
+    })
 
 
 @app.route("/ui_connected", methods=["GET", "POST"])

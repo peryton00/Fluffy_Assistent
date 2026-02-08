@@ -8,11 +8,20 @@ class SecurityMonitor:
         self.trusted_pids = set()
         self.ignored_pids = set()
         self.alert_threshold = 25
+        self.active_pids = set()
 
     def analyze(self, telemetry, ui_active):
-        processes = telemetry.get("processes", {}).get("top_ram", [])
-        persistence_entries = telemetry.get("persistence", [])
+        """
+        Main entry point for behavior analysis.
+        """
+        system = telemetry.get("system", {})
+        processes = system.get("processes", {}).get("top_ram", [])
+        
+        # Track active PIDs for this cycle
+        self.active_pids = {p["pid"] for p in processes}
+        
         timestamp = telemetry.get("timestamp", time.time())
+        persistence_entries = telemetry.get("persistence", [])
         current_pids = set()
         alerts = []
 
@@ -54,10 +63,25 @@ class SecurityMonitor:
 
         return alerts
 
+    def get_unusual_processes(self):
+        """Returns a list of processes with any threat score gain that are still running."""
+        unusual = []
+        for pid, score in self.scores.items():
+            if score > 0 and pid in self.active_pids:
+                hist = self.process_history.get(pid, {})
+                unusual.append({
+                    "pid": pid,
+                    "name": hist.get("name", f"PID {pid}"),
+                    "score": round(score, 1),
+                    "reasons": list(hist.get("detected_signals", []))
+                })
+        return unusual
+
     def _update_process_score(self, p, timestamp, ui_active, child_count, persistence_entries):
         pid = p["pid"]
         if pid not in self.process_history:
             self.process_history[pid] = {
+                "name": p["name"], # Store name for lookup
                 "first_seen": timestamp,
                 "last_cpu": p["cpu_percent"],
                 "last_ram": p["ram_mb"],

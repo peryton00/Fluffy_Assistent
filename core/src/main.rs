@@ -15,7 +15,7 @@ use std::{
     thread,
     time::{Duration, SystemTime, UNIX_EPOCH},
 };
-use sysinfo::{ProcessesToUpdate, System};
+use sysinfo::{Networks, ProcessesToUpdate, System};
 
 type CpuHistory = HashMap<u32, f32>;
 
@@ -84,13 +84,13 @@ fn unix_timestamp() -> u64 {
 #[cfg(target_os = "windows")]
 fn get_startup_entries() -> Vec<String> {
     use windows_sys::Win32::System::Registry::{
-        RegCloseKey, RegEnumValueW, RegOpenKeyExW, HKEY_CURRENT_USER, KEY_READ, LSTATUS,
+        RegCloseKey, RegEnumValueW, RegOpenKeyExW, HKEY_CURRENT_USER, KEY_READ,
     };
     use std::ptr;
 
     let mut entries = Vec::new();
     let subkey = encode_wide("Software\\Microsoft\\Windows\\CurrentVersion\\Run");
-    let mut hkey = 0;
+    let mut hkey: windows_sys::Win32::System::Registry::HKEY = 0;
 
     unsafe {
         if RegOpenKeyExW(HKEY_CURRENT_USER, subkey.as_ptr(), 0, KEY_READ, &mut hkey) == 0 {
@@ -101,7 +101,7 @@ fn get_startup_entries() -> Vec<String> {
                 let mut data = [0u8; 1024];
                 let mut data_len = data.len() as u32;
 
-                let res: LSTATUS = RegEnumValueW(
+                let res = RegEnumValueW(
                     hkey,
                     index,
                     name.as_mut_ptr(),
@@ -116,7 +116,7 @@ fn get_startup_entries() -> Vec<String> {
                     break;
                 }
 
-                let path_str = String::from_utf16_lossy(&name[..name_len as usize]);
+                let _path_str = String::from_utf16_lossy(&name[..name_len as usize]);
                 let val_str = String::from_utf16_lossy(
                     &data.chunks_exact(2)
                         .map(|c| u16::from_ne_bytes([c[0], c[1]]))
@@ -184,13 +184,14 @@ fn main() {
     .expect("Failed to set Ctrl+C handler");
 
     let mut system = System::new_all();
+    let mut networks = Networks::new_with_refreshed_list();
     let mut cpu_history = CpuHistory::new();
 
     while running.load(Ordering::SeqCst) {
         system.refresh_memory();
         system.refresh_cpu_all();
-        system.refresh_processes_with_spec(ProcessesToUpdate::All, true);
-        system.refresh_networks_all();
+        system.refresh_processes(ProcessesToUpdate::All, true);
+        networks.refresh(true);
 
         let mut processes = collect_processes(&system, &mut cpu_history);
         processes.sort_by(|a, b| b.ram_mb.cmp(&a.ram_mb));
@@ -201,7 +202,7 @@ fn main() {
 
         let mut total_received = 0;
         let mut total_transmitted = 0;
-        for (_, data) in system.networks() {
+        for (_, data) in &networks {
             total_received += data.received();
             total_transmitted += data.transmitted();
         }
