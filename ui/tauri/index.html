@@ -53,6 +53,10 @@
             <span class="ping-label">Latency:</span>
             <span id="ping-value">-- ms</span>
           </div>
+          <div class="network-header-status" id="header-net-status" title="Network Connection Info">
+            <span class="net-icon" id="header-net-icon">📡</span>
+            <span id="header-net-speed" style="margin-left: 4px;">-- Mbps</span>
+          </div>
           <div class="user-profile">
             <div id="system-status-dot" class="status-dot"></div>
           </div>
@@ -102,6 +106,46 @@
               <button class="btn-primary btn-sm" id="btn-normalize">Normalize</button>
             </div>
             <p class="card-comparison">Optimized</p>
+          </div>
+
+          <div class="card stat-card network-card">
+            <div class="card-header">
+              <div class="card-icon" id="net-card-icon">🌐</div>
+            </div>
+            <p class="card-label">Network Usage</p>
+            <div class="speed-row">
+              <div class="speed-item">
+                <span class="speed-dir">RX:</span>
+                <span id="net-rx-value">--</span>
+              </div>
+              <div class="speed-item">
+                <span class="speed-dir">TX:</span>
+                <span id="net-tx-value">--</span>
+              </div>
+            </div>
+            <p class="card-comparison" id="net-status-label">Offline</p>
+          </div>
+
+          <!-- Speed Test Container -->
+          <div class="card speed-test-card" id="speed-test-container">
+            <div class="speed-test-header">
+              <div class="speed-test-title">
+                <span class="speed-test-icon">🚀</span>
+                <h3>Internet Speed Test</h3>
+              </div>
+            </div>
+            <div class="speed-test-body">
+              <div class="speed-display">
+                <div class="speed-circle">
+                  <span id="speed-result-value">0.0</span>
+                  <span class="speed-unit">Mbps</span>
+                </div>
+              </div>
+              <div class="speed-info-group">
+                <p id="speed-test-status">Ready to check connection speed</p>
+                <button class="btn-primary" id="btn-run-speedtest">Check Now</button>
+              </div>
+            </div>
           </div>
 
           <div class="card stat-card fluffy-card">
@@ -166,6 +210,14 @@
           <div class="card-header">
             <h3>Process Hierarchy</h3>
             <div class="header-actions">
+              <div class="sort-selector">
+                <label>Sort:</label>
+                <select id="process-sort-mode">
+                  <option value="ram">Most RAM</option>
+                  <option value="cpu">Highest CPU</option>
+                  <option value="name">Name (A-Z)</option>
+                </select>
+              </div>
               <div class="inline-search">
                 <span>🔍</span>
                 <input type="text" id="process-search-input" placeholder="Search by name or PID...">
@@ -188,6 +240,8 @@
         <div class="card analytics-card full-width">
           <div class="card-header">
             <h3>System Insights</h3>
+            <h4 style="margin-left: auto; font-size: 0.8rem; font-weight: normal; opacity: 0.7;">That's where fluffy
+              learn about your system</h4>
           </div>
           <ul id="insights" class="insights-list"></ul>
         </div>
@@ -212,6 +266,7 @@
                 <tr>
                   <th>Name</th>
                   <th>Command / Path</th>
+                  <th>Status</th>
                   <th>Action</th>
                 </tr>
               </thead>
@@ -291,34 +346,37 @@
               <strong>Persistence Guard</strong>
               <p>Watches Registry and Startup entries for unauthorized auto-run attempts.</p>
             </div>
-            <!-- Add Startup Modal -->
-            <div id="startup-modal" class="modal-overlay">
-              <div class="modal-card">
-                <div class="modal-header">
-                  <h3>Add Startup App</h3>
-                  <button id="close-startup-modal" class="close-btn">&times;</button>
-                </div>
-                <div class="modal-body">
-                  <div class="form-group">
-                    <label>Application Name</label>
-                    <input type="text" id="new-startup-name" placeholder="e.g., My App">
-                  </div>
-                  <div class="form-group">
-                    <label>Path or Command</label>
-                    <input type="text" id="new-startup-path" placeholder="C:\Path\To\App.exe">
-                  </div>
-                </div>
-                <div class="modal-footer">
-                  <button class="btn-primary" id="btn-confirm-add-startup">Add</button>
-                </div>
-              </div>
-            </div>
-
           </div>
         </div>
       </div>
       <div class="modal-footer">
         <button class="btn-primary" id="modal-ok">Got it</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Startup Modal -->
+  <div id="startup-modal" class="modal-overlay">
+    <div class="modal-card">
+      <div class="modal-header">
+        <h3>Add Startup App</h3>
+        <button id="close-startup-modal" class="close-btn">&times;</button>
+      </div>
+      <div class="modal-body">
+        <div class="form-group">
+          <label>Application Name</label>
+          <input type="text" id="new-startup-name" placeholder="e.g., My App">
+        </div>
+        <div class="form-group">
+          <label>Path or Command</label>
+          <div class="input-with-action">
+            <input type="text" id="new-startup-path" placeholder="C:\Path\To\App.exe">
+            <button id="btn-browse-app" class="btn-outline btn-sm shadow-hover">Browse</button>
+          </div>
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button class="btn-primary" id="btn-confirm-add-startup">Add to Startup</button>
       </div>
     </div>
   </div>

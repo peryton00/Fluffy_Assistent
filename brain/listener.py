@@ -4,6 +4,13 @@ from threading import Thread
 from interpreter import interpret
 from recommender import recommend
 from security_monitor import SecurityMonitor
+from guardian.baseline import BaselineEngine
+from guardian.anomaly import AnomalyDetector
+from guardian.scorer import RiskScorer
+from guardian.memory import GuardianMemory
+from guardian.intervention import InterventionEngine, InterventionLevel
+from guardian.audit import AuditEngine
+from guardian.verdict import generate_verdicts
 import state
 
 import socket
@@ -20,6 +27,16 @@ IPC_PORT = 9001
 
 shutting_down = False
 ipc_socket = None
+
+# Guardian Components
+GUARDIAN_MEMORY = GuardianMemory(persistence_path="fluffy_data/guardian/memory.json")
+GUARDIAN_BASELINE = BaselineEngine(persistence_path="fluffy_data/guardian/baselines.json")
+GUARDIAN_DETECTOR = AnomalyDetector()
+GUARDIAN_SCORER = RiskScorer(memory=GUARDIAN_MEMORY)
+GUARDIAN_INTERVENTION = InterventionEngine()
+GUARDIAN_AUDIT = AuditEngine(persistence_path="fluffy_data/guardian/audit.json")
+PROCESS_MSG_COUNTER = 0 # For periodic saving
+PROACTIVE_PROMPTS = set() # Track processes already prompted for confirmation
 
 
 # -----------------------------
@@ -47,6 +64,18 @@ def shutdown(signum=None, frame=None):
     shutting_down = True
 
     print("\n[Fluffy Brain] Shutting down...", file=sys.stderr)
+    
+    if GUARDIAN_BASELINE:
+        print("[Fluffy Brain] Saving Guardian baselines...", file=sys.stderr)
+        GUARDIAN_BASELINE.save()
+    
+    if GUARDIAN_MEMORY:
+        print("[Fluffy Brain] Saving Guardian memory...", file=sys.stderr)
+        GUARDIAN_MEMORY.save()
+
+    if GUARDIAN_AUDIT:
+        print("[Fluffy Brain] Saving Guardian audit trail...", file=sys.stderr)
+        GUARDIAN_AUDIT.save()
 
     if ipc_socket:
         try:
@@ -141,7 +170,62 @@ def handle_message(raw_msg, monitor):
     interpretations = interpret(msg)
     recommendations = recommend(msg)
 
-    msg["_insights"] = interpretations
+    # --- GUARDIAN INTELLIGENCE (Phase 10.1) ---
+    all_guardian_verdicts = []
+    processes = msg.get("system", {}).get("processes", {}).get("top_ram", [])
+    
+    for p in processes:
+        name = p["name"]
+        cpu = p["cpu_percent"]
+        ram = p["ram_mb"]
+        children_count = len(p.get("children", []))
+        
+        # 1. Update Baseline
+        GUARDIAN_BASELINE.update(name, cpu, ram, children_count)
+        
+        # 2. Detect Anomalies
+        baseline = GUARDIAN_BASELINE.get_baseline(name)
+        raw_anomalies = GUARDIAN_DETECTOR.analyze(p, baseline)
+        
+        # 3. Score and Filter (Phases 10.2 & 10.3)
+        score, escalated_anomalies = GUARDIAN_SCORER.score(name, raw_anomalies)
+        
+        # 4. Intervention Logic (Phase 10.4)
+        level = GUARDIAN_INTERVENTION.get_level(score)
+        recommendation = GUARDIAN_INTERVENTION.get_action_recommendation(name, escalated_anomalies, level)
+        
+        if level >= InterventionLevel.REQUEST_PERMISSION and name not in PROACTIVE_PROMPTS:
+            PROACTIVE_PROMPTS.add(name)
+            details_str = f"Guardian recommendation: {recommendation}\nProcess {name} (PID {p['pid']}) is exhibiting extremely high risk behavior."
+            state.add_confirmation(
+                cmd_id=f"kill_{p['pid']}_{int(time.time())}",
+                cmd_name="Kill Process",
+                details=details_str
+            )
+            GUARDIAN_AUDIT.log_event("Intervention", name, {"action": "Request Permission", "score": score, "reason": recommendation})
+            add_execution_log(f"Proactive intervention requested for {name}", "action")
+
+        # 5. Generate Verdicts
+        if escalated_anomalies and level >= InterventionLevel.WARN:
+            verdicts = generate_verdicts(name, score, escalated_anomalies, level, recommendation)
+            all_guardian_verdicts.extend(verdicts)
+            GUARDIAN_AUDIT.log_event("Alert", name, {"score": score, "level": level.name, "anomalies": escalated_anomalies})
+        
+        elif escalated_anomalies and level == InterventionLevel.INFORM:
+            # Silent log only
+            for a in escalated_anomalies:
+                add_execution_log(f"[Guardian/Info] {name}: {a['message']}", "system")
+                GUARDIAN_AUDIT.log_event("Observation", name, {"anomaly": a})
+
+    # Periodic baseline save (every 50 telemetry messages)
+    global PROCESS_MSG_COUNTER
+    PROCESS_MSG_COUNTER += 1
+    if PROCESS_MSG_COUNTER >= 50:
+        GUARDIAN_BASELINE.save()
+        PROCESS_MSG_COUNTER = 0
+
+    # Inject Guardian insights into the pipeline
+    msg["_insights"] = interpretations + all_guardian_verdicts
     msg["_recommendations"] = recommendations
     
     # Authoritative health status

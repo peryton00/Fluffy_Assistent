@@ -1,5 +1,8 @@
+mod etw;
 mod ipc;
 mod permissions;
+
+use etw::NetworkMonitor;
 
 use ipc::protocol::IpcMessage;
 use ipc::receiver::start_command_server;
@@ -30,6 +33,8 @@ struct ProcessInfo {
     cpu_percent: f32,
     disk_read_kb: u64,
     disk_written_kb: u64,
+    net_received: f32,
+    net_sent: f32,
 }
 
 #[derive(Serialize)]
@@ -53,6 +58,9 @@ struct CpuStats {
 struct NetworkStats {
     received_kb: u64,
     transmitted_kb: u64,
+    total_rx_kbps: f32,
+    total_tx_kbps: f32,
+    status: String, // "wifi", "ethernet", "offline"
 }
 
 #[derive(Serialize)]
@@ -69,6 +77,7 @@ struct FluffyMessage {
     timestamp: u64,
     system: SystemStats,
     persistence: Vec<StartupApp>,
+    active_sessions: u32,
 }
 
 #[derive(Serialize)]
@@ -91,65 +100,148 @@ fn unix_timestamp() -> u64 {
 
 #[cfg(target_os = "windows")]
 fn get_startup_entries() -> Vec<StartupApp> {
-    use windows_sys::Win32::System::Registry::{
-        RegCloseKey, RegEnumValueW, RegOpenKeyExW, HKEY_CURRENT_USER, KEY_READ,
-    };
     use std::ptr;
+    use windows_sys::Win32::System::Registry::{
+        HKEY_CURRENT_USER, HKEY_LOCAL_MACHINE, KEY_READ, RegCloseKey, RegEnumValueW, RegOpenKeyExW,
+    };
 
     let mut entries = Vec::new();
-    let subkey = encode_wide("Software\\Microsoft\\Windows\\CurrentVersion\\Run");
-    let mut hkey: windows_sys::Win32::System::Registry::HKEY = 0;
+    let run_path = "Software\\Microsoft\\Windows\\CurrentVersion\\Run";
+    let approved_path =
+        "Software\\Microsoft\\Windows\\CurrentVersion\\Explorer\\StartupApproved\\Run";
 
-    unsafe {
-        if RegOpenKeyExW(HKEY_CURRENT_USER, subkey.as_ptr(), 0, KEY_READ, &mut hkey) == 0 {
-            let mut index = 0;
-            loop {
-                // Large buffers for name and data
-                let mut name = [0u16; 16384];
-                let mut name_len = name.len() as u32;
-                let mut data = [0u8; 16384];
-                let mut data_len = data.len() as u32;
-                let mut type_code: u32 = 0;
+    // 1. Read from HKCU and HKLM
+    for &hive in &[HKEY_CURRENT_USER, HKEY_LOCAL_MACHINE] {
+        let hive_name = if hive == HKEY_CURRENT_USER {
+            "HKCU"
+        } else {
+            "HKLM"
+        };
 
-                let res = RegEnumValueW(
-                    hkey,
-                    index,
-                    name.as_mut_ptr(),
-                    &mut name_len,
-                    ptr::null_mut(),
-                    &mut type_code,
-                    data.as_mut_ptr(),
-                    &mut data_len,
-                );
+        // Collect "Disabled" states first
+        let mut disabled_map = std::collections::HashMap::new();
+        let approved_subkey = encode_wide(approved_path);
+        let mut h_approved: windows_sys::Win32::System::Registry::HKEY = 0;
+        unsafe {
+            if RegOpenKeyExW(hive, approved_subkey.as_ptr(), 0, KEY_READ, &mut h_approved) == 0 {
+                let mut index = 0;
+                loop {
+                    let mut name = [0u16; 1024];
+                    let mut name_len = name.len() as u32;
+                    let mut data = [0u8; 1024];
+                    let mut data_len = data.len() as u32;
+                    let mut type_code: u32 = 0;
 
-                if res != 0 {
-                    break;
+                    if RegEnumValueW(
+                        h_approved,
+                        index,
+                        name.as_mut_ptr(),
+                        &mut name_len,
+                        ptr::null_mut(),
+                        &mut type_code,
+                        data.as_mut_ptr(),
+                        &mut data_len,
+                    ) != 0
+                    {
+                        break;
+                    }
+                    let name_str = String::from_utf16_lossy(&name[..name_len as usize])
+                        .trim_matches(char::from(0))
+                        .to_string();
+                    // Task Manager: bit 0 of first byte. 0x02 is enabled, 0x03 (octal 03?) or similar is disabled.
+                    // Actually, if the first byte is even (0x02, 0x06, etc), it's enabled. If odd (0x03, 0x07), it's disabled.
+                    if data_len > 0 {
+                        let is_disabled = (data[0] & 1) == 1;
+                        disabled_map.insert(name_str, is_disabled);
+                    }
+                    index += 1;
                 }
-
-                let name_str = String::from_utf16_lossy(&name[..name_len as usize]);
-                let name_str = name_str.trim_matches(char::from(0)).to_string();
-
-                // Handle REG_SZ (1) and REG_EXPAND_SZ (2)
-                let val_str = if type_code == 1 || type_code == 2 {
-                    String::from_utf16_lossy(
-                        &data.chunks_exact(2)
-                            .map(|c| u16::from_ne_bytes([c[0], c[1]]))
-                            .collect::<Vec<u16>>()[..(data_len as usize / 2)],
-                    ).trim_matches(char::from(0)).to_string()
-                } else {
-                    format!("<binary data type={}>", type_code)
-                };
-                
-                entries.push(StartupApp {
-                    name: name_str,
-                    command: val_str,
-                    enabled: true, // simplified for now
-                });
-                index += 1;
+                RegCloseKey(h_approved);
             }
-            RegCloseKey(hkey);
+        }
+
+        let run_subkey = encode_wide(run_path);
+        let mut h_run: windows_sys::Win32::System::Registry::HKEY = 0;
+        unsafe {
+            if RegOpenKeyExW(hive, run_subkey.as_ptr(), 0, KEY_READ, &mut h_run) == 0 {
+                let mut index = 0;
+                loop {
+                    let mut name = [0u16; 16384];
+                    let mut name_len = name.len() as u32;
+                    let mut data = [0u8; 16384];
+                    let mut data_len = data.len() as u32;
+                    let mut type_code: u32 = 0;
+
+                    if RegEnumValueW(
+                        h_run,
+                        index,
+                        name.as_mut_ptr(),
+                        &mut name_len,
+                        ptr::null_mut(),
+                        &mut type_code,
+                        data.as_mut_ptr(),
+                        &mut data_len,
+                    ) != 0
+                    {
+                        break;
+                    }
+
+                    let name_str = String::from_utf16_lossy(&name[..name_len as usize])
+                        .trim_matches(char::from(0))
+                        .to_string();
+                    let val_str = if type_code == 1 || type_code == 2 {
+                        String::from_utf16_lossy(
+                            &data
+                                .chunks_exact(2)
+                                .map(|c| u16::from_ne_bytes([c[0], c[1]]))
+                                .collect::<Vec<u16>>()[..(data_len as usize / 2)],
+                        )
+                        .trim_matches(char::from(0))
+                        .to_string()
+                    } else {
+                        format!("<binary data type={}>", type_code)
+                    };
+
+                    let is_disabled = *disabled_map.get(&name_str).unwrap_or(&false);
+
+                    entries.push(StartupApp {
+                        name: format!("{} ({})", name_str, hive_name),
+                        command: val_str,
+                        enabled: !is_disabled,
+                    });
+                    index += 1;
+                }
+                RegCloseKey(h_run);
+            }
         }
     }
+
+    // 2. Scan Startup Folders
+    let folders = vec![
+        std::env::var("APPDATA")
+            .map(|s| format!("{}\\Microsoft\\Windows\\Start Menu\\Programs\\Startup", s)),
+        std::env::var("ProgramData")
+            .map(|s| format!("{}\\Microsoft\\Windows\\Start Menu\\Programs\\Startup", s)),
+    ];
+
+    for folder in folders.into_iter().flatten() {
+        if let Ok(dir) = std::fs::read_dir(&folder) {
+            for entry in dir.flatten() {
+                if let Ok(file_type) = entry.file_type() {
+                    if file_type.is_file() {
+                        let name = entry.file_name().to_string_lossy().into_owned();
+                        let path = entry.path().to_string_lossy().into_owned();
+                        entries.push(StartupApp {
+                            name: format!("{} (Folder)", name),
+                            command: path,
+                            enabled: true, // Folder items are generally enabled unless moved/renamed
+                        });
+                    }
+                }
+            }
+        }
+    }
+
     entries
 }
 
@@ -169,7 +261,7 @@ fn collect_processes(system: &System, cpu_history: &mut CpuHistory) -> Vec<Proce
         .map(|(pid, p)| {
             let pid_u32 = pid.as_u32();
             let cpu = p.cpu_usage();
-            
+
             // Explicit smoothing: 70% new, 30% old
             let old_cpu = cpu_history.get(&pid_u32).cloned().unwrap_or(cpu);
             let smoothed = (cpu * 0.7) + (old_cpu * 0.3);
@@ -177,15 +269,39 @@ fn collect_processes(system: &System, cpu_history: &mut CpuHistory) -> Vec<Proce
 
             let disk = p.disk_usage();
 
+            // 🌐 Live ETW Network Stats
+            let mut rx_kbps = 0.0;
+            let mut tx_kbps = 0.0;
+
+            // We use the global map to pull deltas for this PID
+            if let Some(entry) = etw::NETWORK_DELTAS.get(&pid_u32) {
+                // Calculation: (Bytes / 1024) / Interval (2s)
+                tx_kbps = (entry.0 as f32 / 1024.0) / 2.0;
+                rx_kbps = (entry.1 as f32 / 1024.0) / 2.0;
+            }
+            // Note: We don't remove here, pull_stats or a periodic clear should handle it if needed
+            // However, to keep it simple, we can just consume it here if we want strictly 1-reader
+            // But let's stay with the global map and periodic flush in pull_stats instead.
+            // Wait, collect_processes is called every loop. If we don't clear, it will be cumulative.
+            // Let's consume (reset to 0) the entry after reading.
+            if let Some(mut entry) = etw::NETWORK_DELTAS.get_mut(&pid_u32) {
+                *entry = (0, 0);
+            }
+
             ProcessInfo {
                 pid: pid_u32,
                 parent_pid: p.parent().map(|pp| pp.as_u32()),
                 name: p.name().to_string_lossy().into_owned(),
-                exe_path: p.exe().map(|path| path.to_string_lossy().into_owned()).unwrap_or_default(),
+                exe_path: p
+                    .exe()
+                    .map(|path| path.to_string_lossy().into_owned())
+                    .unwrap_or_default(),
                 ram_mb: kib_to_mb(p.memory()),
                 cpu_percent: smoothed,
                 disk_read_kb: disk.read_bytes / 1024,
                 disk_written_kb: disk.written_bytes / 1024,
+                net_received: rx_kbps,
+                net_sent: tx_kbps,
             }
         })
         .collect()
@@ -193,10 +309,14 @@ fn collect_processes(system: &System, cpu_history: &mut CpuHistory) -> Vec<Proce
 
 fn spawn_ui() {
     println!("[Fluffy Core] Spawning UI Dashboard...");
-    println!("[Fluffy Core] NOTE: First boot or changes will trigger UI compilation (approx. 1-2 minutes).");
-    println!("[Fluffy Core] Please do not close the terminal until the dashboard window appearing.");
+    println!(
+        "[Fluffy Core] NOTE: First boot or changes will trigger UI compilation (approx. 1-2 minutes)."
+    );
+    println!(
+        "[Fluffy Core] Please do not close the terminal until the dashboard window appearing."
+    );
     let ui_dir = "../ui/tauri";
-    
+
     #[cfg(target_os = "windows")]
     let res = std::process::Command::new("cmd")
         .args(["/C", "npm run tauri dev"])
@@ -210,13 +330,19 @@ fn spawn_ui() {
         .spawn();
 
     if let Err(e) = res {
-        eprintln!("[Fluffy Core] Failed to spawn UI: {}. Make sure you are running core from its directory and npm is installed.", e);
+        eprintln!(
+            "[Fluffy Core] Failed to spawn UI: {}. Make sure you are running core from its directory and npm is installed.",
+            e
+        );
     }
 }
 
 fn main() {
     let ipc = IpcServer::start(9001);
     start_command_server(9002);
+
+    // 🌐 Start ETW Network Monitor (Requires Admin)
+    NetworkMonitor::start();
 
     // 🚀 Launch UI Dashboard automatically
     spawn_ui();
@@ -250,12 +376,46 @@ fn main() {
 
             let mut total_received = 0;
             let mut total_transmitted = 0;
-            for (_, data) in &networks {
-                total_received += data.received();
-                total_transmitted += data.transmitted();
+            let mut total_rx_kbps = 0.0;
+            let mut total_tx_kbps = 0.0;
+            let mut connection_type = "offline";
+
+            for (name, data) in &networks {
+                let rx = data.received();
+                let tx = data.transmitted();
+                total_received += rx;
+                total_transmitted += tx;
+
+                // KB/s calculation based on 2s interval
+                total_rx_kbps += (rx as f32 / 1024.0) / 2.0;
+                total_tx_kbps += (tx as f32 / 1024.0) / 2.0;
+
+                // Basic heuristic for connection type
+                if rx > 0 || tx > 0 {
+                    let name_lower = name.to_lowercase();
+                    if name_lower.contains("wi-fi")
+                        || name_lower.contains("wlan")
+                        || name_lower.contains("wireless")
+                    {
+                        connection_type = "wifi";
+                    } else if name_lower.contains("ethernet")
+                        || name_lower.contains("eth")
+                        || name_lower.contains("en0")
+                    {
+                        // If we haven't found wifi, or this is a strong indicator
+                        if connection_type != "wifi" {
+                            connection_type = "ethernet";
+                        }
+                    } else if connection_type == "offline" {
+                        connection_type = "ethernet"; // Default active to ethernet
+                    }
+                }
             }
 
-            println!("[Fluffy Core] Broadcasting telemetry ({} processes)...", processes.len());
+            println!(
+                "[Fluffy Core] Broadcasting telemetry ({} processes)...",
+                processes.len()
+            );
             let message = FluffyMessage {
                 schema_version: "1.0",
                 timestamp: unix_timestamp(),
@@ -271,14 +431,18 @@ fn main() {
                     network: NetworkStats {
                         received_kb: total_received / 1024,
                         transmitted_kb: total_transmitted / 1024,
+                        total_rx_kbps,
+                        total_tx_kbps,
+                        status: connection_type.to_string(),
                     },
                     processes: ProcessStats { top_ram: processes },
                 },
                 persistence: get_startup_entries(),
+                active_sessions: 1, // Hardcoded: UI is active if we are here
             };
 
             let payload = serde_json::to_value(&message).unwrap();
-            
+
             ipc.broadcast(&IpcMessage {
                 schema_version: "1.0".to_string(),
                 payload,
@@ -299,7 +463,7 @@ fn main() {
         "type": "shutdown",
         "timestamp": unix_timestamp()
     });
-    
+
     ipc.broadcast(&IpcMessage {
         schema_version: "1.0".to_string(),
         payload: shutdown_payload,

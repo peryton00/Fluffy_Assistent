@@ -34,6 +34,7 @@ export default defineConfig(async () => ({
       '/ui_connected': 'http://127.0.0.1:5123',
       '/ui_disconnected': 'http://127.0.0.1:5123',
       '/security_action': 'http://127.0.0.1:5123',
+      '/net-speed': 'http://127.0.0.1:5123',
     }
   },
 }));

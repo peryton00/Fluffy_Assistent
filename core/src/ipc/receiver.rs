@@ -187,20 +187,74 @@ fn execute(cmd: IpcCommand) {
         IpcCommand::StartupRemove { name } => {
             #[cfg(target_os = "windows")]
             {
-                let script = format!(
-                    "Remove-ItemProperty -Path 'HKCU:\\Software\\Microsoft\\Windows\\CurrentVersion\\Run' -Name '{}' -Force",
-                    name.replace("'", "''")
-                );
+                let mut status = "success";
+                let mut error = None;
 
-                let output = std::process::Command::new("powershell")
-                    .args(["-Command", &script])
-                    .output();
-
-                let (status, error) = match output {
-                    Ok(out) if out.status.success() => ("success", None),
-                    Ok(out) => ("error", Some(String::from_utf8_lossy(&out.stderr).trim().to_string())),
-                    Err(e) => ("error", Some(e.to_string())),
-                };
+                // Parse source from name e.g. "My App (HKLM)" or "script.bat (Folder)"
+                if name.ends_with("(HKCU)") {
+                    let real_name = name.strip_suffix(" (HKCU)").unwrap();
+                    let script = format!(
+                        "Remove-ItemProperty -Path 'HKCU:\\Software\\Microsoft\\Windows\\CurrentVersion\\Run' -Name '{}' -Force",
+                        real_name.replace("'", "''")
+                    );
+                    let output = std::process::Command::new("powershell").args(["-Command", &script]).output();
+                    if let Ok(out) = output {
+                        if !out.status.success() {
+                            status = "error";
+                            error = Some(String::from_utf8_lossy(&out.stderr).trim().to_string());
+                        }
+                    } else if let Err(e) = output {
+                        status = "error";
+                        error = Some(e.to_string());
+                    }
+                } else if name.ends_with("(HKLM)") {
+                    let real_name = name.strip_suffix(" (HKLM)").unwrap();
+                    let script = format!(
+                        "Remove-ItemProperty -Path 'HKLM:\\Software\\Microsoft\\Windows\\CurrentVersion\\Run' -Name '{}' -Force",
+                        real_name.replace("'", "''")
+                    );
+                    let output = std::process::Command::new("powershell").args(["-Command", &script]).output();
+                    if let Ok(out) = output {
+                        if !out.status.success() {
+                            status = "error";
+                            error = Some("Failed to remove HKLM entry. Ensure Fluffy is running as Administrator.".to_string());
+                        }
+                    } else if let Err(e) = output {
+                        status = "error";
+                        error = Some(e.to_string());
+                    }
+                } else if name.ends_with("(Folder)") {
+                    let real_name = name.strip_suffix(" (Folder)").unwrap();
+                    // We need the full path to delete from folder. 
+                    // Since we only have the name here, we'd have to scan both folders to find it.
+                    let folders = vec![
+                        std::env::var("APPDATA").map(|s| format!("{}\\Microsoft\\Windows\\Start Menu\\Programs\\Startup", s)),
+                        std::env::var("ProgramData").map(|s| format!("{}\\Microsoft\\Windows\\Start Menu\\Programs\\Startup", s)),
+                    ];
+                    let mut found = false;
+                    for folder in folders.into_iter().flatten() {
+                        let path = std::path::Path::new(&folder).join(real_name);
+                        if path.exists() {
+                            if let Err(e) = std::fs::remove_file(path) {
+                                status = "error";
+                                error = Some(format!("Failed to delete file: {}", e));
+                            }
+                            found = true;
+                            break;
+                        }
+                    }
+                    if !found {
+                        status = "error";
+                        error = Some("Startup file not found.".to_string());
+                    }
+                } else {
+                    // Fallback for legacy items or items without suffix (defaults to HKCU)
+                    let script = format!(
+                        "Remove-ItemProperty -Path 'HKCU:\\Software\\Microsoft\\Windows\\CurrentVersion\\Run' -Name '{}' -Force",
+                        name.replace("'", "''")
+                    );
+                    let _ = std::process::Command::new("powershell").args(["-Command", &script]).output();
+                }
 
                 crate::ipc::server::IpcServer::broadcast_global(&crate::ipc::protocol::IpcMessage {
                     schema_version: "1.0".to_string(),

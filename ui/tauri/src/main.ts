@@ -15,6 +15,9 @@ const statHistory = {
   ram: new Array(MAX_HISTORY).fill(0)
 };
 
+let sortMode = localStorage.getItem("fluffy_sort_mode") || "ram";
+const pinnedProcesses = new Set<string>(JSON.parse(localStorage.getItem("fluffy_pinned_names") || "[]"));
+
 /* =========================
    UTILITIES
 ========================= */
@@ -169,9 +172,25 @@ function setupNavigation() {
   }
 
   const themeToggle = document.getElementById("theme-toggle-input") as HTMLInputElement;
+  const savedTheme = localStorage.getItem("fluffy_theme") || "dark";
   if (themeToggle) {
+    themeToggle.checked = savedTheme === "dark";
+    document.body.classList.toggle("light-mode", savedTheme === "light");
+
     themeToggle.onchange = () => {
-      document.body.classList.toggle("light-mode", !themeToggle.checked);
+      const mode = themeToggle.checked ? "dark" : "light";
+      document.body.classList.toggle("light-mode", mode === "light");
+      localStorage.setItem("fluffy_theme", mode);
+    };
+  }
+
+  const sortSelect = document.getElementById("process-sort-mode") as HTMLSelectElement;
+  if (sortSelect) {
+    sortSelect.value = sortMode;
+    sortSelect.onchange = () => {
+      sortMode = sortSelect.value;
+      localStorage.setItem("fluffy_sort_mode", sortMode);
+      if (lastData) renderUI(lastData);
     };
   }
 
@@ -428,13 +447,14 @@ function processMatchesSearch(node: any): boolean {
 }
 
 function renderNode(node: any, container: HTMLElement) {
+  const isPinned = pinnedProcesses.has(node.name);
   const matches = !searchQuery || node.name.toLowerCase().includes(searchQuery) || node.pid.toString().includes(searchQuery);
   const subTreeMatches = processMatchesSearch(node);
 
   if (!subTreeMatches) return; // Hide if nothing in this branch matches
 
   const nodeEl = document.createElement("div");
-  nodeEl.className = "tree-node";
+  nodeEl.className = `tree-node ${isPinned ? 'is-pinned' : ''}`;
 
   const hasChildren = node.children && node.children.length > 0;
 
@@ -449,11 +469,18 @@ function renderNode(node: any, container: HTMLElement) {
   row.className = `tree-row ${matches && searchQuery ? 'search-match' : ''}`;
   row.innerHTML = `
     <div class="tree-left">
-      <div class="tree-toggle ${shouldExpand ? "expanded" : ""}">${hasChildren ? (shouldExpand ? "−" : "+") : "•"}</div>
-      <span class="tree-label">${node.name}</span>
+      <div class="tree-toggle ${shouldExpand ? "expanded" : ""}">
+        ${hasChildren ? (shouldExpand ? "−" : "+") : "•"}
+      </div>
+      <span class="tree-label">${node.name} ${isPinned ? '<span class="pinned-badge">Pinned</span>' : ''}</span>
       <span class="tree-pid">${node.pid}</span>
     </div>
     <div class="tree-right">
+      <div class="process-actions">
+        <div class="action-icon ${isPinned ? 'pinned' : ''}" title="${isPinned ? 'Unpin' : 'Pin'}" data-action="pin">📌</div>
+        <div class="action-icon" title="Open File Location" data-action="folder">📁</div>
+        <div class="action-icon" title="Google Search" data-action="google">🔍</div>
+      </div>
       <div class="tree-stats">
         ${ramDisplay}
         <span class="tree-cpu">${node.cpu_percent.toFixed(1)}%</span>
@@ -463,13 +490,53 @@ function renderNode(node: any, container: HTMLElement) {
   `;
 
   if (hasChildren) {
-    const toggle = row.querySelector(".tree-toggle") as HTMLElement;
-    toggle.onclick = () => {
+    row.style.cursor = "pointer";
+    row.onclick = (e: MouseEvent) => {
+      // Don't toggle if clicking a button or action icon
+      const target = e.target as HTMLElement;
+      if (target.closest('button') || target.closest('.action-icon')) return;
+
       if (expandedPids.has(node.pid)) expandedPids.delete(node.pid);
       else expandedPids.add(node.pid);
       renderUI(lastData);
     };
   }
+
+  // Action Logic
+  row.querySelectorAll(".action-icon").forEach((icon: any) => {
+    icon.onclick = async (e: MouseEvent) => {
+      e.stopPropagation();
+      const action = icon.dataset.action;
+      if (action === "pin") {
+        if (isPinned) pinnedProcesses.delete(node.name);
+        else pinnedProcesses.add(node.name);
+        localStorage.setItem("fluffy_pinned_names", JSON.stringify(Array.from(pinnedProcesses)));
+        renderUI(lastData);
+      } else if (action === "folder") {
+        try {
+          // In Tauri 2.0, we use the opener plugin
+          const { revealItemInDir } = await import('@tauri-apps/plugin-opener');
+          if (node.exe_path) {
+            await revealItemInDir(node.exe_path);
+          } else {
+            showToast("Path info not available for this process", "info");
+          }
+        } catch (err) {
+          console.error("Opener failed:", err);
+          showToast("Failed to open location", "error");
+        }
+      } else if (action === "google") {
+        try {
+          const { openUrl } = await import('@tauri-apps/plugin-opener');
+          const query = encodeURIComponent(`what is process ${node.name} windows`);
+          await openUrl(`https://www.google.com/search?q=${query}`);
+        } catch (err) {
+          console.error("Google search failed:", err);
+          showToast("Failed to open search", "error");
+        }
+      }
+    };
+  });
 
   const killBtn = row.querySelector(".btn-tree-kill") as HTMLButtonElement;
   killBtn.onclick = () => killProcess(node.pid, hasChildren ? "tree" : "single");
@@ -479,7 +546,16 @@ function renderNode(node: any, container: HTMLElement) {
   if (hasChildren) {
     const childrenContainer = document.createElement("div");
     childrenContainer.className = `tree-children ${shouldExpand ? "active" : ""}`;
-    node.children.sort((a: any, b: any) => b.ram_mb - a.ram_mb).forEach((child: any) => {
+
+    // Recursive sort for children
+    const sortedChildren = [...node.children].sort((a: any, b: any) => {
+      if (sortMode === "ram") return b.ram_mb - a.ram_mb;
+      if (sortMode === "cpu") return b.cpu_percent - a.cpu_percent;
+      if (sortMode === "name") return a.name.localeCompare(b.name);
+      return 0;
+    });
+
+    sortedChildren.forEach((child: any) => {
       renderNode(child, childrenContainer);
     });
     nodeEl.appendChild(childrenContainer);
@@ -516,8 +592,11 @@ function renderDashboard(data: any) {
     return name.includes("fluffy") ||
       name === "core.exe" ||
       name === "core" ||
-      name.includes("tauri");
+      name.includes("tauri") ||
+      name.includes("python"); // Added python for dev env
   });
+
+  // console.log("Fluffy Processes:", fluffyProcesses);
 
   let totalCpu = 0;
   let totalRam = 0;
@@ -526,22 +605,19 @@ function renderDashboard(data: any) {
     totalRam += p.ram_mb;
   });
 
-  const fluffyUsageEl = document.getElementById("fluffy-usage");
+  const fluffyCpuEl = document.getElementById("fluffy-usage");
+  if (fluffyCpuEl) fluffyCpuEl.innerText = `${totalCpu.toFixed(1)}%`;
+
   const fluffyRamEl = document.getElementById("fluffy-ram");
-  if (fluffyUsageEl) fluffyUsageEl.innerText = `${totalCpu.toFixed(1)}%`;
-  if (fluffyRamEl) fluffyRamEl.innerText = `${totalRam} MB RAM`;
+  if (fluffyRamEl) fluffyRamEl.innerText = `${totalRam} MB`;
 
-  // Active Sessions (Placeholder/Sync)
+  // Active Sessions
   const sessionCountEl = document.getElementById("session-count");
-  if (sessionCountEl) sessionCountEl.innerText = (data.active_sessions || 1).toString();
-
-  const healthEl = document.getElementById("health-status");
-  if (healthEl && sys.health) {
-    healthEl.innerText = sys.health.charAt(0).toUpperCase() + sys.health.slice(1).toLowerCase();
-    healthEl.className = sys.health.toLowerCase(); // Optional: color text too
+  if (sessionCountEl) {
+    // Default to 1 if not present (legacy support)
+    const count = data.active_sessions !== undefined ? data.active_sessions : 1;
+    sessionCountEl.innerText = count.toString();
   }
-
-  updateChart(cpu, ramPercent);
 
   // Render Offenders (Filtered)
   const offendersContainer = document.getElementById("offenders-list");
@@ -558,36 +634,130 @@ function renderDashboard(data: any) {
       const div = document.createElement("div");
       div.className = "offender-item";
       div.innerHTML = `
-        <div class="offender-bar-container">
-          <div class="offender-info">
-            <span>${p.name.substring(0, 15)}</span>
-            <span>${p.ram_mb} MB</span>
+          <div class="offender-bar-container">
+            <div class="offender-info">
+              <span>${p.name.substring(0, 15)}</span>
+              <span>${p.ram_mb} MB</span>
+            </div>
+            <div class="offender-bar-bg">
+              <div class="offender-bar-fill" style="width: ${percent}%"></div>
+            </div>
           </div>
-          <div class="offender-bar-bg">
-            <div class="offender-bar-fill" style="width: ${percent}%"></div>
-          </div>
-        </div>
-      `;
+        `;
       offendersContainer.appendChild(div);
     });
+  }
+
+  // Network Telemetry
+  const net = sys.network;
+  const rxSpeed = net.total_rx_kbps > 1024 ? `${(net.total_rx_kbps / 1024).toFixed(1)} MB/s` : `${net.total_rx_kbps.toFixed(1)} KB/s`;
+  const txSpeed = net.total_tx_kbps > 1024 ? `${(net.total_tx_kbps / 1024).toFixed(1)} MB/s` : `${net.total_tx_kbps.toFixed(1)} KB/s`;
+
+  const headerSpeedEl = document.getElementById("header-net-speed");
+  if (headerSpeedEl) headerSpeedEl.innerText = `${(net.total_rx_kbps / 1024).toFixed(1)} Mbps`;
+
+  const headerIconEl = document.getElementById("header-net-icon");
+  if (headerIconEl) {
+    if (net.status === "wifi") headerIconEl.innerText = "📶";
+    else if (net.status === "ethernet") headerIconEl.innerText = "🔌";
+    else headerIconEl.innerText = "🚫";
+  }
+
+  const netRxEl = document.getElementById("net-rx-value");
+  if (netRxEl) netRxEl.innerText = rxSpeed;
+
+  const netTxEl = document.getElementById("net-tx-value");
+  if (netTxEl) netTxEl.innerText = txSpeed;
+
+  const netStatusEl = document.getElementById("net-status-label");
+  if (netStatusEl) netStatusEl.innerText = net.status.charAt(0).toUpperCase() + net.status.slice(1);
+
+  const netCardIconEl = document.getElementById("net-card-icon");
+  if (netCardIconEl) {
+    if (net.status === "wifi") netCardIconEl.innerText = "📶";
+    else if (net.status === "ethernet") netCardIconEl.innerText = "🔌";
+    else netCardIconEl.innerText = "🌐";
+  }
+
+  const healthEl = document.getElementById("health-status");
+  if (healthEl && sys.health) {
+    healthEl.innerText = sys.health.charAt(0).toUpperCase() + sys.health.slice(1).toLowerCase();
+    healthEl.className = sys.health.toLowerCase();
+  }
+
+  updateChart(cpu, ramPercent);
+
+  // Link Speed Test button if dashboard is active
+  const speedBtn = document.getElementById("btn-run-speedtest");
+  if (speedBtn) {
+    speedBtn.onclick = () => runSpeedTest();
+  }
+}
+
+async function runSpeedTest() {
+  const btn = document.getElementById("btn-run-speedtest") as HTMLButtonElement;
+  const statusEl = document.getElementById("speed-test-status");
+  const resultEl = document.getElementById("speed-result-value");
+  const circleEl = document.querySelector(".speed-circle");
+
+  if (!btn || !statusEl || !resultEl || !circleEl) return;
+
+  btn.disabled = true;
+  statusEl.innerText = "Testing bandwidth... (5-10MB sample)";
+  circleEl.classList.add("testing");
+  resultEl.innerText = "0.0";
+
+  addLog("Internet speed test started", "action");
+
+  try {
+    const data = await apiRequest("/net-speed", { method: "POST" });
+    if (data && data.status === "success") {
+      resultEl.innerText = data.download_mbps.toFixed(1);
+      statusEl.innerText = `Test complete! Latency: ${data.ping_ms}ms`;
+      addLog(`Speed test success: ${data.download_mbps} Mbps`, "success");
+    } else {
+      statusEl.innerText = "Speed test failed. Try again.";
+      addLog("Speed test failed", "error");
+    }
+  } catch (err) {
+    statusEl.innerText = "Connection error during test.";
+    addLog("Speed test connection error", "error");
+  } finally {
+    btn.disabled = false;
+    circleEl.classList.remove("testing");
   }
 }
 
 function renderProcesses(data: any) {
   const container = document.getElementById("processes-tree");
   const highlightContainer = document.getElementById("top-consumer-highlight");
-  if (!container) return;
+  if (!container || !data.system) return;
 
   container.innerHTML = "";
   // Filter out processes that are pending removal
   const allProcs = data.system.processes.top_ram || [];
   const filtered = allProcs.filter((p: any) => !pendingKills.has(p.pid));
 
+  // Sort and Build Tree
+  filtered.sort((a: any, b: any) => {
+    // 1. Pinned Always Top
+    const aPinned = pinnedProcesses.has(a.name);
+    const bPinned = pinnedProcesses.has(b.name);
+    if (aPinned && !bPinned) return -1;
+    if (!aPinned && bPinned) return 1;
+
+    // 2. User selected sort mode
+    if (sortMode === "ram") return b.ram_mb - a.ram_mb;
+    if (sortMode === "cpu") return b.cpu_percent - a.cpu_percent;
+    if (sortMode === "name") return a.name.localeCompare(b.name);
+    return 0;
+  });
+
   const tree = buildTree(filtered);
   // Calculate total tree RAM for each root
   tree.forEach(node => calculateTotalRam(node));
 
-  tree.sort((a, b) => b.total_ram_mb - a.total_ram_mb).forEach(node => renderNode(node, container));
+  tree.forEach(node => renderNode(node, container));
 
   // Handle Top Consumer Highlight
   if (highlightContainer) {
@@ -629,9 +799,13 @@ function renderStartupApps(data: any) {
   tbody.innerHTML = "";
   data.persistence.forEach((app: any) => {
     const tr = document.createElement("tr");
+    const statusClass = app.enabled ? "status-enabled" : "status-disabled";
+    const statusLabel = app.enabled ? "Active" : "Disabled";
+
     tr.innerHTML = `
       <td><strong>${app.name}</strong></td>
       <td title="${app.command}">${app.command}</td>
+      <td><span class="badge ${statusClass}">${statusLabel}</span></td>
       <td>
         <button class="btn-error btn-sm btn-remove-startup" data-name="${app.name}">Remove</button>
       </td>
@@ -651,6 +825,7 @@ function setupStartupApps() {
   const openBtn = document.getElementById("btn-add-startup");
   const closeBtn = document.getElementById("close-startup-modal");
   const confirmBtn = document.getElementById("btn-confirm-add-startup");
+  const browseBtn = document.getElementById("btn-browse-app");
 
   if (!modal || !openBtn || !closeBtn || !confirmBtn) return;
 
@@ -659,6 +834,38 @@ function setupStartupApps() {
 
   openBtn.onclick = show;
   closeBtn.onclick = hide;
+
+  if (browseBtn) {
+    browseBtn.onclick = async () => {
+      try {
+        // Try to use Tauri Dialog plugin if available
+        // Note: This requires '@tauri-apps/plugin-dialog'
+        const { open } = await import('@tauri-apps/plugin-dialog');
+        const selected = await open({
+          multiple: false,
+          filters: [{
+            name: 'Executable',
+            extensions: ['exe', 'bat', 'cmd', 'sh']
+          }]
+        });
+
+        if (selected && typeof selected === 'string') {
+          const pathInput = document.getElementById("new-startup-path") as HTMLInputElement;
+          const nameInput = document.getElementById("new-startup-name") as HTMLInputElement;
+          if (pathInput) pathInput.value = selected;
+
+          // Auto-fill name if empty
+          if (nameInput && !nameInput.value) {
+            const filename = selected.split(/[\\/]/).pop();
+            if (filename) nameInput.value = filename.replace(/\.(exe|bat|cmd|sh)$/i, '');
+          }
+        }
+      } catch (err) {
+        console.warn("Tauri Dialog plugin not found or failed. Falling back to manual entry.", err);
+        showToast("Dialog feature not available. Please enter the path manually.", "info");
+      }
+    };
+  }
 
   confirmBtn.onclick = async () => {
     const nameInput = document.getElementById("new-startup-name") as HTMLInputElement;

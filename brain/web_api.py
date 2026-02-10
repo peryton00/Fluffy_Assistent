@@ -100,13 +100,35 @@ def security_action():
     pid = int(data["pid"])
     action = data["action"]
     
+    # 1. Resolve Name from State
+    process_name = None
+    if state.LATEST_STATE:
+        procs = state.LATEST_STATE.get("system", {}).get("processes", {}).get("top_ram", [])
+        for p in procs:
+            if p["pid"] == pid:
+                process_name = p["name"]
+                break
+    
+    # 2. Update Monitors and Memory
+    from listener import GUARDIAN_MEMORY, GUARDIAN_AUDIT
+    
     if state.MONITOR:
         if action == "ignore":
             state.MONITOR.mark_ignored(pid)
+            if process_name:
+                GUARDIAN_MEMORY.mark_ignored(process_name)
+                GUARDIAN_AUDIT.log_event("UserDecision", process_name, {"action": "Ignore"})
             state.add_execution_log(f"Process {pid} ignored by user", "info")
         elif action == "trust":
             state.MONITOR.mark_trusted(pid)
+            if process_name:
+                GUARDIAN_MEMORY.mark_trusted(process_name)
+                GUARDIAN_AUDIT.log_event("UserDecision", process_name, {"action": "Trust"})
             state.add_execution_log(f"Process {pid} marked as trusted", "info")
+        elif action == "mark_dangerous" and process_name: # Extended action for phase 11
+            GUARDIAN_MEMORY.mark_dangerous(process_name)
+            GUARDIAN_AUDIT.log_event("UserDecision", process_name, {"action": "Mark Dangerous"})
+            state.add_execution_log(f"Process {process_name} marked as DANGEROUS", "warning")
             
     return jsonify({"ok": True})
 
@@ -157,6 +179,28 @@ def ui_disconnected():
 
 # Browser Dashboard (ui/frontend) routes removed per user request.
 
+
+
+@app.route("/net-speed", methods=["POST"])
+def net_speed():
+    if not state.UI_ACTIVE:
+        return jsonify({"error": "UI Disconnected"}), 403
+    
+    import net_utils
+    
+    state.add_execution_log("Initiating network speed test...", "action")
+    
+    # We run it synchronously for simplicity in this dev environment.
+    speed = net_utils.run_speed_test()
+    latency = net_utils.get_ping()
+    
+    state.add_execution_log(f"Speed test complete: {speed} Mbps, Latency: {latency} ms", "info")
+    
+    return jsonify({
+        "status": "success",
+        "download_mbps": speed,
+        "ping_ms": latency
+    })
 
 def start_api():
     app.run(host="127.0.0.1", port=5123, debug=False, use_reloader=False)

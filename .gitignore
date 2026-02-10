@@ -1,0 +1,7 @@
+fluffy_data/
+brain/guardian/*.json
+**/__pycache__/
+*.exe
+target/
+node_modules/
+dist/
