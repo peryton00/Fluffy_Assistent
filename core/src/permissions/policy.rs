@@ -37,5 +37,15 @@ pub fn evaluate(cmd: &Command) -> PermissionDecision {
         &Command::NormalizeSystem => {
             PermissionDecision::Allow
         }
+
+        // Startup App Management
+        &Command::StartupAdd { .. } | &Command::StartupRemove { .. } => {
+            PermissionDecision::RequireConfirmation {
+                reason: "Modifying startup applications affects system boot".into(),
+            }
+        }
+
+        // UI state sync is always allowed
+        &Command::SetUiActive { .. } => PermissionDecision::Allow,
     }
 }

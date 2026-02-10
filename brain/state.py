@@ -7,6 +7,7 @@ SECURITY_ALERTS = []
 MONITOR = None
 UI_ACTIVE = False
 LOCK = Lock()
+SHUTDOWN_MODE = False
 
 
 def update_state(state_update):

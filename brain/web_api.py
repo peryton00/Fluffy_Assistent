@@ -35,6 +35,9 @@ def status():
     if not state.UI_ACTIVE:
         return jsonify({"error": "UI Disconnected"}), 403
     
+    if state.SHUTDOWN_MODE:
+        return jsonify({"status": "shutdown"})
+
     if state.LATEST_STATE is None:
         return jsonify({"status": "initializing"})
     

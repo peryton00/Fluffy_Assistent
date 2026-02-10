@@ -22,6 +22,7 @@ impl IpcServer {
         std::thread::spawn(move || {
             for stream in listener.incoming() {
                 if let Ok(stream) = stream {
+                    println!("[Fluffy Core] New IPC client connected: {:?}", stream.peer_addr());
                     clients_clone.lock().unwrap().push(stream);
                 }
             }

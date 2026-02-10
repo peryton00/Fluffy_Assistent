@@ -1,3 +1,4 @@
+import { invoke } from "@tauri-apps/api/core";
 import { listen } from '@tauri-apps/api/event';
 
 const FLUFFY_TOKEN = "fluffy_dev_token";
@@ -119,7 +120,7 @@ function showToast(message: string, type: "success" | "error" | "info" = "succes
    NAVIGATION & SEARCH
 ========================= */
 function setupNavigation() {
-  const navItems = ["dashboard", "processes", "analytics", "settings"];
+  const navItems = ["dashboard", "processes", "analytics", "startup", "settings"];
   navItems.forEach(id => {
     const btn = document.getElementById(`nav-${id}`);
     if (btn) {
@@ -180,6 +181,8 @@ function setupNavigation() {
   if (normalizeBtn) {
     normalizeBtn.onclick = () => normalizeSystem();
   }
+
+  setupStartupApps();
 
   // Setup Result Modal
   const resultModal = document.getElementById("result-modal");
@@ -619,6 +622,85 @@ function renderAnalytics(data: any) {
   }
 }
 
+function renderStartupApps(data: any) {
+  const tbody = document.getElementById("startup-list-body");
+  if (!tbody || !data.persistence) return;
+
+  tbody.innerHTML = "";
+  data.persistence.forEach((app: any) => {
+    const tr = document.createElement("tr");
+    tr.innerHTML = `
+      <td><strong>${app.name}</strong></td>
+      <td title="${app.command}">${app.command}</td>
+      <td>
+        <button class="btn-error btn-sm btn-remove-startup" data-name="${app.name}">Remove</button>
+      </td>
+    `;
+    tbody.appendChild(tr);
+  });
+
+  // Attach event listeners to remove buttons
+  document.querySelectorAll(".btn-remove-startup").forEach((btn: any) => {
+    btn.onclick = () => removeStartupApp(btn.dataset.name);
+  });
+}
+
+function setupStartupApps() {
+  // Modal Logic
+  const modal = document.getElementById("startup-modal");
+  const openBtn = document.getElementById("btn-add-startup");
+  const closeBtn = document.getElementById("close-startup-modal");
+  const confirmBtn = document.getElementById("btn-confirm-add-startup");
+
+  if (!modal || !openBtn || !closeBtn || !confirmBtn) return;
+
+  const show = () => modal.classList.add("active");
+  const hide = () => modal.classList.remove("active");
+
+  openBtn.onclick = show;
+  closeBtn.onclick = hide;
+
+  confirmBtn.onclick = async () => {
+    const nameInput = document.getElementById("new-startup-name") as HTMLInputElement;
+    const pathInput = document.getElementById("new-startup-path") as HTMLInputElement;
+
+    if (nameInput.value && pathInput.value) {
+      await addStartupApp(nameInput.value, pathInput.value);
+      nameInput.value = "";
+      pathInput.value = "";
+      hide();
+    } else {
+      showToast("Please fill in both fields", "error");
+    }
+  };
+}
+
+async function addStartupApp(name: string, path: string) {
+  addLog(`Requesting to add startup app: ${name}`, "action");
+  await apiRequest("/command", {
+    method: "POST",
+    body: JSON.stringify({
+      StartupAdd: { name, path }
+    })
+  });
+  showToast("Request sent to add startup app", "info");
+  await fetchData();
+}
+
+async function removeStartupApp(name: string) {
+  if (!confirm(`Are you sure you want to remove '${name}' from startup?`)) return;
+
+  addLog(`Requesting to remove startup app: ${name}`, "action");
+  await apiRequest("/command", {
+    method: "POST",
+    body: JSON.stringify({
+      StartupRemove: { name }
+    })
+  });
+  showToast("Request sent to remove startup app", "info");
+  await fetchData();
+}
+
 function renderUI(data: any) {
   if (!data) return;
   lastData = data;
@@ -644,6 +726,7 @@ function renderUI(data: any) {
   if (activeSection === "section-dashboard") renderDashboard(data);
   else if (activeSection === "section-processes") renderProcesses(data);
   else if (activeSection === "section-analytics") renderAnalytics(data);
+  else if (activeSection === "section-startup") renderStartupApps(data);
 
   // Status Dot (Tray Color Sync)
   const statusDot = document.getElementById("system-status-dot");
@@ -695,6 +778,13 @@ function renderUI(data: any) {
 async function fetchData() {
   if (!uiActive) return;
   const data = await apiRequest("/status");
+
+  if (data && data.status === "shutdown") {
+    console.warn("System shutdown signal received. Closing App...");
+    await invoke("graceful_shutdown");
+    return;
+  }
+
   if (data) renderUI(data);
 }
 
@@ -752,9 +842,14 @@ listen('ui-active', async (event) => {
 
 // Initial connection attempt with higher retry for boot up
 console.log("Initializing Fluffy Dashboard connection...");
-apiRequest("/ui_connected", { method: "POST" }, 10).then((res) => {
+addLog("Connecting to Fluffy Brain...", "system");
+
+apiRequest("/ui_connected", { method: "POST" }, 20).then((res) => {
   if (res) {
     console.log("Dashboard connected to brain.");
+    addLog("Connected to Fluffy Brain", "system");
     startPolling();
+  } else {
+    addLog("Failed to connect to Brain after 20 attempts. Please check if Brain is running.", "error");
   }
 });

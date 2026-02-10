@@ -48,6 +48,11 @@ fn handle_command(cmd: IpcCommand) {
             PENDING.lock().unwrap().remove(&command_id);
         }
 
+        IpcCommand::SetUiActive { active } => {
+            println!("[Fluffy Core] Setting UI Active status to: {}", active);
+            crate::IS_UI_ACTIVE.store(active, std::sync::atomic::Ordering::SeqCst);
+        }
+
         other => match evaluate(&other) {
             PermissionDecision::Allow => execute(other),
 
@@ -147,6 +152,68 @@ fn execute(cmd: IpcCommand) {
                 });
             }
         }
+        IpcCommand::StartupAdd { name, path } => {
+            #[cfg(target_os = "windows")]
+            {
+                // PowerShell is robust for registry operations
+                let script = format!(
+                    "New-ItemProperty -Path 'HKCU:\\Software\\Microsoft\\Windows\\CurrentVersion\\Run' -Name '{}' -Value '{}' -PropertyType String -Force",
+                    name.replace("'", "''"), 
+                    path.replace("'", "''")
+                );
+
+                let output = std::process::Command::new("powershell")
+                    .args(["-Command", &script])
+                    .output();
+
+                let (status, error) = match output {
+                    Ok(out) if out.status.success() => ("success", None),
+                    Ok(out) => ("error", Some(String::from_utf8_lossy(&out.stderr).trim().to_string())),
+                    Err(e) => ("error", Some(e.to_string())),
+                };
+
+                crate::ipc::server::IpcServer::broadcast_global(&crate::ipc::protocol::IpcMessage {
+                    schema_version: "1.0".to_string(),
+                    payload: serde_json::json!({
+                        "type": "execution_result",
+                        "command": "StartupAdd",
+                        "status": status,
+                        "error": error
+                    }),
+                });
+            }
+        }
+
+        IpcCommand::StartupRemove { name } => {
+            #[cfg(target_os = "windows")]
+            {
+                let script = format!(
+                    "Remove-ItemProperty -Path 'HKCU:\\Software\\Microsoft\\Windows\\CurrentVersion\\Run' -Name '{}' -Force",
+                    name.replace("'", "''")
+                );
+
+                let output = std::process::Command::new("powershell")
+                    .args(["-Command", &script])
+                    .output();
+
+                let (status, error) = match output {
+                    Ok(out) if out.status.success() => ("success", None),
+                    Ok(out) => ("error", Some(String::from_utf8_lossy(&out.stderr).trim().to_string())),
+                    Err(e) => ("error", Some(e.to_string())),
+                };
+
+                crate::ipc::server::IpcServer::broadcast_global(&crate::ipc::protocol::IpcMessage {
+                    schema_version: "1.0".to_string(),
+                    payload: serde_json::json!({
+                        "type": "execution_result",
+                        "command": "StartupRemove",
+                        "status": status,
+                        "error": error
+                    }),
+                });
+            }
+        }
+
         IpcCommand::NormalizeSystem => {
             #[cfg(target_os = "windows")]
             {

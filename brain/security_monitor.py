@@ -114,7 +114,7 @@ class SecurityMonitor:
                 score_gain += 5
 
         # Signal 4: Persistence (Startup Registry)
-        if exe_path and any(exe_path in entry.lower() for entry in persistence_entries):
+        if exe_path and any(exe_path in entry.get("command", "").lower() for entry in persistence_entries):
             if "Startup Persistence" not in hist["detected_signals"]:
                 hist["detected_signals"].add("Startup Persistence")
                 score_gain += 20

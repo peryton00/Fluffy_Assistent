@@ -13,6 +13,8 @@ import signal
 import time
 import copy
 
+print("[Fluffy Brain] Listener script started", file=sys.stderr)
+
 IPC_HOST = "127.0.0.1"
 IPC_PORT = 9001
 
@@ -86,12 +88,15 @@ def compute_signals(msg):
         else:
             signals["cpu_pressure"] = "OVERLOADED"
 
-    # Offenders (NO SORTING / NO FILTERING)
+    # Offenders (SAFETIED)
     if processes:
         signals["top_ram_offender"] = max(processes, key=lambda p: p.get("ram_mb", 0))
         signals["top_cpu_offender"] = max(
             processes, key=lambda p: p.get("cpu_percent", 0)
         )
+    else:
+        signals["top_ram_offender"] = None
+        signals["top_cpu_offender"] = None
 
     return signals
 
@@ -206,6 +211,7 @@ def main():
 
                     try:
                         raw = json.loads(line)
+                        print(f"[Fluffy Brain] Received telemetry message ({len(line)} bytes)", file=sys.stderr)
                         
                         # Support for both wrapped and unwrapped messages
                         msg_data = raw.get("payload", raw) if isinstance(raw, dict) else raw
@@ -244,6 +250,21 @@ def main():
                                 f"Command {msg_data.get('command')} {status}" + (f": {error_msg}" if error_msg else ""),
                                 level
                             )
+                            continue
+
+                        # --- SHUTDOWN SIGNAL FROM RUST ---
+                        if isinstance(msg_data, dict) and msg_data.get("type") == "shutdown":
+                            print("\n[Fluffy Brain] Shutdown signal received from Core", file=sys.stderr)
+                            state.SHUTDOWN_MODE = True
+                            
+                            # Schedule exit to allow UI to fetch status
+                            def delayed_exit():
+                                time.sleep(2)
+                                print("[Fluffy Brain] Exiting...", file=sys.stderr)
+                                shutdown()
+                                sys.exit(0)
+                            
+                            Thread(target=delayed_exit, daemon=True).start()
                             continue
 
                         handle_message(msg_data, monitor)
