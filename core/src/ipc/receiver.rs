@@ -33,6 +33,9 @@ pub fn start_command_server(port: u16) {
     });
 }
 
+static KILL_HISTORY: Lazy<Mutex<Vec<std::time::Instant>>> = Lazy::new(|| Mutex::new(Vec::new()));
+const PROTECTED_PROCESSES: &[&str] = &["csrss.exe", "wininit.exe", "lsass.exe", "services.exe", "smss.exe", "winlogon.exe"];
+
 fn handle_command(cmd: IpcCommand) {
     match cmd {
         IpcCommand::Confirm { command_id } => {
@@ -78,18 +81,59 @@ fn execute(cmd: IpcCommand) {
         IpcCommand::KillProcess { pid } => {
             #[cfg(target_os = "windows")]
             {
-                let result = std::process::Command::new("taskkill")
-                    .args(["/PID", &pid.to_string(), "/T", "/F"])
-                    .output();
+                use sysinfo::{Pid, System, ProcessesToUpdate};
+                use std::time::{Duration, Instant};
 
-                let status = match result {
-                    Ok(out) if out.status.success() => "success",
-                    Ok(out) => {
-                        eprintln!("{:?}", out.stderr);
-                        "failed"
+                let mut status = "success";
+                let mut error_msg = String::new();
+
+                // 1. Rate Limiting Check
+                let now = Instant::now();
+                let mut history = KILL_HISTORY.lock().unwrap();
+                // Remove entries older than 10 seconds
+                history.retain(|&t| now.duration_since(t) < Duration::from_secs(10));
+                
+                if history.len() >= 3 {
+                    status = "error";
+                    error_msg = "Rate limit exceeded: >3 kills in 10s".to_string();
+                } else {
+                    // 2. Protected Process Check
+                    let mut sys = System::new();
+                    let target_pid = Pid::from_u32(pid);
+                    // Refresh only the specific process
+                    sys.refresh_processes(ProcessesToUpdate::Some(&[target_pid]), true);
+
+                    if let Some(process) = sys.process(target_pid) {
+                        let name = process.name().to_string_lossy().to_lowercase(); // sysinfo might return OsStr
+                            if PROTECTED_PROCESSES.contains(&name.as_str()) {
+                            status = "error";
+                            error_msg = format!("Protected system process: {}", name);
+                        }
                     }
-                    Err(_) => "failed",
-                };
+                    // If process not found, we let taskkill handle it (it might error "process not found")
+                }
+
+                if status == "success" {
+                     // Record this attempt for rate limiting (only if we are actually proceeding)
+                     history.push(now);
+                     
+                    let result = std::process::Command::new("taskkill")
+                        .args(["/PID", &pid.to_string(), "/T", "/F"])
+                        .output();
+
+                    status = match result {
+                        Ok(out) if out.status.success() => "success",
+                        Ok(out) => {
+                            let stderr = String::from_utf8_lossy(&out.stderr).to_string();
+                            error_msg = stderr.trim().to_string();
+                            "error"
+                        }
+                        Err(e) => {
+                            error_msg = e.to_string();
+                            "error"
+                        }
+                    };
+                }
 
                 crate::ipc::server::IpcServer::broadcast_global(&crate::ipc::protocol::IpcMessage {
                     schema_version: "1.0".to_string(),
@@ -97,7 +141,8 @@ fn execute(cmd: IpcCommand) {
                         "type": "execution_result",
                         "command": "KillProcess",
                         "pid": pid,
-                        "status": status
+                        "status": status,
+                        "error": if error_msg.is_empty() { None } else { Some(error_msg) }
                     }),
                 });
             }

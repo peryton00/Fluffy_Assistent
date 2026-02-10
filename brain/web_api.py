@@ -27,10 +27,7 @@ def chrome_probe(_):
 
 @app.route("/")
 def root():
-    ui_path = os.path.abspath(
-        os.path.join(os.path.dirname(__file__), "..", "ui", "frontend")
-    )
-    return send_from_directory(ui_path, "index.html")
+    return jsonify({"service": "Fluffy Brain API", "status": "active", "dashboard": "Tauri (Native) Only"})
 
 
 @app.route("/status")
@@ -44,6 +41,7 @@ def status():
     full_state = state.LATEST_STATE.copy()
     full_state["pending_confirmations"] = state.get_confirmations()
     full_state["security_alerts"] = state.SECURITY_ALERTS
+    full_state["notifications"] = state.get_notifications()
     return jsonify(full_state)
 
 
@@ -154,12 +152,7 @@ def ui_disconnected():
     return jsonify({"status": "UI_DISCONNECTED", "ui_active": state.UI_ACTIVE})
 
 
-@app.route("/<path:filename>")
-def static_files(filename):
-    ui_path = os.path.abspath(
-        os.path.join(os.path.dirname(__file__), "..", "ui", "frontend")
-    )
-    return send_from_directory(ui_path, filename)
+# Browser Dashboard (ui/frontend) routes removed per user request.
 
 
 def start_api():

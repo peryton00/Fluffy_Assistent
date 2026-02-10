@@ -227,11 +227,24 @@ def main():
 
                         # --- EXECUTION RESULT FROM RUST ---
                         if isinstance(msg_data, dict) and msg_data.get("type") == "execution_result":
-                             add_execution_log(
-                                f"Command {msg_data.get('command')} {msg_data.get('status')}",
-                                "info"
+                            from state import add_notification
+                            
+                            level = "info"
+                            status = msg_data.get('status')
+                            error_msg = msg_data.get('error')
+
+                            if status == "error":
+                                level = "error"
+                                if error_msg:
+                                    add_notification(f"Command failed: {error_msg}", "error")
+                                else:
+                                    add_notification(f"Command {msg_data.get('command')} failed", "error")
+
+                            add_execution_log(
+                                f"Command {msg_data.get('command')} {status}" + (f": {error_msg}" if error_msg else ""),
+                                level
                             )
-                             continue
+                            continue
 
                         handle_message(msg_data, monitor)
 

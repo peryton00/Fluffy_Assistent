@@ -47,3 +47,20 @@ def update_security_alerts(alerts):
     global SECURITY_ALERTS
     with LOCK:
         SECURITY_ALERTS = alerts
+
+
+NOTIFICATIONS = []
+
+def add_notification(message, type="info"):
+    with LOCK:
+        NOTIFICATIONS.append({"message": message, "type": type})
+
+def get_notifications():
+    global NOTIFICATIONS
+    with LOCK:
+        if not NOTIFICATIONS:
+            return []
+        notifs = list(NOTIFICATIONS)
+        NOTIFICATIONS = []
+        return notifs
+

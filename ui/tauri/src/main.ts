@@ -678,6 +678,15 @@ function renderUI(data: any) {
       warn.style.display = "none";
     }
   }
+
+  // Notifications (Toast Feedback from Backend)
+  if (data.notifications && data.notifications.length > 0) {
+    data.notifications.forEach((n: any) => {
+      showToast(n.message, n.type || "info");
+    });
+    // Clear notifications to prevent re-toast on re-render of the same data object
+    data.notifications = [];
+  }
 }
 
 /* =========================
