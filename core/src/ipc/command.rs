@@ -10,6 +10,7 @@ pub enum Command {
     // Startup Apps
     StartupAdd { name: String, path: String },
     StartupRemove { name: String },
+    StartupToggle { name: String, enabled: bool },
 
     // Confirmation flow
     Confirm { command_id: String },

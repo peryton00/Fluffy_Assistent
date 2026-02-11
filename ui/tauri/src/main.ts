@@ -805,7 +805,15 @@ function renderStartupApps(data: any) {
     tr.innerHTML = `
       <td><strong>${app.name}</strong></td>
       <td title="${app.command}">${app.command}</td>
-      <td><span class="badge ${statusClass}">${statusLabel}</span></td>
+      <td>
+        <div class="status-cell">
+           <label class="startup-toggle">
+            <input type="checkbox" class="toggle-startup" data-name="${app.name}" ${app.enabled ? 'checked' : ''}>
+            <span class="slider"></span>
+          </label>
+          <span class="badge ${statusClass}">${statusLabel}</span>
+        </div>
+      </td>
       <td>
         <button class="btn-error btn-sm btn-remove-startup" data-name="${app.name}">Remove</button>
       </td>
@@ -813,10 +821,27 @@ function renderStartupApps(data: any) {
     tbody.appendChild(tr);
   });
 
+  // Attach event listeners to toggles
+  document.querySelectorAll(".toggle-startup").forEach((input: any) => {
+    input.onchange = () => toggleStartupApp(input.dataset.name, input.checked);
+  });
+
   // Attach event listeners to remove buttons
   document.querySelectorAll(".btn-remove-startup").forEach((btn: any) => {
     btn.onclick = () => removeStartupApp(btn.dataset.name);
   });
+}
+
+async function toggleStartupApp(name: string, enabled: boolean) {
+  addLog(`Requesting to ${enabled ? 'enable' : 'disable'} startup app: ${name}`, "action");
+  await apiRequest("/command", {
+    method: "POST",
+    body: JSON.stringify({
+      StartupToggle: { name, enabled }
+    })
+  });
+  showToast(`Request sent to ${enabled ? 'enable' : 'disable'} startup app`, "info");
+  await fetchData();
 }
 
 function setupStartupApps() {

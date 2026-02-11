@@ -190,7 +190,7 @@ fn execute(cmd: IpcCommand) {
                 let mut status = "success";
                 let mut error = None;
 
-                // Parse source from name e.g. "My App (HKLM)" or "script.bat (Folder)"
+                // Parse source from name e.g. "My App (HKCU)" or "script.bat (Folder)"
                 if name.ends_with("(HKCU)") {
                     let real_name = name.strip_suffix(" (HKCU)").unwrap();
                     let script = format!(
@@ -261,6 +261,65 @@ fn execute(cmd: IpcCommand) {
                     payload: serde_json::json!({
                         "type": "execution_result",
                         "command": "StartupRemove",
+                        "status": status,
+                        "error": error
+                    }),
+                });
+            }
+        }
+
+        IpcCommand::StartupToggle { name, enabled } => {
+            #[cfg(target_os = "windows")]
+            {
+                let mut status = "success";
+                let mut error = None;
+
+                // Handle registry entries only for now. Folder entries are complex to toggle.
+                if name.ends_with("(HKCU)") || name.ends_with("(HKLM)") {
+                    let (_hive_path, approved_path) = if name.ends_with("(HKCU)") {
+                        ("HKCU:\\Software\\Microsoft\\Windows\\CurrentVersion\\Run", 
+                         "HKCU:\\Software\\Microsoft\\Windows\\CurrentVersion\\Explorer\\StartupApproved\\Run")
+                    } else {
+                        ("HKLM:\\Software\\Microsoft\\Windows\\CurrentVersion\\Run",
+                         "HKLM:\\Software\\Microsoft\\Windows\\CurrentVersion\\Explorer\\StartupApproved\\Run")
+                    };
+
+                    let real_name = if name.ends_with("(HKCU)") {
+                        name.strip_suffix(" (HKCU)").unwrap()
+                    } else {
+                        name.strip_suffix(" (HKLM)").unwrap()
+                    };
+
+                    // Value 0x02 enabled, 0x03 disabled (binary byte array)
+                    let hex_val = if enabled { "02,00,00,00,00,00,00,00,00,00,00,00" } else { "03,00,00,00,00,00,00,00,00,00,00,00" };
+                    
+                    let script = format!(
+                        "Set-ItemProperty -Path '{}' -Name '{}' -Value ([byte[]]({})) -Type Binary -Force",
+                        approved_path,
+                        real_name.replace("'", "''"),
+                        hex_val
+                    );
+
+                    let output = std::process::Command::new("powershell").args(["-Command", &script]).output();
+                    if let Ok(out) = output {
+                        if !out.status.success() {
+                            status = "error";
+                            error = Some(String::from_utf8_lossy(&out.stderr).trim().to_string());
+                        }
+                    } else if let Err(e) = output {
+                        status = "error";
+                        error = Some(e.to_string());
+                    }
+                } else {
+                    status = "error";
+                    error = Some("Only registry startup items can be toggled currently.".to_string());
+                }
+
+                crate::ipc::server::IpcServer::broadcast_global(&crate::ipc::protocol::IpcMessage {
+                    schema_version: "1.0".to_string(),
+                    payload: serde_json::json!({
+                        "type": "execution_result",
+                        "command": "StartupToggle",
                         "status": status,
                         "error": error
                     }),

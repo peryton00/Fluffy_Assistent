@@ -12,8 +12,8 @@ use serde::Serialize;
 use std::collections::HashMap;
 use std::{
     sync::{
-        Arc,
         atomic::{AtomicBool, Ordering},
+        Arc,
     },
     thread,
     time::{Duration, SystemTime, UNIX_EPOCH},
@@ -102,7 +102,7 @@ fn unix_timestamp() -> u64 {
 fn get_startup_entries() -> Vec<StartupApp> {
     use std::ptr;
     use windows_sys::Win32::System::Registry::{
-        HKEY_CURRENT_USER, HKEY_LOCAL_MACHINE, KEY_READ, RegCloseKey, RegEnumValueW, RegOpenKeyExW,
+        RegCloseKey, RegEnumValueW, RegOpenKeyExW, HKEY_CURRENT_USER, HKEY_LOCAL_MACHINE, KEY_READ,
     };
 
     let mut entries = Vec::new();
@@ -307,6 +307,31 @@ fn collect_processes(system: &System, cpu_history: &mut CpuHistory) -> Vec<Proce
         .collect()
 }
 
+fn spawn_listener() {
+    println!("[Fluffy Core] Spawning Brain...");
+
+    let ui_dir = "../brain";
+
+    #[cfg(target_os = "windows")]
+    let res = std::process::Command::new("cmd")
+        .args(["/C", "python listener.py"])
+        .current_dir(ui_dir)
+        .spawn();
+
+    #[cfg(not(target_os = "windows"))]
+    let res = std::process::Command::new("python")
+        .args(["listener.py"])
+        .current_dir(ui_dir)
+        .spawn();
+
+    if let Err(e) = res {
+        eprintln!(
+            "[Fluffy Core] Failed to spawn brain: {}. Make sure you are running core from its directory and python is installed.",
+            e
+        );
+    }
+}
+
 fn spawn_ui() {
     println!("[Fluffy Core] Spawning UI Dashboard...");
     println!(
@@ -343,7 +368,9 @@ fn main() {
 
     // 🌐 Start ETW Network Monitor (Requires Admin)
     NetworkMonitor::start();
-
+    
+    // 👂 Start Brain Listener
+    spawn_listener();
     // 🚀 Launch UI Dashboard automatically
     spawn_ui();
 

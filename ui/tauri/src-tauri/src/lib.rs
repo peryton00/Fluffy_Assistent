@@ -99,8 +99,11 @@ pub fn run() {
             let show_i = MenuItem::with_id(app, "show", "Open Dashboard", true, None::<&str>)?;
             let menu = Menu::with_items(app, &[&show_i, &quit_i])?;
 
+            let icon_bytes = include_bytes!("../icons/icon.ico");
+            let icon = tauri::image::Image::from_bytes(icon_bytes).expect("failed to load icon");
+
             let _tray = TrayIconBuilder::new()
-                .icon(app.default_window_icon().unwrap().clone())
+                .icon(icon)
                 .menu(&menu)
                 .on_menu_event(|app, event| match event.id.as_ref() {
                     "quit" => {

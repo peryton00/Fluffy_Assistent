@@ -39,7 +39,7 @@ pub fn evaluate(cmd: &Command) -> PermissionDecision {
         }
 
         // Startup App Management
-        &Command::StartupAdd { .. } | &Command::StartupRemove { .. } => {
+        &Command::StartupAdd { .. } | &Command::StartupRemove { .. } | &Command::StartupToggle { .. } => {
             PermissionDecision::RequireConfirmation {
                 reason: "Modifying startup applications affects system boot".into(),
             }
