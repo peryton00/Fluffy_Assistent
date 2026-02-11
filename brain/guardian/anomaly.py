@@ -1,130 +1,145 @@
 class AnomalyDetector:
-    def __init__(self, cpu_threshold=3.0, ram_threshold=1.5, child_threshold=2.0):
-        # Thresholds are multipliers of the average
-        self.cpu_threshold = cpu_threshold
-        self.ram_threshold = ram_threshold
-        self.child_threshold = child_threshold
-        
-        # State tracking for resource trends (Keyed by PID)
-        self.pid_history = {} # PID -> { "cpu_samples": [], "ram_samples": [] }
-        
-        # State tracking for restart detection (Keyed by Name)
-        self.name_history = {} # Name -> { "last_pids": set(), "restarts": 0, "last_cycle_pids": set() }
+    """
+    Guardian Anomaly Detection Engine (Level 2)
+    Detects behavioral deviations by comparing live fingerprints against learned baselines.
+    """
+    def __init__(self, thresholds=None):
+        self.thresholds = thresholds or {
+            "cpu_multiplier": 3.0,
+            "ram_multiplier": 2.0,
+            "net_multiplier": 4.0,
+            "child_multiplier": 2.5,
+            "min_ram_growth": 5.0, # MB
+            "min_cpu_abs": 10.0, # %
+            "min_net_abs": 500.0 # KB/s
+        }
 
-    def analyze(self, process_info, baseline):
-        if not baseline or baseline.get("samples", 0) < 5:
+    def analyze(self, fingerprint, baseline):
+        """
+        Analyzes a process fingerprint against its baseline.
+        Returns a list of structured anomaly objects.
+        """
+        if not baseline or baseline.get("samples", 0) < 10:
+            # Not enough data to form a reliable baseline comparison
             return []
 
         anomalies = []
-        name = process_info["name"]
-        pid = process_info["pid"]
-        curr_cpu = process_info["cpu_percent"]
-        curr_ram = process_info["ram_mb"]
-        curr_children = len(process_info.get("children", []))
+        name = fingerprint.name
+        pid = fingerprint.pid
+        is_trusted = baseline.get("trusted", False)
 
-        # 1. Update Resource History (PID-specific)
-        if pid not in self.pid_history:
-            self.pid_history[pid] = {"cpu_samples": [], "ram_samples": []}
+        # 1. CPU Anomaly Detection
+        avg_cpu = max(baseline.get("avg_cpu", 1.0), 1.0)
+        cpu_triggered = False
         
-        phist = self.pid_history[pid]
-        phist["cpu_samples"] = (phist["cpu_samples"] + [curr_cpu])[-10:]
-        phist["ram_samples"] = (phist["ram_samples"] + [curr_ram])[-10:]
+        # Standard anomaly
+        if not is_trusted:
+            if fingerprint.cpu_ema > avg_cpu * self.thresholds["cpu_multiplier"] and fingerprint.cpu_ema > self.thresholds["min_cpu_abs"]:
+                cpu_triggered = True
+        # Hard limit for trusted
+        elif fingerprint.cpu_ema > 90.0:
+            cpu_triggered = True
 
-        # 2. Update Name History (Restart Detection)
-        if name not in self.name_history:
-            self.name_history[name] = {"all_pids_seen": set(), "cycle_pids": set(), "restarts": 0}
-        
-        nhist = self.name_history[name]
-        
-        # Cleanup: If a PID hasn't been seen in a while, it might be dead
-        # Truly robust cleanup would need a 'active_pids' list from listener
-
-        # --- ADVANCED ANOMALY DETECTION ---
-
-        baseline_samples = baseline.get("samples", 0)
-        
-        # A. CPU Anomaly (PID-based)
-        avg_cpu = max(baseline["avg_cpu"], 0.5)
-        if curr_cpu > avg_cpu * self.cpu_threshold and curr_cpu > 5.0:
-            sustained_count = sum(1 for c in phist["cpu_samples"][-5:] if c > avg_cpu * 2)
-            confidence = min(0.5 + (baseline_samples / 100), 0.95)
-            
-            if sustained_count >= 5:
-                anomalies.append({
-                    "type": "SUSTAINED_CPU",
-                    "severity": 3,
-                    "message": f"Sustained high CPU usage ({curr_cpu:.1f}%) detected for over 10s.",
-                    "actual": f"{curr_cpu:.1f}%",
-                    "baseline": f"{avg_cpu:.1f}%",
-                    "confidence": confidence,
-                    "samples": baseline_samples
-                })
-            else:
-                anomalies.append({
-                    "type": "CPU_SPIKE",
-                    "severity": 1,
-                    "message": f"CPU spike detected ({curr_cpu:.1f}%).",
-                    "actual": f"{curr_cpu:.1f}%",
-                    "baseline": f"{avg_cpu:.1f}%",
-                    "confidence": confidence * 0.8,
-                    "samples": baseline_samples
-                })
-
-        # B. RAM Anomaly (PID-based)
-        avg_ram = max(baseline["avg_ram"], 10.0)
-        if curr_ram > avg_ram * self.ram_threshold and curr_ram - avg_ram > 50:
-            confidence = min(0.6 + (baseline_samples / 100), 0.98)
-            if len(phist["ram_samples"]) >= 5:
-                is_leaking = all(phist["ram_samples"][i] < phist["ram_samples"][i+1] for i in range(len(phist["ram_samples"])-1))
-                if is_leaking:
-                    anomalies.append({
-                        "type": "MEMORY_LEAK",
-                        "severity": 3,
-                        "message": f"Potential memory leak detected. RAM has increased consistently to {curr_ram} MB.",
-                        "actual": f"{curr_ram} MB",
-                        "baseline": f"{avg_ram:.1f} MB",
-                        "confidence": confidence,
-                        "samples": baseline_samples
-                    })
-                else:
-                    anomalies.append({
-                        "type": "MEMORY_DEVIATION",
-                        "severity": 2,
-                        "message": f"Significant RAM deviation ({curr_ram} MB) from baseline ({avg_ram:.1f} MB).",
-                        "actual": f"{curr_ram} MB",
-                        "baseline": f"{avg_ram:.1f} MB",
-                        "confidence": confidence * 0.9,
-                        "samples": baseline_samples
-                    })
-
-        # C. Crash/Restart Loops (Name-based, cross-cycle logic)
-        # We only increment restarts if a NEW PID appears that wasn't in the previous cycle
-        if pid not in nhist["all_pids_seen"]:
-            nhist["restarts"] += 1
-            nhist["all_pids_seen"].add(pid)
-            
-        if nhist["restarts"] >= 4: # Threshold for "Loop"
-             anomalies.append({
-                "type": "RESTART_LOOP",
-                "severity": 5,
-                "message": f"Process instability detected. {name} has spawned {nhist['restarts']} unique PIDs recently.",
-                "actual": f"{nhist['restarts']} starts",
-                "baseline": "1 start",
-                "confidence": 0.9,
-                "samples": nhist["restarts"]
+        if cpu_triggered:
+            deviation = fingerprint.cpu_ema / avg_cpu if avg_cpu > 0 else 10.0
+            anomalies.append({
+                "pid": pid,
+                "process_name": name,
+                "type": "CPU_DEVIATION",
+                "deviation_ratio": round(deviation, 2),
+                "severity_score": 10 if is_trusted else min(10, int(deviation * 1.5)),
+                "confidence_score": 1.0 if is_trusted else self._calculate_confidence(baseline, duration_penalty=False),
+                "explanation": f"CRITICAL: Trusted process hit hard CPU limit ({fingerprint.cpu_ema:.1f}%)." if is_trusted else f"CPU usage ({fingerprint.cpu_ema:.1f}%) is {deviation:.1f}x higher than baseline ({avg_cpu:.1f}%)."
             })
 
-        # D. Process Proliferation
-        avg_children = max(baseline["avg_children"], 1.0)
-        if curr_children > avg_children * self.child_threshold and curr_children > avg_children + 2:
+        # 2. RAM Leak / Growth Detection
+        growth_rate = fingerprint.get_growth_rate()
+        avg_ram = max(baseline.get("avg_ram", 10.0), 10.0)
+        
+        # Trusted processes ignore leaks, only hit hard limit
+        if not is_trusted:
+            # Check for continuous growth (Leak)
+            if growth_rate > 1.0 and fingerprint.ram_ema > avg_ram * 1.2:
+                anomalies.append({
+                    "pid": pid,
+                    "process_name": name,
+                    "type": "MEMORY_LEAK",
+                    "deviation_ratio": round(growth_rate, 2),
+                    "severity_score": 6,
+                    "confidence_score": 0.8,
+                    "explanation": f"Sustained RAM growth detected ({growth_rate:.1f} MB/sample trend)."
+                })
+        
+        # RAM Explosion / Hard Limit (5GB = 5120MB)
+        ram_triggered = False
+        if not is_trusted:
+            if fingerprint.ram_ema > avg_ram * self.thresholds["ram_multiplier"]:
+                ram_triggered = True
+        elif fingerprint.ram_ema > 5120.0:
+            ram_triggered = True
+
+        if ram_triggered:
+            deviation = fingerprint.ram_ema / avg_ram if avg_ram > 0 else 10.0
             anomalies.append({
-                "type": "CHILD_PROLIFERATION",
-                "severity": 3,
-                "message": f"Sudden explosion of child processes: {curr_children} (Normal: ~{avg_children:.1f}).",
-                "actual": str(curr_children),
-                "baseline": f"~{avg_children:.1f}",
-                "confidence": 0.9,
-                "samples": baseline_samples
+                "pid": pid,
+                "process_name": name,
+                "type": "MEMORY_EXPLOSION",
+                "deviation_ratio": round(deviation, 2),
+                "severity_score": 10 if is_trusted else 7,
+                "confidence_score": 1.0 if is_trusted else 0.9,
+                "explanation": f"CRITICAL: Trusted process hit hard RAM limit ({fingerprint.ram_ema:.0f} MB)." if is_trusted else f"RAM usage ({fingerprint.ram_ema:.0f} MB) is {deviation:.1f}x higher than baseline ({avg_ram:.0f} MB)."
+            })
+
+        # 3. Network Anomaly Detection (Ignored for trusted unless we want hard limits there too)
+        if not is_trusted:
+            avg_net_sent = max(baseline.get("avg_net_sent", 0.0), 10.0)
+            if fingerprint.net_sent_ema > avg_net_sent * self.thresholds["net_multiplier"] and fingerprint.net_sent_ema > self.thresholds["min_net_abs"]:
+                deviation = fingerprint.net_sent_ema / avg_net_sent
+                anomalies.append({
+                    "pid": pid,
+                    "process_name": name,
+                    "type": "NETWORK_BURST",
+                    "deviation_ratio": round(deviation, 2),
+                    "severity_score": 8,
+                    "confidence_score": 0.85,
+                    "explanation": f"Outbound network flow ({fingerprint.net_sent_ema:.1f} KB/s) is {deviation:.1f}x higher than baseline ({avg_net_sent:.1f} KB/s)."
+                })
+
+        # 4. Child Proliferation (Ignored for trusted)
+        if not is_trusted:
+            avg_children = max(baseline.get("avg_children", 0.0), 1.0)
+            curr_children = fingerprint.child_counts[-1] if fingerprint.child_counts else 0
+            if curr_children > avg_children * self.thresholds["child_multiplier"] and curr_children > avg_children + 3:
+                deviation = curr_children / avg_children
+                anomalies.append({
+                    "pid": pid,
+                    "process_name": name,
+                    "type": "CHILD_EXPLOSION",
+                    "deviation_ratio": round(deviation, 2),
+                    "severity_score": 9,
+                    "confidence_score": 0.95,
+                    "explanation": f"Process spawned {curr_children} children (Typical: ~{avg_children:.1f})."
+                })
+
+        # 5. Respawn Loops (Restart Frequency)
+        # Restart loops are detected via baseline.restart_count > threshold
+        if baseline.get("restart_count", 0) > 5:
+            anomalies.append({
+                "pid": pid,
+                "process_name": name,
+                "type": "RESTART_LOOP",
+                "deviation_ratio": float(baseline["restart_count"]),
+                "severity_score": 10,
+                "confidence_score": 1.0,
+                "explanation": f"Process instability: detected {baseline['restart_count']} restarts in a short window."
             })
 
         return anomalies
+
+    def _calculate_confidence(self, baseline, duration_penalty=True):
+        """
+        Calculates confidence based on baseline sample size.
+        """
+        samples = baseline.get("samples", 0)
+        confidence = min(0.5 + (samples / 100), 0.98)
+        return round(confidence, 2)

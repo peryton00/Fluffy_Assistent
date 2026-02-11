@@ -47,3 +47,12 @@ class AuditEngine:
         if process_name:
             return [e for e in self.events if e["process"] == process_name]
         return self.events
+
+    def clear_all_data(self):
+        self.events = []
+        if os.path.exists(self.path):
+            try:
+                os.remove(self.path)
+            except Exception:
+                pass
+        self.save()

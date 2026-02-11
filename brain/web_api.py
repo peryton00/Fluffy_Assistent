@@ -4,6 +4,7 @@ from commands import send_command
 import os
 import socket
 import json
+import sys
 
 app = Flask(__name__)
 
@@ -38,10 +39,11 @@ def status():
     if state.SHUTDOWN_MODE:
         return jsonify({"status": "shutdown"})
 
-    if state.LATEST_STATE is None:
-        return jsonify({"status": "initializing"})
+    with state.LOCK:
+        if state.LATEST_STATE is None:
+            return jsonify({"status": "initializing"})
+        full_state = state.LATEST_STATE.copy()
     
-    full_state = state.LATEST_STATE.copy()
     full_state["pending_confirmations"] = state.get_confirmations()
     full_state["security_alerts"] = state.SECURITY_ALERTS
     full_state["notifications"] = state.get_notifications()
@@ -110,7 +112,7 @@ def security_action():
                 break
     
     # 2. Update Monitors and Memory
-    from listener import GUARDIAN_MEMORY, GUARDIAN_AUDIT
+    from guardian_manager import GUARDIAN_MEMORY, GUARDIAN_AUDIT
     
     if state.MONITOR:
         if action == "ignore":
@@ -131,6 +133,38 @@ def security_action():
             state.add_execution_log(f"Process {process_name} marked as DANGEROUS", "warning")
             
     return jsonify({"ok": True})
+
+
+@app.route("/trust_process", methods=["POST"])
+def trust_process():
+    if request.remote_addr not in ("127.0.0.1", "::1"):
+        return jsonify({"error": "Forbidden"}), 403
+    token = request.headers.get("X-Fluffy-Token")
+    if token != FLUFFY_TOKEN:
+        return jsonify({"error": "Unauthorized"}), 401
+    
+    data = request.get_json(silent=True)
+    process_name = data.get("process")
+    if not process_name:
+        return jsonify({"error": "Missing process name"}), 400
+    
+    from guardian_manager import GUARDIAN_BASELINE
+    GUARDIAN_BASELINE.mark_trusted(process_name)
+    state.add_execution_log(f"Manual trust: {process_name} behaviors are now whitelisted", "info")
+    return jsonify({"ok": True, "message": f"Behavior for {process_name} marked as trusted."})
+
+
+@app.route("/clear_guardian_data", methods=["POST"])
+def clear_guardian_data():
+    if request.remote_addr not in ("127.0.0.1", "::1"):
+        return jsonify({"error": "Forbidden"}), 403
+    token = request.headers.get("X-Fluffy-Token")
+    if token != FLUFFY_TOKEN:
+        return jsonify({"error": "Unauthorized"}), 401
+
+    from guardian_manager import reset_guardian
+    reset_guardian()
+    return jsonify({"ok": True, "message": "All Guardian recognition data cleared and state reset. Re-entering learning phase."})
 
 
 

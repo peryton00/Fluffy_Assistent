@@ -56,3 +56,14 @@ class GuardianMemory:
 
     def is_ignored(self, name):
         return name in self.ignored_names
+
+    def clear_all_data(self):
+        self.trusted_names = set()
+        self.dangerous_names = set()
+        self.ignored_names = set()
+        if os.path.exists(self.path):
+            try:
+                os.remove(self.path)
+            except Exception:
+                pass
+        self.save()

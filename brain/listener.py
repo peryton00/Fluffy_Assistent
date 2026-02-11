@@ -4,13 +4,12 @@ from threading import Thread
 from interpreter import interpret
 from recommender import recommend
 from security_monitor import SecurityMonitor
-from guardian.baseline import BaselineEngine
-from guardian.anomaly import AnomalyDetector
-from guardian.scorer import RiskScorer
-from guardian.memory import GuardianMemory
-from guardian.intervention import InterventionEngine, InterventionLevel
-from guardian.audit import AuditEngine
 from guardian.verdict import generate_verdicts
+from guardian_manager import (
+    GUARDIAN_MEMORY, GUARDIAN_BASELINE, GUARDIAN_DETECTOR, GUARDIAN_SCORER,
+    GUARDIAN_FINGERPRINTS, GUARDIAN_CHAINS, GUARDIAN_STATE, GUARDIAN_INTERVENTION,
+    GUARDIAN_AUDIT, reset_guardian
+)
 import state
 
 import socket
@@ -28,15 +27,12 @@ IPC_PORT = 9001
 shutting_down = False
 ipc_socket = None
 
-# Guardian Components
-GUARDIAN_MEMORY = GuardianMemory(persistence_path="fluffy_data/guardian/memory.json")
-GUARDIAN_BASELINE = BaselineEngine(persistence_path="fluffy_data/guardian/baselines.json")
-GUARDIAN_DETECTOR = AnomalyDetector()
-GUARDIAN_SCORER = RiskScorer(memory=GUARDIAN_MEMORY)
-GUARDIAN_INTERVENTION = InterventionEngine()
-GUARDIAN_AUDIT = AuditEngine(persistence_path="fluffy_data/guardian/audit.json")
+
 PROCESS_MSG_COUNTER = 0 # For periodic saving
 PROACTIVE_PROMPTS = set() # Track processes already prompted for confirmation
+
+
+
 
 
 # -----------------------------
@@ -131,19 +127,48 @@ def compute_signals(msg):
 
 
 def compute_health(signals, security_alerts):
-    # Determine overall system health based on resource pressure and security threats
-    if security_alerts:
-        return "CRITICAL" # Security threats are always critical
+    reasons = []
     
+    # 1. Security (Log-based)
+    if security_alerts:
+        reasons.append("Active security threats detected in system logs.")
+    
+    # 2. Resource Inputs
     cpu = signals.get("cpu_pressure", "NORMAL")
     ram = signals.get("memory_pressure", "LOW")
 
-    if cpu == "OVERLOADED" or ram == "CRITICAL":
-        return "CRITICAL"
-    if cpu == "BUSY" or ram == "HIGH":
-        return "WARNING"
+    if cpu == "OVERLOADED":
+        reasons.append("Extreme CPU pressure detected.")
+    elif cpu == "BUSY":
+        reasons.append("High CPU usage detected.")
+
+    if ram == "CRITICAL":
+        reasons.append("System memory is nearly full.")
+    elif ram == "HIGH":
+        reasons.append("High memory usage detected.")
+
+    # 3. Status Determination (Pure System Health)
+    is_critical = (cpu == "OVERLOADED" or ram == "CRITICAL" or security_alerts)
+    is_warning = (cpu == "BUSY" or ram == "HIGH")
+
+    if is_critical:
+        status = "critical"
+    elif is_warning:
+        status = "warning"
+    else:
+        status = "healthy"
     
-    return "HEALTHY"
+    # Guardian info is still good for 'Reasons' but won't trigger status change
+    guardian = GUARDIAN_STATE.current_state
+    if guardian == GUARDIAN_STATE.CRITICAL:
+        reasons.append("[Guardian] Critical behavioral anomalies present.")
+    elif guardian in (GUARDIAN_STATE.ALERT, GUARDIAN_STATE.DEFENSIVE):
+        reasons.append(f"[Guardian] System in {guardian} mode.")
+
+    if not reasons:
+        reasons.append("No issues detected. System is optimized.")
+
+    return status, reasons
 
 
 # -----------------------------
@@ -170,52 +195,76 @@ def handle_message(raw_msg, monitor):
     interpretations = interpret(msg)
     recommendations = recommend(msg)
 
-    # --- GUARDIAN INTELLIGENCE (Phase 10.1) ---
+    # --- GUARDIAN ENGINE (Level 2) ---
     all_guardian_verdicts = []
     processes = msg.get("system", {}).get("processes", {}).get("top_ram", [])
+    active_pids = [p["pid"] for p in processes]
     
+    current_scores = {}
+    
+    # 5-Minute Learning Mode Check
+    learning_progress = GUARDIAN_BASELINE.get_learning_progress()
+    is_learning = learning_progress < 100
+
     for p in processes:
+        pid = p["pid"]
         name = p["name"]
         cpu = p["cpu_percent"]
         ram = p["ram_mb"]
-        children_count = len(p.get("children", []))
+        net_sent = p.get("net_sent", 0.0)
+        net_received = p.get("net_received", 0.0)
+        child_count = len(p.get("children", []))
         
-        # 1. Update Baseline
-        GUARDIAN_BASELINE.update(name, cpu, ram, children_count)
+        # 1. Update / Load Fingerprint
+        fp = GUARDIAN_FINGERPRINTS.track(pid, name, cpu, ram, net_sent, net_received, child_count)
         
-        # 2. Detect Anomalies
+        # 2. Get Baseline
         baseline = GUARDIAN_BASELINE.get_baseline(name)
-        raw_anomalies = GUARDIAN_DETECTOR.analyze(p, baseline)
         
-        # 3. Score and Filter (Phases 10.2 & 10.3)
-        score, escalated_anomalies = GUARDIAN_SCORER.score(name, raw_anomalies)
+        # 3. Detect Anomalies
+        anomalies = GUARDIAN_DETECTOR.analyze(fp, baseline)
         
-        # 4. Intervention Logic (Phase 10.4)
-        level = GUARDIAN_INTERVENTION.get_level(score)
-        recommendation = GUARDIAN_INTERVENTION.get_action_recommendation(name, escalated_anomalies, level)
+        # 4. Behavioral Chain Tracking
+        chain_multiplier = GUARDIAN_CHAINS.update(pid, name, anomalies)
         
-        if level >= InterventionLevel.REQUEST_PERMISSION and name not in PROACTIVE_PROMPTS:
-            PROACTIVE_PROMPTS.add(name)
-            details_str = f"Guardian recommendation: {recommendation}\nProcess {name} (PID {p['pid']}) is exhibiting extremely high risk behavior."
-            state.add_confirmation(
-                cmd_id=f"kill_{p['pid']}_{int(time.time())}",
-                cmd_name="Kill Process",
-                details=details_str
-            )
-            GUARDIAN_AUDIT.log_event("Intervention", name, {"action": "Request Permission", "score": score, "reason": recommendation})
-            add_execution_log(f"Proactive intervention requested for {name}", "action")
-
-        # 5. Generate Verdicts
-        if escalated_anomalies and level >= InterventionLevel.WARN:
-            verdicts = generate_verdicts(name, score, escalated_anomalies, level, recommendation)
+        # 5. Risk Scoring
+        risk_score = GUARDIAN_SCORER.score(name, pid, anomalies) * chain_multiplier
+        current_scores[pid] = risk_score
+        
+        # 6. Generate Verdicts (Level 2)
+        level = GUARDIAN_SCORER.get_level(risk_score)
+        
+        # Verdict Generation (Suppressed during initial 5-min Learning Mode)
+        if not is_learning:
+            verdicts = generate_verdicts(name, pid, risk_score, anomalies, level, 0.8)
             all_guardian_verdicts.extend(verdicts)
-            GUARDIAN_AUDIT.log_event("Alert", name, {"score": score, "level": level.name, "anomalies": escalated_anomalies})
-        
-        elif escalated_anomalies and level == InterventionLevel.INFORM:
-            # Silent log only
-            for a in escalated_anomalies:
-                add_execution_log(f"[Guardian/Info] {name}: {a['message']}", "system")
-                GUARDIAN_AUDIT.log_event("Observation", name, {"anomaly": a})
+            
+            # Audit logging
+            if anomalies:
+                 GUARDIAN_AUDIT.log_event("BehaviorAlert", name, {"score": risk_score, "level": level, "anomalies": anomalies})
+
+            # Confirmation Logic (Level: Request Confirmation) -> Only if not learning
+            if level == "Request Confirmation" and name not in PROACTIVE_PROMPTS:
+                PROACTIVE_PROMPTS.add(name)
+                v = verdicts[0] if verdicts else {"reason": "Undetermined risk", "explanation": "High suspicion score"}
+                details_str = f"Guardian Alert: {v['reason']}\n{v['explanation']}\n\nThis process has exceeded the safety threshold (Score: {risk_score:.1f}). Should Fluffy terminate it?"
+                state.add_confirmation(
+                    cmd_id=f"kill_{pid}_{int(time.time())}",
+                    cmd_name="Terminate Suspicious Process",
+                    details=details_str
+                )
+                add_execution_log(f"Guardian requesting confirmation to terminate {name}", "action")
+
+        # 7. Update Baseline (Slow adaptation)
+        GUARDIAN_BASELINE.update(name, cpu, ram, child_count, net_sent, net_received)
+
+    # Global State Update
+    GUARDIAN_STATE.update(current_scores)
+    
+    # Cleanup dead PIDs
+    GUARDIAN_FINGERPRINTS.cleanup(active_pids)
+    GUARDIAN_CHAINS.cleanup(active_pids)
+    GUARDIAN_SCORER.cleanup(active_pids)
 
     # Periodic baseline save (every 50 telemetry messages)
     global PROCESS_MSG_COUNTER
@@ -224,16 +273,20 @@ def handle_message(raw_msg, monitor):
         GUARDIAN_BASELINE.save()
         PROCESS_MSG_COUNTER = 0
 
-    # Inject Guardian insights into the pipeline
-    msg["_insights"] = interpretations + all_guardian_verdicts
+    # Inject Guardian insights and State into the pipeline
+    msg["_insights"] = interpretations + [f"[Guardian] {v['process']}: {v['level']} - {v['reason']}" for v in all_guardian_verdicts]
+    guardian_state_info = GUARDIAN_STATE.get_ui_info()
+    guardian_state_info["learning_progress"] = learning_progress
+    guardian_state_info["is_learning"] = is_learning
+    msg["_guardian_state"] = guardian_state_info
+    msg["_guardian_verdicts"] = all_guardian_verdicts # Structured for UI
     msg["_recommendations"] = recommendations
     
     # Authoritative health status
-    msg["system"]["health"] = compute_health(signals, security_alerts)
+    health_status, health_reasons = compute_health(signals, security_alerts)
+    msg["system"]["health"] = health_status
+    msg["system"]["health_reasons"] = health_reasons
 
-    add_execution_log("Telemetry received from core", "system")
-
-    # Push ONE complete snapshot to UI
     update_state(msg)
 
     if interpretations:
@@ -329,6 +382,12 @@ def main():
                                     add_notification(f"Command failed: {error_msg}", "error")
                                 else:
                                     add_notification(f"Command {msg_data.get('command')} failed", "error")
+                            else:
+                                cmd_name = msg_data.get('command')
+                                if cmd_name == "KillProcess":
+                                    add_notification("Process terminated successfully", "success")
+                                else:
+                                    add_notification(f"{cmd_name} executed successfully", "success")
 
                             add_execution_log(
                                 f"Command {msg_data.get('command')} {status}" + (f": {error_msg}" if error_msg else ""),

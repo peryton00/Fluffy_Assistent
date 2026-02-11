@@ -6,6 +6,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>Fluffy Desktop Dashboard</title>
   <link rel="stylesheet" href="/src/styles.css" />
+  <link rel="stylesheet" href="/src/styles-enhanced.css" />
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700&display=swap" rel="stylesheet">
@@ -16,14 +17,23 @@
     <!-- Sidebar -->
     <aside class="sidebar">
       <div class="sidebar-header">
-        <div class="logo-circle">
-          <img src="/logo.png" alt="Fluffy Logo" class="logo-img">
+        <div class="logo-group">
+          <div class="logo-circle">
+            <img src="/logo.png" alt="Fluffy Logo" class="logo-img">
+          </div>
+          <span class="logo-text">Fluffy</span>
         </div>
-        <span class="logo-text">Fluffy</span>
+        <div class="notification-area">
+          <div id="guardian-notification-icon" class="notification-icon" title="Guardian Notifications">
+            🛡️
+            <span id="notification-badge" class="notification-badge">0</span>
+          </div>
+        </div>
       </div>
       <nav class="sidebar-nav">
         <a href="#" class="nav-item active" id="nav-dashboard">Dashboard</a>
         <a href="#" class="nav-item" id="nav-processes">Processes</a>
+        <a href="#" class="nav-item" id="nav-guardian">Guardian</a>
         <a href="#" class="nav-item" id="nav-analytics">Analytics</a>
         <a href="#" class="nav-item" id="nav-startup">Startup Apps</a>
         <a href="#" class="nav-item" id="nav-settings">Settings</a>
@@ -106,6 +116,7 @@
             <h2 id="health-status">Healthy</h2>
             <div class="card-actions">
               <button class="btn-primary btn-sm" id="btn-normalize">Normalize</button>
+              <button class="btn-outline btn-sm" id="btn-health-details">Details</button>
             </div>
             <p class="card-comparison">Optimized</p>
           </div>
@@ -237,6 +248,34 @@
         </div>
       </section>
 
+      <!-- VIEW: GUARDIAN -->
+      <section id="section-guardian" class="view-section">
+        <div class="card full-width guardian-view-card">
+          <div class="card-header">
+            <div class="header-with-badge">
+              <h3>Behavioral Guardian</h3>
+              <span class="view-badge">Level 2 Protection</span>
+            </div>
+            <p class="section-desc">Real-time intent analysis and behavioral chain tracking.</p>
+            <div id="learning-mode-indicator" class="learning-banner" style="display: none;">
+              <span class="learning-icon">🧠</span>
+              <div class="learning-info">
+                <strong>Initial Learning Phase</strong>
+                <p>Establishing behavioral baselines. Alerts suppressed: <span id="learning-progress">0</span>%</p>
+              </div>
+            </div>
+          </div>
+          <div id="guardian-alerts" class="guardian-alerts-container large-view">
+            <!-- Populated via JS -->
+            <div class="guardian-empty-state">
+              <div class="empty-icon">🛡️</div>
+              <h3>System Secure</h3>
+              <p>No suspicious behavioral chains detected in the last window.</p>
+            </div>
+          </div>
+        </div>
+      </section>
+
       <!-- VIEW: ANALYTICS -->
       <section id="section-analytics" class="view-section">
         <div class="card analytics-card full-width">
@@ -298,6 +337,14 @@
             <div class="form-group">
               <label>Refresh Interval (ms)</label>
               <input type="number" value="2000" readonly>
+            </div>
+            <div class="setting-divider"></div>
+            <div class="setting-item">
+              <div class="setting-info">
+                <strong>Guardian Knowledge</strong>
+                <p>Wipe all learned behavioral patterns and restart the 5-minute learning phase.</p>
+              </div>
+              <button id="btn-clear-guardian" class="btn-outline btn-danger">Clear recognition data</button>
             </div>
           </div>
         </div>
@@ -401,7 +448,35 @@
     </div>
   </div>
 
+  <!-- Floating Window: Guardian Notifications -->
+  <div id="notification-portal" class="notification-portal">
+    <div class="portal-header">
+      <h4>Guardian Alerts</h4>
+      <button id="close-portal" class="close-btn">&times;</button>
+    </div>
+    <div id="notification-list" class="notification-list">
+      <!-- Guardian autonomous alerts appear here -->
+      <p class="empty-notif">No new security suggestions.</p>
+    </div>
+  </div>
+
   <script type="module" src="/src/main.ts"></script>
+  <!-- Health Details Modal -->
+  <div id="health-details-modal" class="modal-overlay">
+    <div class="modal-card">
+      <div class="modal-header">
+        <h3>System Health Breakdown</h3>
+        <button class="close-btn" id="close-health-details">&times;</button>
+      </div>
+      <div class="modal-body">
+        <p>Current health status is determined by aggregate resource pressure and security signals.</p>
+        <ul id="health-reasons-list" class="reason-list">
+          <!-- Populated via JS -->
+        </ul>
+      </div>
+    </div>
+  </div>
+
 </body>
 
 </html>

@@ -123,7 +123,7 @@ function showToast(message: string, type: "success" | "error" | "info" = "succes
    NAVIGATION & SEARCH
 ========================= */
 function setupNavigation() {
-  const navItems = ["dashboard", "processes", "analytics", "startup", "settings"];
+  const navItems = ["dashboard", "processes", "guardian", "analytics", "startup", "settings"];
   navItems.forEach(id => {
     const btn = document.getElementById(`nav-${id}`);
     if (btn) {
@@ -209,8 +209,16 @@ function setupNavigation() {
   const okResultBtn = document.getElementById("result-ok");
   if (resultModal && closeResultBtn && okResultBtn) {
     const hide = () => resultModal.classList.remove("active");
-    closeResultBtn.onclick = hide;
     okResultBtn.onclick = hide;
+  }
+
+  const clearGuardianBtn = document.getElementById("btn-clear-guardian");
+  if (clearGuardianBtn) {
+    clearGuardianBtn.onclick = async () => {
+      if (confirm("This will wipe all learned process behaviors. Are you sure?")) {
+        await clearGuardianData();
+      }
+    };
   }
 }
 
@@ -343,12 +351,12 @@ async function confirmCommand(commandId: string, approve: boolean = true) {
   await fetchData();
 }
 
-async function killProcess(pid: number, mode: string = "tree") {
+async function killProcess(pid: number, mode: string = "tree", skipConfirm = false) {
   const msg = mode === "tree"
     ? "Terminate this process and ALL its children?"
     : "Terminate ONLY this process?";
 
-  if (!confirm(`⚠ ${msg}\nUnsaved work may be lost.`)) return;
+  if (!skipConfirm && !confirm(`⚠ ${msg}\nUnsaved work may be lost.`)) return;
 
   // Optimistic UI: Mark for removal
   pendingKills.add(pid);
@@ -692,6 +700,28 @@ function renderDashboard(data: any) {
   if (speedBtn) {
     speedBtn.onclick = () => runSpeedTest();
   }
+
+  const healthDetailsBtn = document.getElementById("btn-health-details");
+  if (healthDetailsBtn) {
+    healthDetailsBtn.onclick = () => {
+      const reasons = data.system?.health_reasons || ["No specific health signals recorded."];
+      showHealthDetailsModal(reasons);
+    };
+  }
+}
+
+function showHealthDetailsModal(reasons: string[]) {
+  const modal = document.getElementById("health-details-modal") as HTMLElement;
+  const list = document.getElementById("health-reasons-list") as HTMLElement;
+  const closeBtn = document.getElementById("close-health-details");
+
+  if (!modal || !list || !closeBtn) return;
+
+  list.innerHTML = reasons.map(r => `<li>${r}</li>`).join("");
+  modal.style.display = "flex";
+
+  closeBtn.onclick = () => modal.style.display = "none";
+  modal.onclick = (e) => { if (e.target === modal) modal.style.display = "none"; };
 }
 
 async function runSpeedTest() {
@@ -832,6 +862,89 @@ function renderStartupApps(data: any) {
   });
 }
 
+async function trustProcess(name: string, risk_score: number) {
+  addLog(`Requesting to trust behavior for: ${name}`, "action");
+
+  // Optimistic UI: find and remove the card immediately
+  const cardId = `alert-${name}-${risk_score}`;
+  const card = document.getElementById(cardId);
+  if (card) {
+    card.style.opacity = "0";
+    card.style.transform = "translateX(50px)";
+    setTimeout(() => card.remove(), 300);
+  }
+
+  const res = await apiRequest("/trust_process", {
+    method: "POST",
+    body: JSON.stringify({ process: name })
+  });
+  if (res && res.ok) {
+    showToast(`Behavior for ${name} is now trusted.`, "success");
+    await fetchData();
+  }
+}
+
+async function clearGuardianData() {
+  addLog("Requesting to clear all Guardian recognition data", "action");
+  const res = await apiRequest("/clear_guardian_data", { method: "POST" });
+  if (res && res.ok) {
+    showToast("Guardian data cleared. Learning phase restarted.", "info");
+    await fetchData();
+  }
+}
+
+function renderGuardianAlerts(data: any) {
+  const container = document.getElementById("guardian-alerts");
+  if (!container) return;
+
+  const verdicts = data._guardian_verdicts || [];
+
+  if (verdicts.length === 0) {
+    container.innerHTML = `
+      <div class="guardian-empty-state">
+        <div class="empty-icon">🛡️</div>
+        <h3>System Secure</h3>
+        <p>No suspicious behavioral chains detected in the last window.</p>
+      </div>
+    `;
+    return;
+  }
+
+  container.innerHTML = "";
+  verdicts.forEach((v: any) => {
+    const card = document.createElement("div");
+    const cardId = `alert-${v.process}-${v.risk_score}`;
+    card.id = cardId;
+    card.className = `alert-card ${v.level.toLowerCase().replace(" ", "-")}`;
+    card.innerHTML = `
+      <div class="alert-header">
+        <span class="alert-icon">⚠️</span>
+        <div>
+          <h4>${v.process}</h4>
+          <span class="alert-level">${v.level} (Score: ${v.risk_score.toFixed(1)})</span>
+        </div>
+      </div>
+      <p class="alert-reason"><strong>Reason:</strong> ${v.reason}</p>
+      <p class="alert-explanation">${v.explanation}</p>
+      <div class="alert-actions">
+        <button class="btn-primary btn-sm btn-kill" id="kill-${v.process}-${v.risk_score}">Terminate</button>
+        <button class="btn-outline btn-sm btn-trust" id="trust-${v.process}-${v.risk_score}">Trust Behavior</button>
+      </div>
+    `;
+    container.appendChild(card);
+
+    const killBtn = card.querySelector(".btn-kill") as HTMLButtonElement;
+    if (killBtn) {
+      killBtn.onclick = () => killProcess(v.pid, "tree", true);
+    }
+
+    const trustBtn = card.querySelector(".btn-trust") as HTMLButtonElement;
+    if (trustBtn) {
+      trustBtn.onclick = () => trustProcess(v.process, v.risk_score);
+    }
+  });
+}
+
 async function toggleStartupApp(name: string, enabled: boolean) {
   addLog(`Requesting to ${enabled ? 'enable' : 'disable'} startup app: ${name}`, "action");
   await apiRequest("/command", {
@@ -957,23 +1070,44 @@ function renderUI(data: any) {
   const activeSection = document.querySelector(".view-section.active")?.id;
   if (activeSection === "section-dashboard") renderDashboard(data);
   else if (activeSection === "section-processes") renderProcesses(data);
+  else if (activeSection === "section-guardian") renderGuardianAlerts(data);
   else if (activeSection === "section-analytics") renderAnalytics(data);
   else if (activeSection === "section-startup") renderStartupApps(data);
 
-  // Status Dot (Tray Color Sync)
-  const statusDot = document.getElementById("system-status-dot");
-  if (statusDot && data.system && data.system.health) {
-    statusDot.className = "status-dot " + data.system.health.toLowerCase();
+  // Learning Mode Banner
+  const learningBanner = document.getElementById("learning-mode-indicator");
+  const learningProgress = document.getElementById("learning-progress");
+  if (learningBanner && learningProgress && data._guardian_state) {
+    const isLearning = data._guardian_state.is_learning;
+    learningBanner.style.display = isLearning ? "flex" : "none";
+    learningProgress.innerText = data._guardian_state.learning_progress.toString();
   }
 
-  // Confirmations (global layer)
+  // Status Dot (Tray Color Sync) - Strictly system health
+  const statusDot = document.getElementById("system-status-dot");
+  if (statusDot) {
+    const systemHealth = data.system?.health?.toLowerCase() || "healthy";
+    statusDot.className = "status-dot " + systemHealth;
+  }
+
+  // Guardian Notifications (Sidebar Portal)
+  renderGuardianNotifications(data);
+
+  // Confirmations (global layer) - Filter out Guardian autonomous ones
   const warn = document.getElementById("admin-warning");
-  const confs = data.pending_confirmations || [];
+  const allConfs = data.pending_confirmations || [];
+
+  // High-level filter: Only show manual/system confirmations here
+  const systemConfs = allConfs.filter((c: any) =>
+    !c.command_name.includes("Guardian") &&
+    !c.details.toLowerCase().includes("suspicious")
+  );
+
   if (warn) {
-    if (confs.length > 0) {
+    if (systemConfs.length > 0) {
       warn.style.display = "block";
       warn.innerHTML = "<h4>⚠ Action Required</h4>";
-      confs.forEach((c: any) => {
+      systemConfs.forEach((c: any) => {
         const div = document.createElement("div");
         div.className = "confirm-item";
         div.innerHTML = `
@@ -994,13 +1128,80 @@ function renderUI(data: any) {
     }
   }
 
+  // Admin warning globally handled at the top of renderUI
+  // Guardian Alerts moved to dedicated tab
+
   // Notifications (Toast Feedback from Backend)
   if (data.notifications && data.notifications.length > 0) {
     data.notifications.forEach((n: any) => {
       showToast(n.message, n.type || "info");
     });
-    // Clear notifications to prevent re-toast on re-render of the same data object
+    // Clear notifications to prevent re-toast on re-render
     data.notifications = [];
+  }
+}
+
+function renderGuardianNotifications(data: any) {
+  const icon = document.getElementById("guardian-notification-icon");
+  const badge = document.getElementById("notification-badge");
+  const list = document.getElementById("notification-list");
+
+  const verdicts = data._guardian_verdicts || [];
+  const confs = (data.pending_confirmations || []).filter((c: any) =>
+    c.command_name.includes("Guardian") || c.details.toLowerCase().includes("suspicious")
+  );
+
+  const totalCount = verdicts.length + confs.length;
+
+  if (badge) {
+    badge.innerText = totalCount.toString();
+    if (totalCount > 0) icon?.classList.add("has-alerts");
+    else icon?.classList.remove("has-alerts");
+  }
+
+  if (list) {
+    if (totalCount === 0) {
+      list.innerHTML = `<p class="empty-notif">No new security suggestions.</p>`;
+      return;
+    }
+
+    list.innerHTML = "";
+
+    // Render Confirmations first
+    confs.forEach((c: any) => {
+      const div = document.createElement("div");
+      div.className = "notif-item confirm";
+      div.innerHTML = `
+        <div class="notif-item-header">
+           <span class="notif-process">🚨 ${c.command_name}</span>
+        </div>
+        <p class="notif-reason">${c.details}</p>
+        <div class="confirm-actions" style="margin-top: 8px;">
+          <button class="btn-primary btn-xs" onclick="confirmCommand('${c.command_id}', true)">Confirm</button>
+          <button class="btn-outline btn-xs" onclick="confirmCommand('${c.command_id}', false)">Cancel</button>
+        </div>
+      `;
+      list.appendChild(div);
+    });
+
+    // Render Verdicts
+    verdicts.forEach((v: any) => {
+      const div = document.createElement("div");
+      div.className = "notif-item";
+      div.onclick = () => {
+        // Switch to Guardian tab
+        document.getElementById("nav-guardian")?.click();
+        document.getElementById("notification-portal")?.classList.remove("active");
+      };
+      div.innerHTML = `
+        <div class="notif-item-header">
+          <span class="notif-process">${v.process}</span>
+          <span class="notif-score" style="color: ${v.risk_score > 12 ? 'var(--error)' : 'var(--warning)'}">${v.risk_score.toFixed(1)}</span>
+        </div>
+        <p class="notif-reason">${v.reason}</p>
+      `;
+      list.appendChild(div);
+    });
   }
 }
 
@@ -1075,6 +1276,38 @@ listen('ui-active', async (event) => {
 // Initial connection attempt with higher retry for boot up
 console.log("Initializing Fluffy Dashboard connection...");
 addLog("Connecting to Fluffy Brain...", "system");
+
+function setupUIListeners() {
+  // Sidebar Notifications Portal
+  const icon = document.getElementById("guardian-notification-icon");
+  const portal = document.getElementById("notification-portal");
+  const closePortal = document.getElementById("close-portal");
+
+  if (icon && portal) {
+    icon.onclick = (e) => {
+      e.stopPropagation();
+      portal.classList.toggle("active");
+    };
+  }
+
+  if (closePortal && portal) {
+    closePortal.onclick = () => {
+      portal.classList.remove("active");
+    };
+  }
+
+  // Close portal when clicking outside
+  document.addEventListener("click", (e) => {
+    if (portal && !portal.contains(e.target as Node) && e.target !== icon) {
+      portal.classList.remove("active");
+    }
+  });
+
+
+}
+
+// Initialize listeners
+setupUIListeners();
 
 apiRequest("/ui_connected", { method: "POST" }, 20).then((res) => {
   if (res) {
