@@ -44,6 +44,10 @@
           <span class="nav-icon"><i data-lucide="shield-check"></i></span>
           <span class="nav-text">Guardian</span>
         </a>
+        <a href="#" class="nav-item" id="nav-apps">
+          <span class="nav-icon"><i data-lucide="package"></i></span>
+          <span class="nav-text">Apps</span>
+        </a>
         <a href="#" class="nav-item" id="nav-analytics">
           <span class="nav-icon"><i data-lucide="line-chart"></i></span>
           <span class="nav-text">Analytics</span>
@@ -313,6 +317,33 @@
         </div>
       </section>
 
+      <!-- VIEW: APPS -->
+      <section id="section-apps" class="view-section">
+        <div class="card full-width">
+          <div class="card-header">
+            <h3>Installed Applications</h3>
+            <div class="header-actions">
+              <div class="search-box">
+                <i data-lucide="search"></i>
+                <input type="text" id="apps-search-input" placeholder="Search installed software...">
+              </div>
+              <button class="btn-outline refresh-btn" id="btn-refresh-apps" title="Refresh App List">
+                <i data-lucide="refresh-cw"></i>
+              </button>
+            </div>
+          </div>
+          <div class="apps-grid-container">
+            <div id="apps-loading-indicator" class="loading-overlay hidden">
+              <div class="spinner"></div>
+              <p>Scanning System Registry...</p>
+            </div>
+            <div id="apps-grid" class="apps-grid">
+              <!-- Populated via JS -->
+            </div>
+          </div>
+        </div>
+      </section>
+
       <!-- VIEW: STARTUP APPS -->
       <section id="section-startup" class="view-section">
         <div class="card full-width">
@@ -381,6 +412,27 @@
             <div class="layout-settings">
               <div id="layout-order-list" class="layout-order-list">
                 <!-- Populated via JS -->
+              </div>
+            </div>
+          </div>
+
+          <!-- Category: Voice -->
+          <div class="card settings-group">
+            <div class="settings-group-header">
+              <div class="group-icon"><i data-lucide="mic"></i></div>
+              <div>
+                <h3>Voice & Feedback</h3>
+                <p>Test the real-time response of the TTS engine.</p>
+              </div>
+            </div>
+            <div class="settings-form">
+              <div class="form-group">
+                <label>Test TTS Message</label>
+                <div class="input-with-btn">
+                  <input type="text" id="tts-test-input" placeholder="Enter text for Fluffy to say..."
+                    value="Hello Boss, I am standing by.">
+                  <button class="btn-primary" id="btn-test-tts">Test Voice</button>
+                </div>
               </div>
             </div>
           </div>

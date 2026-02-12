@@ -351,6 +351,34 @@ def main():
     if VOICE_AVAILABLE:
         speak_welcome()
 
+    def background_app_scanner():
+        """Periodic silent app scan every 24 hours."""
+        from app_utils import get_cache_metadata, scan_and_cache_apps
+        print("[Apps] Background scanner active.", file=sys.stderr)
+        while not shutting_down:
+            try:
+                meta = get_cache_metadata()
+                last_scan = meta.get("last_scan", 0)
+                now = int(time.time())
+                
+                # If 24h passed (86400 seconds)
+                if now - last_scan >= 86400:
+                    print("[Apps] 24h passed since last scan. Refreshing cache...", file=sys.stderr)
+                    # Add a log to state so user sees it in dashboard logs
+                    from state import add_execution_log
+                    add_execution_log("Running scheduled software discovery scan...", "system")
+                    scan_and_cache_apps()
+                
+            except Exception as e:
+                print(f"[Apps] Background scan error: {e}", file=sys.stderr)
+            
+            # Check every hour
+            for _ in range(3600):
+                if shutting_down: break
+                time.sleep(1)
+
+    Thread(target=background_app_scanner, daemon=True).start()
+
     buffer = ""
 
     try:

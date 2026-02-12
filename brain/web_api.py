@@ -2,9 +2,12 @@ from flask import Flask, jsonify, send_from_directory, request
 import state
 from commands import send_command
 import os
+import sys
 import socket
 import json
-import sys
+
+# Add parent directory to path to ensure voice module is discoverable
+sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..'))
 
 app = Flask(__name__)
 
@@ -263,6 +266,111 @@ def net_speed():
         "download_mbps": speed,
         "ping_ms": latency
     })
+
+@app.route("/tts_test", methods=["POST"])
+def tts_test():
+    if request.remote_addr not in ("127.0.0.1", "::1"):
+        return jsonify({"error": "Forbidden"}), 403
+    token = request.headers.get("X-Fluffy-Token")
+    if token != FLUFFY_TOKEN:
+        return jsonify({"error": "Unauthorized"}), 401
+    
+    data = request.get_json(silent=True)
+    if not data:
+        return jsonify({"error": "Malformed JSON or empty payload"}), 400
+        
+    text = data.get("text")
+    if not text:
+        return jsonify({"error": "No text provided"}), 400
+    
+    # Import and use the voice module
+    try:
+        from voice import speak_custom
+        speak_custom(text)
+        state.add_execution_log(f"TTS Test: '{text[:40]}...'", "action")
+        return jsonify({"ok": True})
+    except ImportError as e:
+        state.add_execution_log(f"TTS Import Error: {e}", "error")
+        return jsonify({"error": f"Voice module not found: {e}"}), 500
+    except Exception as e:
+        state.add_execution_log(f"TTS Execution Error: {e}", "error")
+        return jsonify({"error": f"TTS Failure: {str(e)}"}), 500
+
+
+@app.route("/apps", methods=["GET"])
+def get_apps():
+    if request.remote_addr not in ("127.0.0.1", "::1"):
+        return jsonify({"error": "Forbidden"}), 403
+    token = request.headers.get("X-Fluffy-Token")
+    if token != FLUFFY_TOKEN:
+        return jsonify({"error": "Unauthorized"}), 401
+    try:
+        from app_utils import list_installed_apps
+        apps = list_installed_apps()
+        return jsonify(apps)
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+@app.route("/apps/refresh", methods=["POST"])
+def refresh_apps():
+    if request.remote_addr not in ("127.0.0.1", "::1"):
+        return jsonify({"error": "Forbidden"}), 403
+    token = request.headers.get("X-Fluffy-Token")
+    if token != FLUFFY_TOKEN:
+        return jsonify({"error": "Unauthorized"}), 401
+    try:
+        from app_utils import scan_and_cache_apps
+        apps = scan_and_cache_apps()
+        return jsonify({"ok": True, "count": len(apps)})
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+
+@app.route("/apps/launch", methods=["POST"])
+def launch_application():
+    if request.remote_addr not in ("127.0.0.1", "::1"):
+        return jsonify({"error": "Forbidden"}), 403
+    token = request.headers.get("X-Fluffy-Token")
+    if token != FLUFFY_TOKEN:
+        return jsonify({"error": "Unauthorized"}), 401
+    data = request.get_json(silent=True)
+    location = data.get("location")
+    exe_path = data.get("exe_path")
+    name = data.get("name")
+    if not location and not exe_path:
+        return jsonify({"error": "Missing executable path"}), 400
+    try:
+        from app_utils import launch_app
+        if launch_app(exe_path, location, name):
+            state.add_execution_log(f"Launched application: {name}", "action")
+            return jsonify({"ok": True})
+        else:
+            return jsonify({"error": "Failed to launch app"}), 500
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+
+@app.route("/apps/uninstall", methods=["POST"])
+def uninstall_application():
+    if request.remote_addr not in ("127.0.0.1", "::1"):
+        return jsonify({"error": "Forbidden"}), 403
+    token = request.headers.get("X-Fluffy-Token")
+    if token != FLUFFY_TOKEN:
+        return jsonify({"error": "Unauthorized"}), 401
+    data = request.get_json(silent=True)
+    uninstall_string = data.get("uninstall_string")
+    name = data.get("name")
+    if not uninstall_string:
+        return jsonify({"error": "Missing uninstall string"}), 400
+    try:
+        from app_utils import uninstall_app
+        if uninstall_app(uninstall_string):
+            state.add_execution_log(f"Triggered uninstaller for: {name}", "warning")
+            return jsonify({"ok": True})
+        else:
+            return jsonify({"error": "Failed to trigger uninstaller"}), 500
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
 
 def start_api():
     app.run(host="127.0.0.1", port=5123, debug=False, use_reloader=False)

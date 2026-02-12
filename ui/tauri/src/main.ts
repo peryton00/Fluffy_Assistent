@@ -126,7 +126,7 @@ function showToast(message: string, type: "success" | "error" | "info" = "succes
    NAVIGATION & SEARCH
 ========================= */
 function setupNavigation() {
-  const navItems = ["dashboard", "processes", "guardian", "analytics", "startup", "settings"];
+  const navItems = ["dashboard", "processes", "guardian", "apps", "analytics", "startup", "settings"];
   navItems.forEach(id => {
     const btn = document.getElementById(`nav-${id}`);
     if (btn) {
@@ -135,9 +135,23 @@ function setupNavigation() {
         switchView(id);
         if (id === "settings") renderLayoutSettings();
         if (id === "dashboard") applyDashboardOrder();
+        if (id === "apps") fetchApps();
       };
     }
   });
+
+  const appsSearchInput = document.getElementById("apps-search-input") as HTMLInputElement;
+  if (appsSearchInput) {
+    appsSearchInput.oninput = (e) => {
+      const q = (e.target as HTMLInputElement).value.toLowerCase();
+      renderApps(null, q); // Filter current list
+    };
+  }
+
+  const refreshAppsBtn = document.getElementById("btn-refresh-apps");
+  if (refreshAppsBtn) {
+    refreshAppsBtn.onclick = () => fetchApps();
+  }
 
   const searchInput = document.getElementById("process-search-input") as HTMLInputElement;
   const clearBtn = document.getElementById("clear-search");
@@ -1328,7 +1342,33 @@ function setupUIListeners() {
     }
   });
 
+  // TTS Test
+  const ttsBtn = document.getElementById("btn-test-tts");
+  const ttsInput = document.getElementById("tts-test-input") as HTMLInputElement;
+  if (ttsBtn && ttsInput) {
+    ttsBtn.onclick = async () => {
+      const text = ttsInput.value.trim();
+      if (!text) {
+        showToast("Please enter some text to speak", "error");
+        return;
+      }
 
+      ttsBtn.setAttribute("disabled", "true");
+      try {
+        const res = await apiRequest("/tts_test", {
+          method: "POST",
+          body: JSON.stringify({ text })
+        });
+        if (res && res.ok) {
+          showToast("Speaking...", "success");
+        } else {
+          showToast("Failed to trigger TTS. Check logs.", "error");
+        }
+      } finally {
+        setTimeout(() => ttsBtn.removeAttribute("disabled"), 1000);
+      }
+    };
+  }
 }
 
 // Initialize listeners
@@ -1434,4 +1474,152 @@ function renderLayoutSettings() {
 applyDashboardOrder();
 if (document.getElementById("section-settings")?.classList.contains("active")) {
   renderLayoutSettings();
+}
+
+/* =========================
+   APPS MANAGEMENT
+========================= */
+let allApps: any[] = [];
+let appsRefreshBound = false;
+
+async function fetchApps(forceRefresh = false) {
+  const loader = document.getElementById("apps-loading-indicator");
+  const grid = document.getElementById("apps-grid");
+  if (loader) loader.classList.remove("hidden");
+  if (grid) grid.innerHTML = "";
+
+  if (!appsRefreshBound) {
+    document.getElementById("btn-refresh-apps")?.addEventListener("click", () => fetchApps(true));
+    appsRefreshBound = true;
+  }
+
+  const endpoint = forceRefresh ? "/apps/refresh" : "/apps";
+  const method = forceRefresh ? "POST" : "GET";
+
+  addLog(forceRefresh ? "Forcing full system scan for apps..." : "Loading applications from cache...", "action");
+  const data = await apiRequest(endpoint, { method });
+
+  if (loader) loader.classList.add("hidden");
+
+  if (data) {
+    if (forceRefresh) {
+      // After refresh, the data returned is {ok: true, count: X}, not the list.
+      // So we need to call /apps to get the updated list.
+      const apps = await apiRequest("/apps");
+      if (apps && Array.isArray(apps)) {
+        allApps = apps;
+        renderApps(allApps);
+        addLog(`Found ${apps.length} applications after refresh`, "success");
+      }
+    } else if (Array.isArray(data)) {
+      allApps = data;
+      renderApps(allApps);
+      addLog(`Loaded ${data.length} applications from cache`, "success");
+    }
+  } else {
+    showToast("Failed to fetch installed apps", "error");
+  }
+}
+
+function renderApps(apps: any[] | null = null, filter: string = "") {
+  const grid = document.getElementById("apps-grid");
+  if (!grid) return;
+
+  const list = apps || allApps;
+  grid.innerHTML = "";
+
+  const filtered = list.filter(app =>
+    app.name.toLowerCase().includes(filter) ||
+    app.publisher.toLowerCase().includes(filter)
+  );
+
+  if (filtered.length === 0) {
+    grid.innerHTML = `
+      <div class="empty-state" style="grid-column: 1/-1; padding: 40px; text-align: center; opacity: 0.5;">
+        <i data-lucide="search-x" style="width: 48px; height: 48px; margin-bottom: 10px;"></i>
+        <p>No applications found matching "${filter}"</p>
+      </div>
+    `;
+    if ((window as any).lucide) (window as any).lucide.createIcons();
+    return;
+  }
+
+  filtered.forEach(app => {
+    const card = document.createElement("div");
+    card.className = "app-card";
+
+    // Icon resolution: use data uri if available, otherwise fallback to lucide icon
+    const iconHtml = app.icon_data
+      ? `<img src="${app.icon_data}" class="app-icon-img" alt="${app.name}">`
+      : `<i data-lucide="package"></i>`;
+
+    // Only show launch button if we have a valid exe_path
+    const showLaunch = !!app.exe_path;
+
+    card.innerHTML = `
+      <div class="app-card-header">
+        <div class="app-icon-wrapper">
+          ${iconHtml}
+        </div>
+        <div class="app-info">
+          <div class="app-name" title="${app.name}">${app.name}</div>
+          <div class="app-publisher">${app.publisher}</div>
+        </div>
+      </div>
+      <div class="app-meta">
+        <div class="meta-item">
+          <i data-lucide="info"></i>
+          <span>Version: ${app.version}</span>
+        </div>
+        ${app.install_location ? `
+        <div class="meta-item">
+          <i data-lucide="folder"></i>
+          <span style="white-space: nowrap; overflow: hidden; text-overflow: ellipsis;" title="${app.install_location}">${app.install_location}</span>
+        </div>` : ''}
+      </div>
+      <div class="app-actions">
+        ${showLaunch ? `
+        <button class="btn-app-action btn-launch" data-app-id="${app.id}">
+          <i data-lucide="play"></i> Launch
+        </button>` : '<span></span>'}
+        <button class="btn-app-action btn-uninstall" data-app-id="${app.id}">
+          <i data-lucide="trash-2"></i> Uninstall
+        </button>
+      </div>
+    `;
+
+    const launchBtn = card.querySelector(".btn-launch") as HTMLButtonElement;
+    const uninstallBtn = card.querySelector(".btn-uninstall") as HTMLButtonElement;
+
+    if (launchBtn) {
+      launchBtn.onclick = async () => {
+        launchBtn.disabled = true;
+        const res = await apiRequest("/apps/launch", {
+          method: "POST",
+          body: JSON.stringify({
+            exe_path: app.exe_path,
+            location: app.install_location,
+            name: app.name
+          })
+        });
+        if (res && res.ok) showToast(`Launching ${app.name}...`, "success");
+        else showToast(`Failed to launch ${app.name}`, "error");
+        launchBtn.disabled = false;
+      };
+    }
+
+    uninstallBtn.onclick = async () => {
+      if (confirm(`Are you sure you want to uninstall ${app.name}?\nThis will open the system uninstaller.`)) {
+        const res = await apiRequest("/apps/uninstall", {
+          method: "POST",
+          body: JSON.stringify({ uninstall_string: app.uninstall_string, name: app.name })
+        });
+        if (res && res.ok) showToast(`Uninstaller sequence started for ${app.name}`, "info");
+      }
+    };
+
+    grid.appendChild(card);
+  });
+
+  if ((window as any).lucide) (window as any).lucide.createIcons();
 }
