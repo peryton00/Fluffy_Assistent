@@ -149,8 +149,34 @@ def trust_process():
         return jsonify({"error": "Missing process name"}), 400
     
     from guardian_manager import GUARDIAN_BASELINE
-    GUARDIAN_BASELINE.mark_trusted(process_name)
-    state.add_execution_log(f"Manual trust: {process_name} behaviors are now whitelisted", "info")
+    import time
+    
+    baseline = GUARDIAN_BASELINE.get_baseline(process_name)
+    if not baseline:
+        # Create minimal baseline entry for newly trusted process
+        GUARDIAN_BASELINE.baselines[process_name] = {
+            "trusted": True,
+            "samples": 0,
+            "first_seen": time.time(),
+            "last_seen": time.time(),
+            "avg_cpu": 0.0,
+            "peak_cpu": 0.0,
+            "avg_ram": 0.0,
+            "peak_ram": 0.0,
+            "ram_growth_rate": 0.0,
+            "avg_children": 0.0,
+            "child_spawn_rate": 0.0,
+            "avg_net_sent": 0.0,
+            "avg_net_received": 0.0,
+            "avg_lifespan": 0.0,
+            "restart_count": 0
+        }
+        GUARDIAN_BASELINE.save()
+        state.add_execution_log(f"Manual trust: {process_name} marked as trusted (baseline created)", "info")
+    else:
+        GUARDIAN_BASELINE.mark_trusted(process_name)
+        state.add_execution_log(f"Manual trust: {process_name} behaviors are now whitelisted", "info")
+    
     return jsonify({"ok": True, "message": f"Behavior for {process_name} marked as trusted."})
 
 
@@ -199,15 +225,17 @@ def normalize_system():
 
 @app.route("/ui_connected", methods=["GET", "POST"])
 def ui_connected():
-    state.UI_ACTIVE = True
-    state.add_execution_log("UI Dashboard connected", "system")
+    if not state.UI_ACTIVE:
+        state.UI_ACTIVE = True
+        state.add_execution_log("UI Dashboard connected", "system")
     return jsonify({"status": "UI_CONNECTED", "ui_active": state.UI_ACTIVE})
 
 
 @app.route("/ui_disconnected", methods=["GET", "POST"])
 def ui_disconnected():
-    state.UI_ACTIVE = False
-    state.add_execution_log("UI Dashboard disconnected", "system")
+    if state.UI_ACTIVE:
+        state.UI_ACTIVE = False
+        state.add_execution_log("UI Dashboard disconnected", "system")
     return jsonify({"status": "UI_DISCONNECTED", "ui_active": state.UI_ACTIVE})
 
 

@@ -12,37 +12,37 @@ def get_ping(host="8.8.8.8"):
         return 999
 
 def run_speed_test():
-    """Run a simple download speed test (measures in Mbps)."""
-    # Candidate URLs (1MB to 10MB files)
+    """Run a rigorous download speed test for at least 10 seconds."""
     test_urls = [
-        "https://speed.hetzner.de/10MB.bin", 
-        "http://speedtest.tele2.net/1MB.zip",
-        "https://proof.ovh.net/files/1Mb.dat"
+        "https://speed.hetzner.de/100MB.bin", 
+        "http://speedtest.tele2.net/100MB.zip",
+        "https://proof.ovh.net/files/100Mb.dat"
     ]
     
     for url in test_urls:
         try:
             print(f"[SpeedTest] Testing against {url}...")
             start_time = time.time()
-            # Set a rigorous timeout
-            with urllib.request.urlopen(url, timeout=10) as response:
+            total_bytes = 0
+            
+            # Target 10 seconds of active downloading
+            with urllib.request.urlopen(url, timeout=15) as response:
                 if response.status != 200:
-                    print(f"[SpeedTest] Failed with status {response.status}")
                     continue
-                    
-                data = response.read()
+                
+                while time.time() - start_time < 10:
+                    chunk = response.read(1024 * 128) # 128KB chunks
+                    if not chunk:
+                        break
+                    total_bytes += len(chunk)
+                
                 end_time = time.time()
-                
-                size_bits = len(data) * 8
-                if size_bits == 0:
-                    print("[SpeedTest] Downloaded 0 bytes")
-                    continue
-                    
                 duration = end_time - start_time
-                if duration < 0.1: duration = 0.1 # Prevent division by zero/tiny
+                if duration < 1: duration = 1
                 
+                size_bits = total_bytes * 8
                 mbps = (size_bits / duration) / (1024 * 1024)
-                print(f"[SpeedTest] Success: {mbps:.2f} Mbps")
+                print(f"[SpeedTest] Success: {mbps:.2f} Mbps over {duration:.1f}s")
                 return round(mbps, 2)
                 
         except Exception as e:

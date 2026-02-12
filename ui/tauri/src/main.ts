@@ -18,6 +18,9 @@ const statHistory = {
 let sortMode = localStorage.getItem("fluffy_sort_mode") || "ram";
 const pinnedProcesses = new Set<string>(JSON.parse(localStorage.getItem("fluffy_pinned_names") || "[]"));
 
+const DEFAULT_LAYOUT_ORDER = ["cpu", "ram", "proc", "health", "network", "speedtest", "fluffy", "sessions"];
+let dashboardOrder = JSON.parse(localStorage.getItem("fluffy_dashboard_order") || JSON.stringify(DEFAULT_LAYOUT_ORDER));
+
 /* =========================
    UTILITIES
 ========================= */
@@ -130,6 +133,8 @@ function setupNavigation() {
       btn.onclick = (e) => {
         e.preventDefault();
         switchView(id);
+        if (id === "settings") renderLayoutSettings();
+        if (id === "dashboard") applyDashboardOrder();
       };
     }
   });
@@ -246,25 +251,33 @@ async function normalizeSystem() {
       const processList = data.unusual_processes.map((p: any) => `<li>${p.name} (PID: ${p.pid})</li>`).join("");
       detailsHtml += `
         <div style="margin-top:15px; border-top:1px solid rgba(255,255,255,0.1); padding-top:10px;">
-          <p style="color:#f59e0b; margin-bottom:5px;">⚠️ <strong>${data.unusual_processes.length} Unusual Process(es) Detected:</strong></p>
-          <ul style="color:#e2e8f0; font-size:0.9em;">${processList}</ul>
+          <p style="color:#f59e0b; margin-bottom:5px; display:flex; align-items:center; gap:8px;">
+            <i data-lucide="alert-triangle" style="width:18px; height:18px;"></i>
+            <strong>${data.unusual_processes.length} Unusual Process(es) Detected:</strong>
+          </p>
+          <ul style="color:#e2e8f0; font-size:0.9em; margin-left:26px;">${processList}</ul>
         </div>
       `;
     } else {
-      detailsHtml += `<p style="margin-top:10px; color:#10b981; font-size:0.9em;">✅ No unusual processes detected.</p>`;
+      detailsHtml += `
+        <p style="margin-top:10px; color:#10b981; font-size:0.9em; display:flex; align-items:center; gap:8px;">
+          <i data-lucide="check-circle" style="width:18px; height:18px;"></i>
+          No unusual processes detected.
+        </p>
+      `;
     }
 
     showResultModal(
       "Normalization Success",
       "System has been successfully optimized.",
-      "✅",
+      "check-circle",
       detailsHtml
     );
   } else {
     showResultModal(
       "Normalization Failed",
       data?.error || "An unknown error occurred during normalization.",
-      "❌",
+      "alert-octagon",
       ""
     );
   }
@@ -285,8 +298,10 @@ function showResultModal(title: string, message: string, icon: string, detailsHt
 
   titleEl.innerText = title;
   messageEl.innerText = message;
-  iconEl.innerText = icon;
+  iconEl.innerHTML = `<i data-lucide="${icon}"></i>`;
   detailsEl.innerHTML = detailsHtml;
+
+  if ((window as any).lucide) (window as any).lucide.createIcons();
 
   modal.classList.add("active");
 }
@@ -478,16 +493,16 @@ function renderNode(node: any, container: HTMLElement) {
   row.innerHTML = `
     <div class="tree-left">
       <div class="tree-toggle ${shouldExpand ? "expanded" : ""}">
-        ${hasChildren ? (shouldExpand ? "−" : "+") : "•"}
+        ${hasChildren ? (shouldExpand ? '<i data-lucide="minus-square"></i>' : '<i data-lucide="plus-square"></i>') : '<i data-lucide="circle" style="width:6px; height:6px; fill:currentColor;"></i>'}
       </div>
       <span class="tree-label">${node.name} ${isPinned ? '<span class="pinned-badge">Pinned</span>' : ''}</span>
       <span class="tree-pid">${node.pid}</span>
     </div>
     <div class="tree-right">
       <div class="process-actions">
-        <div class="action-icon ${isPinned ? 'pinned' : ''}" title="${isPinned ? 'Unpin' : 'Pin'}" data-action="pin">📌</div>
-        <div class="action-icon" title="Open File Location" data-action="folder">📁</div>
-        <div class="action-icon" title="Google Search" data-action="google">🔍</div>
+        <div class="action-icon ${isPinned ? 'pinned' : ''}" title="${isPinned ? 'Unpin' : 'Pin'}" data-action="pin"><i data-lucide="pin"></i></div>
+        <div class="action-icon" title="Open File Location" data-action="folder"><i data-lucide="folder"></i></div>
+        <div class="action-icon" title="Google Search" data-action="google"><i data-lucide="search"></i></div>
       </div>
       <div class="tree-stats">
         ${ramDisplay}
@@ -662,13 +677,13 @@ function renderDashboard(data: any) {
   const txSpeed = net.total_tx_kbps > 1024 ? `${(net.total_tx_kbps / 1024).toFixed(1)} MB/s` : `${net.total_tx_kbps.toFixed(1)} KB/s`;
 
   const headerSpeedEl = document.getElementById("header-net-speed");
-  if (headerSpeedEl) headerSpeedEl.innerText = `${(net.total_rx_kbps / 1024).toFixed(1)} Mbps`;
+  if (headerSpeedEl) headerSpeedEl.innerText = `${net.total_rx_kbps.toFixed(0)} Kbps`;
 
   const headerIconEl = document.getElementById("header-net-icon");
   if (headerIconEl) {
-    if (net.status === "wifi") headerIconEl.innerText = "📶";
-    else if (net.status === "ethernet") headerIconEl.innerText = "🔌";
-    else headerIconEl.innerText = "🚫";
+    if (net.status === "wifi") headerIconEl.innerHTML = '<i data-lucide="wifi"></i>';
+    else if (net.status === "ethernet") headerIconEl.innerHTML = '<i data-lucide="network"></i>';
+    else headerIconEl.innerHTML = '<i data-lucide="wifi-off"></i>';
   }
 
   const netRxEl = document.getElementById("net-rx-value");
@@ -682,9 +697,9 @@ function renderDashboard(data: any) {
 
   const netCardIconEl = document.getElementById("net-card-icon");
   if (netCardIconEl) {
-    if (net.status === "wifi") netCardIconEl.innerText = "📶";
-    else if (net.status === "ethernet") netCardIconEl.innerText = "🔌";
-    else netCardIconEl.innerText = "🌐";
+    if (net.status === "wifi") netCardIconEl.innerHTML = '<i data-lucide="wifi"></i>';
+    else if (net.status === "ethernet") netCardIconEl.innerHTML = '<i data-lucide="network"></i>';
+    else netCardIconEl.innerHTML = '<i data-lucide="globe"></i>';
   }
 
   const healthEl = document.getElementById("health-status");
@@ -718,10 +733,10 @@ function showHealthDetailsModal(reasons: string[]) {
   if (!modal || !list || !closeBtn) return;
 
   list.innerHTML = reasons.map(r => `<li>${r}</li>`).join("");
-  modal.style.display = "flex";
+  modal.classList.add("active");
 
-  closeBtn.onclick = () => modal.style.display = "none";
-  modal.onclick = (e) => { if (e.target === modal) modal.style.display = "none"; };
+  closeBtn.onclick = () => modal.classList.remove("active");
+  modal.onclick = (e) => { if (e.target === modal) modal.classList.remove("active"); };
 }
 
 async function runSpeedTest() {
@@ -733,7 +748,7 @@ async function runSpeedTest() {
   if (!btn || !statusEl || !resultEl || !circleEl) return;
 
   btn.disabled = true;
-  statusEl.innerText = "Testing bandwidth... (5-10MB sample)";
+  statusEl.innerText = "Testing bandwidth... (10s rigorous sample)";
   circleEl.classList.add("testing");
   resultEl.innerText = "0.0";
 
@@ -902,7 +917,7 @@ function renderGuardianAlerts(data: any) {
   if (verdicts.length === 0) {
     container.innerHTML = `
       <div class="guardian-empty-state">
-        <div class="empty-icon">🛡️</div>
+        <div class="empty-icon"><i data-lucide="shield-check"></i></div>
         <h3>System Secure</h3>
         <p>No suspicious behavioral chains detected in the last window.</p>
       </div>
@@ -918,7 +933,7 @@ function renderGuardianAlerts(data: any) {
     card.className = `alert-card ${v.level.toLowerCase().replace(" ", "-")}`;
     card.innerHTML = `
       <div class="alert-header">
-        <span class="alert-icon">⚠️</span>
+        <span class="alert-icon"><i data-lucide="alert-triangle"></i></span>
         <div>
           <h4>${v.process}</h4>
           <span class="alert-level">${v.level} (Score: ${v.risk_score.toFixed(1)})</span>
@@ -1106,7 +1121,7 @@ function renderUI(data: any) {
   if (warn) {
     if (systemConfs.length > 0) {
       warn.style.display = "block";
-      warn.innerHTML = "<h4>⚠ Action Required</h4>";
+      warn.innerHTML = "<h4><i data-lucide='alert-triangle'></i> Action Required</h4>";
       systemConfs.forEach((c: any) => {
         const div = document.createElement("div");
         div.className = "confirm-item";
@@ -1139,6 +1154,8 @@ function renderUI(data: any) {
     // Clear notifications to prevent re-toast on re-render
     data.notifications = [];
   }
+
+  if ((window as any).lucide) (window as any).lucide.createIcons();
 }
 
 function renderGuardianNotifications(data: any) {
@@ -1173,7 +1190,7 @@ function renderGuardianNotifications(data: any) {
       div.className = "notif-item confirm";
       div.innerHTML = `
         <div class="notif-item-header">
-           <span class="notif-process">🚨 ${c.command_name}</span>
+           <span class="notif-process"><i data-lucide="alert-octagon"></i> ${c.command_name}</span>
         </div>
         <p class="notif-reason">${c.details}</p>
         <div class="confirm-actions" style="margin-top: 8px;">
@@ -1203,6 +1220,7 @@ function renderGuardianNotifications(data: any) {
       list.appendChild(div);
     });
   }
+  if ((window as any).lucide) (window as any).lucide.createIcons();
 }
 
 /* =========================
@@ -1260,13 +1278,20 @@ function stopPolling() {
   logsInterval = null;
 }
 
-// Listen for visibility changes from Rust
+// Track backend connection state locally to prevent spam
+let backendUIActive = false;
+
+// Listen for visibility changes from Rust (Tauri)
 listen('ui-active', async (event) => {
-  console.log('UI Active State Changed:', event.payload);
-  uiActive = event.payload as boolean;
-  if (uiActive) {
-    const connected = await apiRequest("/ui_connected", { method: "POST" });
-    if (connected) startPolling();
+  const newState = event.payload as boolean;
+  if (newState === backendUIActive) return;
+
+  backendUIActive = newState;
+  console.log('UI Active State Changed:', backendUIActive);
+
+  if (backendUIActive) {
+    const success = await apiRequest("/ui_connected", { method: "POST" });
+    if (success) startPolling();
   } else {
     stopPolling();
     await apiRequest("/ui_disconnected", { method: "POST" });
@@ -1308,13 +1333,105 @@ function setupUIListeners() {
 
 // Initialize listeners
 setupUIListeners();
+if ((window as any).lucide) (window as any).lucide.createIcons();
 
-apiRequest("/ui_connected", { method: "POST" }, 20).then((res) => {
-  if (res) {
-    console.log("Dashboard connected to brain.");
-    addLog("Connected to Fluffy Brain", "system");
-    startPolling();
-  } else {
-    addLog("Failed to connect to Brain after 20 attempts. Please check if Brain is running.", "error");
-  }
-});
+// Initial connection attempt
+if (!backendUIActive) {
+  apiRequest("/ui_connected", { method: "POST" }, 20).then((res) => {
+    if (res) {
+      console.log("Dashboard connected to brain.");
+      backendUIActive = true;
+      addLog("Connected to Fluffy Brain", "system");
+      startPolling();
+    } else {
+      addLog("Failed to connect to Brain after 20 attempts. Please check if Brain is running.", "error");
+    }
+  });
+}
+
+/* =========================
+   DASHBOARD LAYOUT MANAGEMENT
+========================= */
+
+function applyDashboardOrder() {
+  const grid = document.querySelector(".dashboard-grid");
+  if (!grid) return;
+
+  const components: { [key: string]: HTMLElement } = {};
+  grid.querySelectorAll("[data-component-id]").forEach(el => {
+    const id = el.getAttribute("data-component-id");
+    if (id) components[id] = el as HTMLElement;
+  });
+
+  dashboardOrder.forEach((id: string) => {
+    if (components[id]) {
+      grid.appendChild(components[id]);
+    }
+  });
+}
+
+function renderLayoutSettings() {
+  const list = document.getElementById("layout-order-list");
+  if (!list) return;
+
+  list.innerHTML = "";
+
+  const componentNames: { [key: string]: { name: string, icon: string } } = {
+    cpu: { name: "CPU Usage", icon: "zap" },
+    ram: { name: "RAM Usage", icon: "database" },
+    proc: { name: "Total Processes", icon: "layers" },
+    health: { name: "Health Score", icon: "shield" },
+    network: { name: "Network Usage", icon: "globe" },
+    speedtest: { name: "Internet Speed Test", icon: "gauge" },
+    fluffy: { name: "Fluffy Usage", icon: "sparkles" },
+    sessions: { name: "Active Sessions", icon: "users" }
+  };
+
+  dashboardOrder.forEach((id: string, index: number) => {
+    const info = componentNames[id];
+    if (!info) return;
+
+    const item = document.createElement("div");
+    item.className = "layout-item";
+    item.innerHTML = `
+      <div class="layout-item-info">
+        <span class="layout-item-icon"><i data-lucide="${info.icon}"></i></span>
+        <span class="layout-item-name">${info.name}</span>
+      </div>
+      <div class="layout-item-actions">
+        <button class="btn-layout" data-action="up" data-index="${index}" ${index === 0 ? 'disabled' : ''}>
+          <i data-lucide="chevron-up"></i>
+        </button>
+        <button class="btn-layout" data-action="down" data-index="${index}" ${index === dashboardOrder.length - 1 ? 'disabled' : ''}>
+          <i data-lucide="chevron-down"></i>
+        </button>
+      </div>
+    `;
+
+    item.querySelectorAll(".btn-layout").forEach(btn => {
+      (btn as HTMLButtonElement).onclick = () => {
+        const action = btn.getAttribute("data-action");
+        const idx = parseInt(btn.getAttribute("data-index") || "0");
+
+        if (action === "up" && idx > 0) {
+          [dashboardOrder[idx], dashboardOrder[idx - 1]] = [dashboardOrder[idx - 1], dashboardOrder[idx]];
+        } else if (action === "down" && idx < dashboardOrder.length - 1) {
+          [dashboardOrder[idx], dashboardOrder[idx + 1]] = [dashboardOrder[idx + 1], dashboardOrder[idx]];
+        }
+
+        localStorage.setItem("fluffy_dashboard_order", JSON.stringify(dashboardOrder));
+        renderLayoutSettings();
+        applyDashboardOrder();
+      };
+    });
+
+    list.appendChild(item);
+  });
+  if ((window as any).lucide) (window as any).lucide.createIcons();
+}
+
+// Initialize layout on load
+applyDashboardOrder();
+if (document.getElementById("section-settings")?.classList.contains("active")) {
+  renderLayoutSettings();
+}

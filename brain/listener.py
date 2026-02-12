@@ -12,6 +12,20 @@ from guardian_manager import (
 )
 import state
 
+# Voice system import (safe - fails silently if Piper not available)
+try:
+    import sys
+    import os
+    # Add parent directory to path for voice module
+    sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..'))
+    from voice import speak_welcome, speak_guardian_alert
+    VOICE_AVAILABLE = True
+except Exception as e:
+    print(f"[Voice] Voice system unavailable: {e}", file=sys.stderr)
+    VOICE_AVAILABLE = False
+    speak_welcome = lambda: None
+    speak_guardian_alert = lambda x: None
+
 import socket
 import json
 import sys
@@ -236,8 +250,24 @@ def handle_message(raw_msg, monitor):
         
         # Verdict Generation (Suppressed during initial 5-min Learning Mode)
         if not is_learning:
+            # Skip verdict generation for trusted processes
+            if baseline and baseline.get("trusted", False):
+                # Process is trusted - no alerts needed
+                continue
+            
             verdicts = generate_verdicts(name, pid, risk_score, anomalies, level, 0.8)
             all_guardian_verdicts.extend(verdicts)
+            
+            # Voice alert for serious verdicts with metrics
+            if VOICE_AVAILABLE and verdicts:
+                for verdict in verdicts:
+                    # Pass current process metrics for conversational alerts
+                    speak_guardian_alert(
+                        verdict,
+                        cpu=cpu,
+                        ram=ram,
+                        network=(net_sent + net_received) / 1024  # Convert to KB/s
+                    )
             
             # Audit logging
             if anomalies:
@@ -316,6 +346,10 @@ def main():
 
     ipc_socket = connect_ipc()
     print("[Fluffy Brain] Connected to IPC", file=sys.stderr)
+    
+    # Speak welcome message (non-blocking)
+    if VOICE_AVAILABLE:
+        speak_welcome()
 
     buffer = ""
 

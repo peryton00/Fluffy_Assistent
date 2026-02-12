@@ -10,6 +10,7 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+  <script src="https://unpkg.com/lucide@latest"></script>
 </head>
 
 <body>
@@ -25,18 +26,36 @@
         </div>
         <div class="notification-area">
           <div id="guardian-notification-icon" class="notification-icon" title="Guardian Notifications">
-            🛡️
+            <i data-lucide="bell"></i>
             <span id="notification-badge" class="notification-badge">0</span>
           </div>
         </div>
       </div>
       <nav class="sidebar-nav">
-        <a href="#" class="nav-item active" id="nav-dashboard">Dashboard</a>
-        <a href="#" class="nav-item" id="nav-processes">Processes</a>
-        <a href="#" class="nav-item" id="nav-guardian">Guardian</a>
-        <a href="#" class="nav-item" id="nav-analytics">Analytics</a>
-        <a href="#" class="nav-item" id="nav-startup">Startup Apps</a>
-        <a href="#" class="nav-item" id="nav-settings">Settings</a>
+        <a href="#" class="nav-item active" id="nav-dashboard">
+          <span class="nav-icon"><i data-lucide="layout-dashboard"></i></span>
+          <span class="nav-text">Dashboard</span>
+        </a>
+        <a href="#" class="nav-item" id="nav-processes">
+          <span class="nav-icon"><i data-lucide="list"></i></span>
+          <span class="nav-text">Processes</span>
+        </a>
+        <a href="#" class="nav-item" id="nav-guardian">
+          <span class="nav-icon"><i data-lucide="shield-check"></i></span>
+          <span class="nav-text">Guardian</span>
+        </a>
+        <a href="#" class="nav-item" id="nav-analytics">
+          <span class="nav-icon"><i data-lucide="line-chart"></i></span>
+          <span class="nav-text">Analytics</span>
+        </a>
+        <a href="#" class="nav-item" id="nav-startup">
+          <span class="nav-icon"><i data-lucide="rocket"></i></span>
+          <span class="nav-text">Startup Apps</span>
+        </a>
+        <a href="#" class="nav-item" id="nav-settings">
+          <span class="nav-icon"><i data-lucide="settings"></i></span>
+          <span class="nav-text">Settings</span>
+        </a>
       </nav>
       <div class="sidebar-footer">
         <div class="upgrade-card">
@@ -66,8 +85,8 @@
             <span id="ping-value">-- ms</span>
           </div>
           <div class="network-header-status" id="header-net-status" title="Network Connection Info">
-            <span class="net-icon" id="header-net-icon">📡</span>
-            <span id="header-net-speed" style="margin-left: 4px;">-- Mbps</span>
+            <span class="net-icon" id="header-net-icon"><i data-lucide="satellite"></i></span>
+            <span id="header-net-speed" style="margin-left: 4px;">-- Kbps</span>
           </div>
           <div class="user-profile">
             <div id="system-status-dot" class="status-dot"></div>
@@ -81,36 +100,36 @@
       <section id="section-dashboard" class="view-section active">
         <div class="dashboard-grid">
           <!-- Stat Cards -->
-          <div class="card stat-card primary">
+          <div class="card stat-card primary" data-component-id="cpu">
             <div class="card-header">
-              <div class="card-icon cpu">⚡</div>
+              <div class="card-icon cpu"><i data-lucide="zap"></i></div>
             </div>
             <p class="card-label">CPU Usage</p>
             <h2 id="cpu-value">--%</h2>
             <p class="card-comparison">System Load</p>
           </div>
 
-          <div class="card stat-card">
+          <div class="card stat-card" data-component-id="ram">
             <div class="card-header">
-              <div class="card-icon ram">💾</div>
+              <div class="card-icon ram"><i data-lucide="database"></i></div>
             </div>
             <p class="card-label">RAM Usage</p>
             <h2 id="ram-value">-- MB</h2>
             <p class="card-comparison" id="ram-total">Total: -- GB</p>
           </div>
 
-          <div class="card stat-card">
+          <div class="card stat-card" data-component-id="proc">
             <div class="card-header">
-              <div class="card-icon proc">🌳</div>
+              <div class="card-icon proc"><i data-lucide="layers"></i></div>
             </div>
             <p class="card-label">Total Processes</p>
             <h2 id="proc-count">--</h2>
             <p class="card-comparison">Monitoring active</p>
           </div>
 
-          <div class="card stat-card">
+          <div class="card stat-card" data-component-id="health">
             <div class="card-header">
-              <div class="card-icon health">🛡</div>
+              <div class="card-icon health"><i data-lucide="shield"></i></div>
             </div>
             <p class="card-label">Health Score</p>
             <h2 id="health-status">Healthy</h2>
@@ -121,9 +140,9 @@
             <p class="card-comparison">Optimized</p>
           </div>
 
-          <div class="card stat-card network-card">
+          <div class="card stat-card network-card" data-component-id="network">
             <div class="card-header">
-              <div class="card-icon" id="net-card-icon">🌐</div>
+              <div class="card-icon" id="net-card-icon"><i data-lucide="globe"></i></div>
             </div>
             <p class="card-label">Network Usage</p>
             <div class="speed-row">
@@ -140,10 +159,10 @@
           </div>
 
           <!-- Speed Test Container -->
-          <div class="card speed-test-card" id="speed-test-container">
+          <div class="card speed-test-card" id="speed-test-container" data-component-id="speedtest">
             <div class="speed-test-header">
               <div class="speed-test-title">
-                <span class="speed-test-icon">🚀</span>
+                <span class="speed-test-icon"><i data-lucide="gauge"></i></span>
                 <h3>Internet Speed Test</h3>
               </div>
             </div>
@@ -161,18 +180,18 @@
             </div>
           </div>
 
-          <div class="card stat-card fluffy-card">
+          <div class="card stat-card fluffy-card" data-component-id="fluffy">
             <div class="card-header">
-              <div class="card-icon self">✨</div>
+              <div class="card-icon self"><i data-lucide="sparkles"></i></div>
             </div>
             <p class="card-label">Fluffy Usage</p>
             <h2 id="fluffy-usage">--%</h2>
             <p class="card-comparison" id="fluffy-ram">-- MB RAM</p>
           </div>
 
-          <div class="card stat-card">
+          <div class="card stat-card" data-component-id="sessions">
             <div class="card-header">
-              <div class="card-icon session">👥</div>
+              <div class="card-icon session"><i data-lucide="users"></i></div>
             </div>
             <p class="card-label">Active Sessions</p>
             <h2 id="session-count">--</h2>
@@ -232,9 +251,9 @@
                 </select>
               </div>
               <div class="inline-search">
-                <span>🔍</span>
+                <i data-lucide="search"></i>
                 <input type="text" id="process-search-input" placeholder="Search by name or PID...">
-                <button id="clear-search" class="clear-search-btn" title="Clear Search">&times;</button>
+                <button id="clear-search" class="clear-search-btn" title="Clear Search"><i data-lucide="x"></i></button>
               </div>
               <button class="btn-outline" id="refresh-tree">Refresh Tree</button>
             </div>
@@ -258,7 +277,7 @@
             </div>
             <p class="section-desc">Real-time intent analysis and behavioral chain tracking.</p>
             <div id="learning-mode-indicator" class="learning-banner" style="display: none;">
-              <span class="learning-icon">🧠</span>
+              <span class="learning-icon"><i data-lucide="brain"></i></span>
               <div class="learning-info">
                 <strong>Initial Learning Phase</strong>
                 <p>Establishing behavioral baselines. Alerts suppressed: <span id="learning-progress">0</span>%</p>
@@ -268,7 +287,7 @@
           <div id="guardian-alerts" class="guardian-alerts-container large-view">
             <!-- Populated via JS -->
             <div class="guardian-empty-state">
-              <div class="empty-icon">🛡️</div>
+              <div class="empty-icon"><i data-lucide="shield-check"></i></div>
               <h3>System Secure</h3>
               <p>No suspicious behavioral chains detected in the last window.</p>
             </div>
@@ -321,32 +340,70 @@
 
       <!-- VIEW: SETTINGS -->
       <section id="section-settings" class="view-section">
-        <div class="card settings-card full-width">
-          <div class="card-header">
-            <h3>Application Settings</h3>
+        <div class="settings-container">
+
+          <!-- Category: Connection -->
+          <div class="card settings-group">
+            <div class="settings-group-header">
+              <div class="group-icon"><i data-lucide="network"></i></div>
+              <div>
+                <h3>Connectivity</h3>
+                <p>Backend communication and API configuration.</p>
+              </div>
+            </div>
+            <div class="settings-form">
+              <div class="form-row">
+                <div class="form-group">
+                  <label>API Endpoint</label>
+                  <div class="readonly-value">http://127.0.0.1:5123</div>
+                </div>
+                <div class="form-group">
+                  <label>Security Token</label>
+                  <div class="readonly-value">••••••••••••••••</div>
+                </div>
+              </div>
+              <div class="form-group">
+                <label>Refresh Interval</label>
+                <div class="readonly-value">2000 ms</div>
+              </div>
+            </div>
           </div>
-          <div class="settings-form">
-            <div class="form-group">
-              <label>API Endpoint</label>
-              <input type="text" value="http://127.0.0.1:5123" readonly>
+
+          <!-- Category: Dashboard -->
+          <div class="card settings-group">
+            <div class="settings-group-header">
+              <div class="group-icon"><i data-lucide="layout"></i></div>
+              <div>
+                <h3>Dashboard Layout</h3>
+                <p>Customize the order and visibility of your stat cards.</p>
+              </div>
             </div>
-            <div class="form-group">
-              <label>Security Token</label>
-              <input type="password" value="fluffy_dev_token" readonly>
+            <div class="layout-settings">
+              <div id="layout-order-list" class="layout-order-list">
+                <!-- Populated via JS -->
+              </div>
             </div>
-            <div class="form-group">
-              <label>Refresh Interval (ms)</label>
-              <input type="number" value="2000" readonly>
+          </div>
+
+          <!-- Category: Security -->
+          <div class="card settings-group danger-zone">
+            <div class="settings-group-header">
+              <div class="group-icon"><i data-lucide="brain-circuit"></i></div>
+              <div>
+                <h3>Guardian Intelligence</h3>
+                <p>Manage autonomous learning and behavioral data.</p>
+              </div>
             </div>
-            <div class="setting-divider"></div>
             <div class="setting-item">
               <div class="setting-info">
-                <strong>Guardian Knowledge</strong>
-                <p>Wipe all learned behavioral patterns and restart the 5-minute learning phase.</p>
+                <strong>Reset Recognition Data</strong>
+                <p>Wipe all learned patterns and restart the 5-minute learning phase. Use this if Guardian is flagging
+                  many false positives.</p>
               </div>
-              <button id="btn-clear-guardian" class="btn-outline btn-danger">Clear recognition data</button>
+              <button id="btn-clear-guardian" class="btn-outline btn-danger">Clear Knowledge Base</button>
             </div>
           </div>
+
         </div>
       </section>
 
@@ -360,7 +417,7 @@
     <div class="modal-card">
       <div class="modal-header">
         <h3>System Protection Details</h3>
-        <button id="close-modal" class="close-btn">&times;</button>
+        <button class="close-btn" id="close-modal"><i data-lucide="x"></i></button>
       </div>
       <div class="modal-body">
         <div class="protection-status-header">
@@ -369,28 +426,28 @@
         </div>
         <div class="details-grid">
           <div class="detail-item">
-            <span class="detail-icon">📁</span>
+            <span class="detail-icon"><i data-lucide="folder-search"></i></span>
             <div class="detail-text">
               <strong>Path Integrity</strong>
               <p>Detects processes executing from temporary or suspicious locations.</p>
             </div>
           </div>
           <div class="detail-item">
-            <span class="detail-icon">⚡</span>
+            <span class="detail-icon"><i data-lucide="zap"></i></span>
             <div class="detail-text">
               <strong>Resource Anomaly</strong>
               <p>Flags sudden CPU, RAM, or Disk spikes that don't match user activity.</p>
             </div>
           </div>
           <div class="detail-item">
-            <span class="detail-icon">🌿</span>
+            <span class="detail-icon"><i data-lucide="git-branch"></i></span>
             <div class="detail-text">
               <strong>Child Spawning</strong>
               <p>Monitors for rapid creation of sub-processes, a common malware indicator.</p>
             </div>
           </div>
           <div class="detail-item">
-            <span class="detail-icon">🔑</span>
+            <span class="detail-icon"><i data-lucide="key"></i></span>
             <div class="detail-text">
               <strong>Persistence Guard</strong>
               <p>Watches Registry and Startup entries for unauthorized auto-run attempts.</p>
@@ -409,7 +466,7 @@
     <div class="modal-card">
       <div class="modal-header">
         <h3>Add Startup App</h3>
-        <button id="close-startup-modal" class="close-btn">&times;</button>
+        <button id="close-startup-modal" class="close-btn"><i data-lucide="x"></i></button>
       </div>
       <div class="modal-body">
         <div class="form-group">
@@ -435,10 +492,10 @@
     <div class="modal-card result-card">
       <div class="modal-header">
         <h3 id="result-title">Normalization Success</h3>
-        <button id="close-result-modal" class="close-btn">&times;</button>
+        <button id="close-result-modal" class="close-btn"><i data-lucide="x"></i></button>
       </div>
       <div class="modal-body text-center">
-        <div id="result-icon" class="status-icon large">✅</div>
+        <div id="result-icon" class="status-icon large"><i data-lucide="check-circle"></i></div>
         <p id="result-message" class="result-text">System has been successfully optimized.</p>
         <div id="result-details" class="result-details-box"></div>
       </div>
@@ -452,7 +509,7 @@
   <div id="notification-portal" class="notification-portal">
     <div class="portal-header">
       <h4>Guardian Alerts</h4>
-      <button id="close-portal" class="close-btn">&times;</button>
+      <button id="close-portal" class="close-btn"><i data-lucide="x"></i></button>
     </div>
     <div id="notification-list" class="notification-list">
       <!-- Guardian autonomous alerts appear here -->
@@ -466,7 +523,7 @@
     <div class="modal-card">
       <div class="modal-header">
         <h3>System Health Breakdown</h3>
-        <button class="close-btn" id="close-health-details">&times;</button>
+        <button class="close-btn" id="close-health-details"><i data-lucide="x"></i></button>
       </div>
       <div class="modal-body">
         <p>Current health status is determined by aggregate resource pressure and security signals.</p>

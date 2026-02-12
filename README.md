@@ -6,12 +6,13 @@ The goal is to provide users with real-time insights into their system's health,
 
 ## 🚀 Features
 
--   **Real-time Monitoring**: Track CPU, RAM, Disk, and Network usage with low overhead.
--   **Security Guardian**: Detects suspicious processes based on path, resource spikes, child spawning, and persistence.
--   **System Control**: Adjust volume and brightness directly from the dashboard.
--   **Normalization**: One-click system optimization (reset volume/brightness, clean temp files).
--   **Process Management**: Kill processes and view detailed process trees.
--   **Privacy Focused**: All data is processed locally. No cloud dependecies for core functionality.
+-   **Premium "Industrial" UI**: A high-fidelity, theme-aware dashboard built with Tauri and vectorized Lucide icons.
+-   **Security Guardian**: Real-time behavioral analysis detecting suspicious process chains, spikes, and persistence.
+-   **Hybrid Telemetry**: Professional network tracking using high-precision Kbps for live monitoring and Mbps for broadband benchmarking.
+-   **Process Hierarchy**: Advanced process tree visualization with pinning, sorting, and deep-link actions (Folder/Google search).
+-   **Customizable Layout**: Reorderable dashboard components saved instantly to local state.
+-   **Normalization Engine**: One-click system optimization and optimization routines.
+-   **Privacy-First**: 100% local processing; no cloud dependencies or data exfiltration.
 
 ## 🏗️ Architecture
 
@@ -97,9 +98,9 @@ npm run tauri dev
 
 ## 📝 Development Notes
 
--   **API Token**: The internal API uses a hardcoded token `X-Fluffy-Token: fluffy_dev_token` for authenticating requests between components.
--   **Logs**: You can view backend logs at `http://127.0.0.1:5123/logs` when the Brain is running.
--   **File Locking**: If you encounter file locking issues when rebuilding the Core, ensure `core.exe` is fully prohibited in Task Manager.
+-   **API Security**: Uses a token-based handshake (`X-Fluffy-Token`) for all inter-service communication.
+-   **Precision Telemetry**: The "Internet Speed Test" runs for a rigorous 10 seconds to ensure ISP-grade Mbps accuracy.
+-   **Theme Engine**: Automatically detects system theme preferences while offering a manual override.
 
 ## 📄 License
 

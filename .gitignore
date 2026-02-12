@@ -1,7 +1,42 @@
+# Fluffy Assistant Ignores
+
+# Data & Security
 fluffy_data/
 brain/guardian/*.json
+brain/**/*.log
+*.fluffy
+.env
+*.token
+
+# Python
 **/__pycache__/
-*.exe
+*.py[cod]
+*$py.class
+vwen/
+env/
+.venv/
+.pytest_cache/
+
+# Rust
 target/
+**/*.rs.bk
+build.rs
+Cargo.lock.tmp
+
+# Node.js/Tauri
 node_modules/
 dist/
+ui/tauri/src-tauri/target/
+ui/tauri/src-tauri/binaries/
+ui/tauri/dist/
+.tauri/
+
+# OS/IDEs
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db
+*.exe
+*.dll
+*.so
+*.dylib
