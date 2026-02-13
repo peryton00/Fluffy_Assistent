@@ -1,6 +1,7 @@
 """
 Voice Controller Module
 Central TTS entry point with adaptive tone, dynamic phrasing, and conversational Guardian alerts.
+Also manages STT (Speech-to-Text) functionality.
 """
 import sys
 import time
@@ -8,6 +9,14 @@ import random
 import re
 from typing import Dict, Optional, List
 from .tts.speaker import get_speaker
+
+# STT import (safe - fails silently if not available)
+try:
+    from .stt import get_stt_engine
+    STT_AVAILABLE = True
+except ImportError:
+    STT_AVAILABLE = False
+    get_stt_engine = None
 
 
 class VoiceController:
@@ -22,8 +31,14 @@ class VoiceController:
         self.cooldown_seconds = 60  # Don't repeat same message within 60s
         self.enabled = self.speaker is not None
         
+        # STT engine
+        self.stt_engine = get_stt_engine() if STT_AVAILABLE else None
+        self.stt_enabled = STT_AVAILABLE and (self.stt_engine is not None)
+        
         if not self.enabled:
-            print("[Voice] Voice system disabled (Piper not available)", file=sys.stderr)
+            print("[Voice] TTS system disabled (Piper not available)", file=sys.stderr)
+        if not self.stt_enabled:
+            print("[Voice] STT system disabled (Vosk not available)", file=sys.stderr)
     
     def speak_welcome(self):
         """Speak welcome message when Fluffy starts."""
@@ -109,8 +124,16 @@ class VoiceController:
     def _split_text_hybrid(self, text: str) -> List[str]:
         """
         Split text into chunks using punctuation and word counts.
+        Short sentences (≤6 words) are processed as a single unit.
         """
-        # 1. Split by natural punctuation
+        # Check total word count first
+        total_words = len(text.split())
+        
+        # If 6 words or less, process as single chunk (no splitting)
+        if total_words <= 6:
+            return [text.strip()]
+        
+        # For longer text, split by natural punctuation
         sentences = re.split(r'([.!?\n,;]+)', text)
         parts = []
         for i in range(0, len(sentences)-1, 2):
@@ -124,6 +147,7 @@ class VoiceController:
         for part in parts:
             words = part.split()
             if len(words) > 12:
+                # Only chunk very long parts
                 for i in range(0, len(words), 8):
                     chunk = " ".join(words[i:i+8])
                     if chunk: final_chunks.append(chunk)
@@ -162,6 +186,35 @@ class VoiceController:
             return False
         self.last_spoken[message_key] = now
         return True
+    
+    # ===== STT Methods =====
+    
+    def start_stt_test(self) -> bool:
+        """Start STT listening test. Returns True if successful."""
+        if not self.stt_enabled:
+            print("[Voice] STT not available", file=sys.stderr)
+            return False
+        
+        return self.stt_engine.start_listening()
+    
+    def stop_stt_test(self):
+        """Stop STT listening test."""
+        if not self.stt_enabled:
+            return
+        
+        self.stt_engine.stop_listening()
+    
+    def get_stt_status(self) -> dict:
+        """Get current STT status and transcription."""
+        if not self.stt_enabled:
+            return {
+                "available": False,
+                "listening": False,
+                "transcription": "",
+                "error": "STT not available"
+            }
+        
+        return self.stt_engine.get_status()
 
 
 # Global singleton instance
@@ -187,3 +240,13 @@ def speak_custom(text: str, message_key: Optional[str] = None, blocking: bool = 
 
 def speak_stream(chunks_iterable):
     get_voice_controller().speak_stream(chunks_iterable)
+
+# STT convenience functions
+def start_stt_test() -> bool:
+    return get_voice_controller().start_stt_test()
+
+def stop_stt_test():
+    get_voice_controller().stop_stt_test()
+
+def get_stt_status() -> dict:
+    return get_voice_controller().get_stt_status()

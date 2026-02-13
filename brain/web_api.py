@@ -297,6 +297,70 @@ def tts_test():
         return jsonify({"error": f"TTS Failure: {str(e)}"}), 500
 
 
+@app.route("/test_stt", methods=["POST"])
+def test_stt():
+    """Start STT listening test"""
+    if request.remote_addr not in ("127.0.0.1", "::1"):
+        return jsonify({"error": "Forbidden"}), 403
+    token = request.headers.get("X-Fluffy-Token")
+    if token != FLUFFY_TOKEN:
+        return jsonify({"error": "Unauthorized"}), 401
+    
+    try:
+        from voice import start_stt_test
+        success = start_stt_test()
+        if success:
+            state.add_execution_log("STT listening started", "action")
+            return jsonify({"ok": True, "status": "listening"})
+        else:
+            return jsonify({"error": "Failed to start STT (check if Vosk is installed)"}), 500
+    except ImportError as e:
+        state.add_execution_log(f"STT Import Error: {e}", "error")
+        return jsonify({"error": f"Voice module not found: {e}"}), 500
+    except Exception as e:
+        state.add_execution_log(f"STT Start Error: {e}", "error")
+        return jsonify({"error": f"STT Failure: {str(e)}"}), 500
+
+
+@app.route("/stop_stt", methods=["POST"])
+def stop_stt():
+    """Stop STT listening test"""
+    if request.remote_addr not in ("127.0.0.1", "::1"):
+        return jsonify({"error": "Forbidden"}), 403
+    token = request.headers.get("X-Fluffy-Token")
+    if token != FLUFFY_TOKEN:
+        return jsonify({"error": "Unauthorized"}), 401
+    
+    try:
+        from voice import stop_stt_test
+        stop_stt_test()
+        state.add_execution_log("STT listening stopped", "action")
+        return jsonify({"ok": True, "status": "stopped"})
+    except ImportError as e:
+        return jsonify({"error": f"Voice module not found: {e}"}), 500
+    except Exception as e:
+        return jsonify({"error": f"STT Failure: {str(e)}"}), 500
+
+
+@app.route("/stt_status", methods=["GET"])
+def stt_status():
+    """Get current STT status and transcription"""
+    if request.remote_addr not in ("127.0.0.1", "::1"):
+        return jsonify({"error": "Forbidden"}), 403
+    token = request.headers.get("X-Fluffy-Token")
+    if token != FLUFFY_TOKEN:
+        return jsonify({"error": "Unauthorized"}), 401
+    
+    try:
+        from voice import get_stt_status
+        status_data = get_stt_status()
+        return jsonify(status_data)
+    except ImportError as e:
+        return jsonify({"error": f"Voice module not found: {e}"}), 500
+    except Exception as e:
+        return jsonify({"error": f"STT Failure: {str(e)}"}), 500
+
+
 @app.route("/apps", methods=["GET"])
 def get_apps():
     if request.remote_addr not in ("127.0.0.1", "::1"):

@@ -1623,3 +1623,105 @@ function renderApps(apps: any[] | null = null, filter: string = "") {
 
   if ((window as any).lucide) (window as any).lucide.createIcons();
 }
+
+// ===== STT Testing Handlers =====
+let sttPollingInterval: number | null = null;
+
+const btnStartSTT = document.getElementById('btn-start-stt') as HTMLButtonElement;
+const btnStopSTT = document.getElementById('btn-stop-stt') as HTMLButtonElement;
+const sttStatusText = document.getElementById('stt-status-text');
+const sttResultText = document.getElementById('stt-result-text');
+
+async function pollSTTStatus() {
+  try {
+    const response = await apiRequest('/stt_status');
+    
+    if (response && sttResultText) {
+      const transcription = response.transcription || '';
+      sttResultText.textContent = transcription || 'Listening...';
+    }
+  } catch (error) {
+    console.error('Failed to poll STT status:', error);
+  }
+}
+
+if (btnStartSTT) {
+  btnStartSTT.onclick = async () => {
+    try {
+      const response = await apiRequest('/test_stt', { method: 'POST' });
+      
+      if (response && response.ok) {
+        btnStartSTT.disabled = true;
+        if (btnStopSTT) btnStopSTT.disabled = false;
+        btnStartSTT.setAttribute('data-recording', 'true');
+        if (sttStatusText) sttStatusText.textContent = 'Listening...';
+        if (sttResultText) sttResultText.textContent = '';
+        
+        // Start polling for transcription results
+        sttPollingInterval = window.setInterval(pollSTTStatus, 500);
+        
+        showToast('STT listening started', 'success');
+      } else {
+        showToast(response?.error || 'Failed to start STT', 'error');
+      }
+    } catch (error) {
+      console.error('Failed to start STT:', error);
+      showToast('Failed to start STT', 'error');
+    }
+  };
+}
+
+if (btnStopSTT) {
+  btnStopSTT.onclick = async () => {
+    try {
+      await apiRequest('/stop_stt', { method: 'POST' });
+      
+      if (btnStartSTT) {
+        btnStartSTT.disabled = false;
+        btnStartSTT.removeAttribute('data-recording');
+      }
+      btnStopSTT.disabled = true;
+      if (sttStatusText) sttStatusText.textContent = 'Stopped';
+      
+      if (sttPollingInterval) {
+        clearInterval(sttPollingInterval);
+        sttPollingInterval = null;
+      }
+      
+      showToast('STT listening stopped', 'info');
+    } catch (error) {
+      console.error('Failed to stop STT:', error);
+      showToast('Failed to stop STT', 'error');
+    }
+  };
+}
+
+// TTS Testing Handler
+const btnTestTTS = document.getElementById('btn-test-tts');
+const ttsTestInput = document.getElementById('tts-test-input') as HTMLInputElement;
+
+if (btnTestTTS && ttsTestInput) {
+  btnTestTTS.onclick = async () => {
+    const text = ttsTestInput.value.trim();
+    if (!text) {
+      showToast('Please enter text to speak', 'info');
+      return;
+    }
+    
+    try {
+      const response = await apiRequest('/tts_test', {
+        method: 'POST',
+        body: JSON.stringify({ text })
+      });
+      
+      if (response && response.ok) {
+        showToast('TTS test started', 'success');
+      } else {
+        showToast(response?.error || 'TTS test failed', 'error');
+      }
+    } catch (error) {
+      console.error('TTS test error:', error);
+      showToast('TTS test failed', 'error');
+    }
+  };
+}

@@ -437,6 +437,37 @@
             </div>
           </div>
 
+          <!-- Category: Speech Recognition (STT) -->
+          <div class="card settings-group">
+            <div class="settings-group-header">
+              <div class="group-icon"><i data-lucide="mic"></i></div>
+              <div>
+                <h3>Speech Recognition (STT)</h3>
+                <p>Test offline speech-to-text recognition powered by Vosk.</p>
+              </div>
+            </div>
+            <div class="settings-form">
+              <div class="form-group">
+                <label>Microphone Test</label>
+                <div class="stt-test-container">
+                  <button class="btn-primary" id="btn-start-stt">
+                    <i data-lucide="mic"></i> Start Listening
+                  </button>
+                  <button class="btn-outline" id="btn-stop-stt" disabled>
+                    <i data-lucide="mic-off"></i> Stop
+                  </button>
+                </div>
+                <div id="stt-status" class="stt-status-box">
+                  <p class="status-label">Status: <span id="stt-status-text">Ready</span></p>
+                  <div id="stt-transcription" class="transcription-box">
+                    <p class="transcription-label">Transcription:</p>
+                    <p id="stt-result-text" class="transcription-text">Speak to see results...</p>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+
           <!-- Category: Security -->
           <div class="card settings-group danger-zone">
             <div class="settings-group-header">

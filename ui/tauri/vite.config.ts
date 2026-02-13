@@ -38,6 +38,9 @@ export default defineConfig(async () => ({
       '/trust_process': 'http://127.0.0.1:5123',
       '/clear_guardian_data': 'http://127.0.0.1:5123',
       '/tts_test': 'http://127.0.0.1:5123',
+      '/test_stt': 'http://127.0.0.1:5123',
+      '/stop_stt': 'http://127.0.0.1:5123',
+      '/stt_status': 'http://127.0.0.1:5123',
       '/apps': 'http://127.0.0.1:5123'
     }
   },
