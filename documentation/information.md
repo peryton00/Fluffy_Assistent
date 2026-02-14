@@ -1,6 +1,6 @@
 # Fluffy Assistant: Ultimate Information Dossier 🐰
 
-This document serves as the single source of truth for the **Fluffy Assistant Desktop** project. It consolidates all architectural, functional, and technical documentation into one structured guide.
+This document serves as the single source of truth for the **Fluffy Integrated Assistant Assistant System** project. It consolidates all architectural, functional, and technical documentation into one structured guide.
 
 ---
 
