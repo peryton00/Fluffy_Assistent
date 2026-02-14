@@ -1,6 +1,7 @@
 mod etw;
 mod ipc;
 mod permissions;
+mod actions;
 
 use etw::NetworkMonitor;
 

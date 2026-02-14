@@ -1,0 +1,35 @@
+{
+  "sessions": [
+    {
+      "id": "3ee7c015-02a0-48f6-bd9d-f00454b2f455",
+      "created": "2026-02-14T04:24:58.446510",
+      "last_updated": "2026-02-14T04:24:59.440663",
+      "messages": [
+        {
+          "type": "fluffy",
+          "text": "Welcome back Boss! Fluffy is standing by. How can I help you today?",
+          "timestamp": "2026-02-13T22:54:59.401Z"
+        }
+      ]
+    },
+    {
+      "id": "b2ac93ff-de59-49d9-a709-d58988c652f0",
+      "created": "2026-02-14T04:25:15.986987",
+      "last_updated": "2026-02-14T04:25:22.507120",
+      "messages": [
+        {
+          "type": "fluffy",
+          "text": "Welcome back Boss! Fluffy is standing by. How can I help you today?",
+          "timestamp": "2026-02-13T22:55:22.497Z"
+        }
+      ]
+    },
+    {
+      "id": "13b8a51f-4904-49d7-884a-db7d91f3a080",
+      "created": "2026-02-14T04:28:24.119494",
+      "last_updated": "2026-02-14T04:28:24.119508",
+      "messages": []
+    }
+  ],
+  "current_session_id": "13b8a51f-4904-49d7-884a-db7d91f3a080"
+}

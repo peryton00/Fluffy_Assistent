@@ -1,0 +1,29 @@
+{
+  "id": "5a40f27c-26eb-448e-a15d-3dd0f834578c",
+  "created": "2026-02-14T04:28:37.023210",
+  "last_updated": "2026-02-14T04:28:37.118212",
+  "messages": [
+    {
+      "type": "user",
+      "text": "open chrome",
+      "timestamp": "2026-02-14T04:28:37.043953"
+    },
+    {
+      "type": "fluffy",
+      "text": "Launched chrome",
+      "timestamp": "2026-02-14T04:28:37.043972",
+      "status": "success"
+    },
+    {
+      "type": "user",
+      "text": "close notepad",
+      "timestamp": "2026-02-14T04:28:37.043978"
+    },
+    {
+      "type": "fluffy",
+      "text": "Closed notepad",
+      "timestamp": "2026-02-14T04:28:37.043983",
+      "status": "success"
+    }
+  ]
+}

@@ -1,0 +1,16 @@
+{
+  "timestamp": "2026-02-14T17:33:40.654730",
+  "description": "Test backup",
+  "files": [
+    {
+      "original": "C:\\Users\\sudip\\OneDrive\\Desktop\\webProjects\\FluffyAssistent\\brain\\command_parser.py",
+      "backup": "C:\\Users\\sudip\\OneDrive\\Desktop\\webProjects\\FluffyAssistent\\brain\\backups\\20260214_173340\\command_parser.py",
+      "size": 16850
+    },
+    {
+      "original": "C:\\Users\\sudip\\OneDrive\\Desktop\\webProjects\\FluffyAssistent\\brain\\command_executor.py",
+      "backup": "C:\\Users\\sudip\\OneDrive\\Desktop\\webProjects\\FluffyAssistent\\brain\\backups\\20260214_173340\\command_executor.py",
+      "size": 23657
+    }
+  ]
+}

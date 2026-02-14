@@ -8,11 +8,14 @@ The goal is to provide users with real-time insights into their system's health,
 
 -   **Premium "Industrial" UI**: A high-fidelity, theme-aware dashboard built with Tauri and vectorized Lucide icons.
 -   **Security Guardian**: Real-time behavioral analysis detecting suspicious process chains, spikes, and persistence.
+-   **Memory System** (NEW): Persistent user preferences and trusted processes that survive restarts.
+-   **Interrupt Commands** (NEW): Cancel pending actions with natural commands (stop, cancel, abort, etc.).
 -   **Hybrid Telemetry**: Professional network tracking using high-precision Kbps for live monitoring and Mbps for broadband benchmarking.
 -   **Process Hierarchy**: Advanced process tree visualization with pinning, sorting, and deep-link actions (Folder/Google search).
 -   **Customizable Layout**: Reorderable dashboard components saved instantly to local state.
 -   **Normalization Engine**: One-click system optimization and optimization routines.
 -   **Privacy-First**: 100% local processing; no cloud dependencies or data exfiltration.
+
 
 ## 🏗️ Architecture
 
@@ -22,7 +25,7 @@ The application follows a Hexagonal Architecture split into three services:
 2.  **Brain (Python)**: The intelligence layer. Analyzes telemetry for threats, manages state, and exposes a Web API.
 3.  **Frontend (Tauri/TypeScript)**: The user interface. Displays data and sends user commands to the Brain.
 
-For a deep dive into the architecture, please refer to [`agent.md`](./agent.md).
+For a deep dive into the architecture, please refer to [`agent.md`](./documentation/agent.md).
 
 ## 🛠️ Prerequisites
 
@@ -96,9 +99,38 @@ npm run tauri dev
 
 *This will launch the desktop application window.*
 
+## ✨ New Features (February 2026)
+
+### Memory System
+Fluffy now remembers your preferences and trusted processes across restarts:
+- **Persistent Storage**: User preferences saved to `fluffy_data/memory/long_term.json`
+- **Trusted Processes**: Whitelist processes permanently (no more re-trusting after restart)
+- **Session Memory**: Track multi-step conversations and pending actions
+- **API Endpoints**: 8 new endpoints for memory management
+
+### Interrupt Commands
+Take control of pending actions with natural commands:
+- **Keywords**: `stop`, `cancel`, `abort`, `quit`, `exit`, `mute`, `quiet`, `shut up`, `never mind`, `forget it`
+- **Multi-Action Cancellation**: Stops TTS, clears pending intents, removes confirmations
+- **API Endpoints**: 3 new endpoints for interrupt handling
+
+For detailed documentation, see the following in the [`documentation/`](./documentation/) folder:
+- [`FUNCTIONALITY_GUIDE.md`](./documentation/FUNCTIONALITY_GUIDE.md) - Core features
+- [`CODE_EXPLANATIONS.md`](./documentation/CODE_EXPLANATIONS.md) - Implementation details
+- [`VOICE_SETUP.md`](./documentation/VOICE_SETUP.md) - Voice & Audio configuration
+- [`STT_SETUP.md`](./documentation/STT_SETUP.md) - Speech-to-Text setup
+- [`LLM_SETUP.md`](./documentation/LLM_SETUP.md) - AI Brain configuration
+- [`LEARNING_PHASE.md`](./documentation/LEARNING_PHASE.md) - Guardian behavior details
+- [`agent.md`](./documentation/agent.md) - Technical architecture overview
+
 ## 📝 Development Notes
 
+
 -   **API Security**: Uses a token-based handshake (`X-Fluffy-Token`) for all inter-service communication.
+---
+
+> [!TIP]
+> **Complete Project Dossier**: For a single, consolidated document containing all technical, architectural, and setup information, refer to [**`documentation/information.md`**](./documentation/information.md).
 -   **Precision Telemetry**: The "Internet Speed Test" runs for a rigorous 10 seconds to ensure ISP-grade Mbps accuracy.
 -   **Theme Engine**: Automatically detects system theme preferences while offering a manual override.
 

@@ -1,0 +1,9 @@
+flask
+requests
+vosk
+sounddevice
+numpy
+pathlib
+uuid
+websockets
+psutil

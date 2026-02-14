@@ -53,14 +53,25 @@ pub fn run() {
             println!("[Fluffy Rust] Current working directory: {:?}", std::env::current_dir().unwrap_or_default());
             // 1. Start Python backend
             let python_script = "../../../brain/listener.py";
-            let python_commands = ["python", "python3", "py"];
-            let mut spawned = false;
-
             println!("[Fluffy Rust] Attempting to spawn Python backend with script: {}", python_script);
 
+            // 1a. Build list of potential python executables
+            let mut python_commands = Vec::new();
+
+            // Try local venv first (Industry standard)
+            let venv_python = "../../../.venv/Scripts/python.exe";
+            if std::path::Path::new(venv_python).exists() {
+                println!("[Fluffy Rust] Found local virtual environment at: {}", venv_python);
+                python_commands.push(venv_python.to_string());
+            }
+
+            // Fallback to system commands
+            python_commands.extend(vec!["python".to_string(), "python3".to_string(), "py".to_string()]);
+
+            let mut spawned = false;
             for cmd in python_commands {
                 println!("[Fluffy Rust] Trying command: {}", cmd);
-                let child = Command::new(cmd)
+                let child = Command::new(&cmd)
                     .arg(python_script)
                     .spawn();
 

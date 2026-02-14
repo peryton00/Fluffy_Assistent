@@ -239,6 +239,14 @@ function setupNavigation() {
       }
     };
   }
+
+  // Floating Chat Button
+  const fabChat = document.getElementById("fab-chat");
+  if (fabChat) {
+    fabChat.onclick = () => {
+      switchView("chat");
+    };
+  }
 }
 
 async function normalizeSystem() {
@@ -604,7 +612,12 @@ function renderNode(node: any, container: HTMLElement) {
 /* =========================
    VIEW UPDATES
 ========================= */
+
 function renderDashboard(data: any) {
+  if (!data || !data.system || !data.system.cpu || !data.system.ram) {
+    console.warn("Incomplete dashboard data", data);
+    return;
+  }
   const sys = data.system;
   const cpu = sys.cpu.usage_percent;
   const ram = sys.ram;
@@ -1635,7 +1648,7 @@ const sttResultText = document.getElementById('stt-result-text');
 async function pollSTTStatus() {
   try {
     const response = await apiRequest('/stt_status');
-    
+
     if (response && sttResultText) {
       const transcription = response.transcription || '';
       sttResultText.textContent = transcription || 'Listening...';
@@ -1649,17 +1662,17 @@ if (btnStartSTT) {
   btnStartSTT.onclick = async () => {
     try {
       const response = await apiRequest('/test_stt', { method: 'POST' });
-      
+
       if (response && response.ok) {
         btnStartSTT.disabled = true;
         if (btnStopSTT) btnStopSTT.disabled = false;
         btnStartSTT.setAttribute('data-recording', 'true');
         if (sttStatusText) sttStatusText.textContent = 'Listening...';
         if (sttResultText) sttResultText.textContent = '';
-        
+
         // Start polling for transcription results
         sttPollingInterval = window.setInterval(pollSTTStatus, 500);
-        
+
         showToast('STT listening started', 'success');
       } else {
         showToast(response?.error || 'Failed to start STT', 'error');
@@ -1675,19 +1688,19 @@ if (btnStopSTT) {
   btnStopSTT.onclick = async () => {
     try {
       await apiRequest('/stop_stt', { method: 'POST' });
-      
+
       if (btnStartSTT) {
         btnStartSTT.disabled = false;
         btnStartSTT.removeAttribute('data-recording');
       }
       btnStopSTT.disabled = true;
       if (sttStatusText) sttStatusText.textContent = 'Stopped';
-      
+
       if (sttPollingInterval) {
         clearInterval(sttPollingInterval);
         sttPollingInterval = null;
       }
-      
+
       showToast('STT listening stopped', 'info');
     } catch (error) {
       console.error('Failed to stop STT:', error);
@@ -1707,13 +1720,13 @@ if (btnTestTTS && ttsTestInput) {
       showToast('Please enter text to speak', 'info');
       return;
     }
-    
+
     try {
       const response = await apiRequest('/tts_test', {
         method: 'POST',
         body: JSON.stringify({ text })
       });
-      
+
       if (response && response.ok) {
         showToast('TTS test started', 'success');
       } else {
@@ -1725,3 +1738,646 @@ if (btnTestTTS && ttsTestInput) {
     }
   };
 }
+
+/* =========================
+   CHAT INTERFACE
+========================= */
+
+interface ChatMessage {
+  id: number;
+  text: string;
+  type: 'user' | 'fluffy' | 'system';
+  timestamp: Date;
+  status?: 'success' | 'error' | 'warning';
+  inputMode?: 'text' | 'voice';
+}
+
+const chatState = {
+  messages: [] as ChatMessage[],
+  isListening: false,
+  inputMode: 'text' as 'text' | 'voice',
+  sttPollInterval: null as any,
+  currentSessionId: null as string | null
+};
+
+function addChatMessage(text: string, type: 'user' | 'fluffy' | 'system', metadata: Partial<ChatMessage> = {}) {
+  const message: ChatMessage = {
+    id: Date.now(),
+    text,
+    type,
+    timestamp: new Date(),
+    ...metadata
+  };
+
+  chatState.messages.push(message);
+  renderChatMessage(message);
+  scrollChatToBottom();
+
+  // Auto-save to backend if we have a session
+  if (chatState.currentSessionId && type !== 'system') {
+    saveChatMessageToBackend(message);
+  }
+}
+
+function renderChatMessage(message: ChatMessage) {
+  const messagesContainer = document.getElementById('chat-messages');
+  if (!messagesContainer) return;
+
+  const messageEl = document.createElement('div');
+  messageEl.className = `message ${message.type}`;
+  messageEl.setAttribute('data-message-id', message.id.toString());
+
+  if (message.type === 'system') {
+    messageEl.innerHTML = `
+      <div class="system-message">
+        <i data-lucide="info"></i>
+        <span>${message.text}</span>
+      </div>
+    `;
+  } else {
+    const icon = message.type === 'user' ? '👤' : '🤖';
+    const statusIcon = message.status === 'success' ? '✓' :
+      message.status === 'error' ? '✗' :
+        message.status === 'warning' ? '⚠' : '';
+
+    // Add TTS button for fluffy messages
+    const ttsButton = message.type === 'fluffy'
+      ? `<button class="tts-btn" data-text="${message.text.replace(/"/g, '&quot;')}" title="Speak"><i data-lucide="volume-2"></i></button>`
+      : '';
+
+    messageEl.innerHTML = `
+      <div class="message-avatar">${icon}</div>
+      <div class="message-bubble">
+        <div class="message-text">${message.text}</div>
+        <div class="message-meta">
+          <span class="message-time">${formatChatTime(message.timestamp)}</span>
+          ${statusIcon ? `<span class="message-status">${statusIcon}</span>` : ''}
+          ${ttsButton}
+        </div>
+      </div>
+    `;
+  }
+
+  messagesContainer.appendChild(messageEl);
+
+  // Re-initialize Lucide icons for new elements
+  if (typeof (window as any).lucide !== 'undefined') {
+    (window as any).lucide.createIcons();
+  }
+
+  // Add click handlers for TTS buttons
+  const ttsButtons = messageEl.querySelectorAll('.tts-btn');
+  ttsButtons.forEach(btn => {
+    btn.addEventListener('click', (e) => {
+      const text = (e.currentTarget as HTMLElement).getAttribute('data-text');
+      if (text) playTTS(text);
+    });
+  });
+}
+
+async function playTTS(text: string) {
+  try {
+    const response = await apiRequest('/tts/speak', {
+      method: 'POST',
+      body: JSON.stringify({ text })
+    });
+
+    if (!response || !response.ok) {
+      console.error('Failed to play TTS');
+      showToast('Failed to play audio', 'error');
+    }
+  } catch (error) {
+    console.error('TTS error:', error);
+  }
+
+}
+
+async function stopTTS() {
+  console.log('Attempting to stop TTS...');
+  try {
+    await apiRequest('/tts/stop', { method: 'POST' });
+  } catch (err) {
+    console.error('Failed to stop TTS:', err);
+  }
+}
+
+function formatChatTime(date: Date): string {
+  return date.toLocaleTimeString('en-US', {
+    hour: '2-digit',
+    minute: '2-digit'
+  });
+}
+
+function scrollChatToBottom() {
+  const messagesContainer = document.getElementById('chat-messages');
+  if (messagesContainer) {
+    messagesContainer.scrollTop = messagesContainer.scrollHeight;
+  }
+}
+
+function removeLastSystemMessage() {
+  const messagesContainer = document.getElementById('chat-messages');
+  if (!messagesContainer) return;
+
+  const systemMessages = messagesContainer.querySelectorAll('.message.system');
+  if (systemMessages.length > 0) {
+    const lastSystem = systemMessages[systemMessages.length - 1];
+    lastSystem.remove();
+    chatState.messages = chatState.messages.filter(m =>
+      m.id !== parseInt(lastSystem.getAttribute('data-message-id') || '0')
+    );
+  }
+}
+
+function updateChatStatus(text: string, state: 'ready' | 'listening' | 'processing') {
+  const indicator = document.getElementById('chat-status-indicator');
+  const statusText = document.getElementById('chat-status-text');
+
+  if (indicator && statusText) {
+    indicator.className = `status-dot ${state}`;
+    statusText.textContent = text;
+  }
+}
+
+async function sendTextCommand() {
+  const input = document.getElementById('chat-input') as HTMLInputElement;
+  if (!input) return;
+
+  const text = input.value.trim();
+  if (!text) return;
+
+  // Interrupt any ongoing speech when user sends a new command
+  stopTTS();
+
+  // Add user message
+  addChatMessage(text, 'user', { inputMode: 'text' });
+  input.value = '';
+
+  // Show processing
+  addChatMessage('Processing...', 'system');
+  updateChatStatus('Processing...', 'processing');
+
+  // Send to chat endpoint (supports both commands and LLM)
+  try {
+    const response = await apiRequest('/chat/message', {
+      method: 'POST',
+      body: JSON.stringify({
+        message: text,
+        session_id: chatState.currentSessionId,
+        use_voice: chatState.inputMode === 'voice'  // Only use voice if input mode is voice
+      })
+    });
+
+    // Remove "Processing..." message
+    removeLastSystemMessage();
+    updateChatStatus('Ready', 'ready');
+
+    console.log('Chat response:', response);
+
+    if (response && response.ok) {
+      // Response can be either command or LLM
+      const messageText = response.message || 'Done';
+      const isCommand = response.type === 'command';
+
+      // Determine status based on response
+      let status: 'success' | 'error' | 'warning' = 'success';
+      if (isCommand && response.result) {
+        status = response.result.success ? 'success' : 'error';
+      }
+
+      addChatMessage(messageText, 'fluffy', { status });
+    } else {
+      const errorMsg = response?.error || 'Failed to process message';
+      console.error('Chat error:', errorMsg, response);
+      addChatMessage(errorMsg, 'fluffy', { status: 'error' });
+    }
+  } catch (error: any) {
+    removeLastSystemMessage();
+    updateChatStatus('Ready', 'ready');
+    console.error('Chat exception:', error);
+    addChatMessage(`Error: ${error.message}`, 'fluffy', { status: 'error' });
+  }
+}
+
+
+async function startVoiceInput() {
+  if (chatState.isListening) return;
+
+  chatState.isListening = true;
+  chatState.inputMode = 'voice'; // Ensure input mode is voice
+  updateChatStatus('Listening...', 'listening');
+  addChatMessage('Listening for voice input...', 'system');
+
+  try {
+    // Start STT
+    const response = await apiRequest('/test_stt', { method: 'POST' });
+
+    if (!response || !response.ok) {
+      throw new Error('Failed to start STT');
+    }
+
+    // Poll for transcription
+    let pollCount = 0;
+    const maxPolls = 20; // 10 seconds max
+
+    chatState.sttPollInterval = setInterval(async () => {
+      pollCount++;
+
+      if (pollCount > maxPolls) {
+        stopVoiceInput('Voice input timeout');
+        return;
+      }
+
+      const statusResponse = await apiRequest('/stt_status', { method: 'GET' });
+
+      if (statusResponse && statusResponse.transcription && statusResponse.transcription.trim()) {
+        const transcription = statusResponse.transcription.trim();
+
+        // Stop STT
+        await apiRequest('/stop_stt', { method: 'POST' });
+
+        // Clear interval
+        if (chatState.sttPollInterval) {
+          clearInterval(chatState.sttPollInterval);
+          chatState.sttPollInterval = null;
+        }
+
+        // Remove "Listening..." message
+        removeLastSystemMessage();
+
+        // Use transcription as command
+        const input = document.getElementById('chat-input') as HTMLInputElement;
+        if (input) {
+          input.value = transcription;
+        }
+
+        chatState.isListening = false;
+        updateChatStatus('Ready', 'ready');
+
+        // Auto-send
+        await sendTextCommand();
+      }
+    }, 500);
+
+  } catch (error: any) {
+    stopVoiceInput(`Voice input error: ${error.message} `);
+  }
+}
+
+function stopVoiceInput(message?: string) {
+  if (chatState.sttPollInterval) {
+    clearInterval(chatState.sttPollInterval);
+    chatState.sttPollInterval = null;
+  }
+
+  chatState.isListening = false;
+  updateChatStatus('Ready', 'ready');
+  removeLastSystemMessage();
+
+  if (message) {
+    addChatMessage(message, 'system');
+  }
+}
+
+// Chat event listeners
+const sendBtn = document.getElementById('send-btn');
+const chatInput = document.getElementById('chat-input') as HTMLInputElement;
+const voiceModeBtn = document.getElementById('voice-mode-btn');
+const textModeBtn = document.getElementById('text-mode-btn');
+
+if (sendBtn) {
+  sendBtn.onclick = sendTextCommand;
+}
+
+if (chatInput) {
+  // Stop TTS when user starts typing
+  chatInput.addEventListener('input', () => {
+    if (chatInput.value.length > 0) {
+      apiRequest('/stop_tts', { method: 'POST' }).catch(() => { });
+    }
+  });
+
+  chatInput.addEventListener('keypress', (e) => {
+    if (e.key === 'Enter') {
+      sendTextCommand();
+    }
+  });
+}
+
+if (voiceModeBtn) {
+  voiceModeBtn.onclick = () => {
+    if (!chatState.isListening) {
+      startVoiceInput();
+    }
+  };
+}
+
+if (textModeBtn) {
+  textModeBtn.onclick = () => {
+    chatState.inputMode = 'text';
+    textModeBtn.classList.add('active');
+    voiceModeBtn?.classList.remove('active');
+  };
+}
+
+// Add chat to navigation
+const navChat = document.getElementById('nav-chat');
+if (navChat) {
+  navChat.onclick = (e) => {
+    e.preventDefault();
+    switchView('chat');
+  };
+}
+
+// ============================================================================
+// CHAT HISTORY FUNCTIONS
+// ============================================================================
+
+async function saveChatMessageToBackend(message: ChatMessage) {
+  try {
+    if (!chatState.currentSessionId) return;
+
+    await apiRequest('/chat/save_message', {
+      method: 'POST',
+
+      body: JSON.stringify({
+        session_id: chatState.currentSessionId,
+        message: {
+          type: message.type,
+          text: message.text,
+          timestamp: message.timestamp.toISOString(),
+          status: message.status,
+          inputMode: message.inputMode
+        }
+      })
+    });
+  } catch (error) {
+    console.error('Failed to save message:', error);
+  }
+}
+
+async function initializeChatSession() {
+  try {
+    // Try to get current session
+    const currentResponse = await apiRequest('/chat/current_session', {
+      method: 'GET'
+    });
+
+    if (currentResponse && currentResponse.ok && currentResponse.session_id) {
+      // Load existing session
+      chatState.currentSessionId = currentResponse.session_id;
+      await loadChatSession(currentResponse.session_id);
+    } else {
+      // Create new session
+      const createResponse = await apiRequest('/chat/create_session', {
+        method: 'POST'
+      });
+
+      if (createResponse && createResponse.ok) {
+        chatState.currentSessionId = createResponse.session_id;
+        console.log('Created new chat session:', createResponse.session_id);
+
+        // Add welcome message for new session
+        addChatMessage("Welcome back Boss! Fluffy is standing by. How can I help you today?", 'fluffy');
+      }
+    }
+  } catch (error) {
+    console.error('Failed to initialize chat session:', error);
+  }
+}
+
+async function loadChatSession(sessionId: string) {
+  try {
+    const response = await apiRequest(`/chat/session/${sessionId}`, {
+      method: 'GET'
+    });
+
+    if (response && response.ok && response.session) {
+      // Clear current messages
+      chatState.messages = [];
+      const messagesContainer = document.getElementById('chat-messages');
+      if (messagesContainer) {
+        messagesContainer.innerHTML = '';
+      }
+
+      // Load messages from session
+      for (const msg of response.session.messages) {
+        const message: ChatMessage = {
+          id: Date.now() + Math.random(),
+          text: msg.text,
+          type: msg.type,
+          timestamp: new Date(msg.timestamp),
+          status: msg.status,
+          inputMode: msg.inputMode
+        };
+
+        chatState.messages.push(message);
+        renderChatMessage(message);
+      }
+
+      scrollChatToBottom();
+      console.log(`Loaded ${response.session.messages.length} messages from session`);
+    }
+  } catch (error) {
+    console.error('Failed to load chat session:', error);
+  }
+}
+
+// Initialize chat session on load
+initializeChatSession();
+
+// ============================================================================
+// HISTORY SIDEBAR FUNCTIONS
+// ============================================================================
+
+function toggleHistorySidebar() {
+  const sidebar = document.getElementById('chat-history-sidebar');
+  if (sidebar) {
+    sidebar.classList.toggle('hidden');
+  }
+}
+
+async function loadSessionsList() {
+  try {
+    const response = await apiRequest('/chat/sessions', {
+      method: 'GET'
+    });
+
+    if (response && response.ok && response.sessions) {
+      renderSessionsList(response.sessions);
+    }
+  } catch (error) {
+    console.error('Failed to load sessions list:', error);
+  }
+}
+
+function renderSessionsList(sessions: any[]) {
+  const sessionsList = document.getElementById('sessions-list');
+  if (!sessionsList) return;
+
+  if (sessions.length === 0) {
+    sessionsList.innerHTML = '<p class="empty-state">No chat history yet</p>';
+    return;
+  }
+
+  sessionsList.innerHTML = '';
+
+  for (const session of sessions) {
+    const sessionEl = document.createElement('div');
+    sessionEl.className = 'session-item';
+    if (session.id === chatState.currentSessionId) {
+      sessionEl.classList.add('active');
+    }
+
+    sessionEl.innerHTML = `
+      <div class="session-preview">${session.preview}</div>
+      <div class="session-meta">
+        <span class="session-time">${formatSessionTime(session.last_updated)}</span>
+        <button class="session-delete" data-session-id="${session.id}">
+          <i data-lucide="trash-2"></i>
+        </button>
+      </div>
+    `;
+
+    // Click to load session
+    sessionEl.addEventListener('click', (e) => {
+      if (!(e.target as HTMLElement).closest('.session-delete')) {
+        switchToSession(session.id);
+      }
+    });
+
+    // Delete button
+    const deleteBtn = sessionEl.querySelector('.session-delete');
+    if (deleteBtn) {
+      deleteBtn.addEventListener('click', (e) => {
+        e.stopPropagation();
+        deleteSessionWithConfirmation(session.id);
+      });
+    }
+
+    sessionsList.appendChild(sessionEl);
+  }
+
+  // Re-initialize Lucide icons
+  if (typeof (window as any).lucide !== 'undefined') {
+    (window as any).lucide.createIcons();
+  }
+}
+
+function formatSessionTime(timestamp: string): string {
+  const date = new Date(timestamp);
+  const now = new Date();
+  const diffMs = now.getTime() - date.getTime();
+  const diffMins = Math.floor(diffMs / 60000);
+
+  if (diffMins < 1) return 'Just now';
+  if (diffMins < 60) return `${diffMins} min ago`;
+
+  const diffHours = Math.floor(diffMins / 60);
+  if (diffHours < 24) return `${diffHours} hour${diffHours > 1 ? 's' : ''} ago`;
+
+  const diffDays = Math.floor(diffHours / 24);
+  if (diffDays < 7) return `${diffDays} day${diffDays > 1 ? 's' : ''} ago`;
+
+  return date.toLocaleDateString();
+}
+
+async function switchToSession(sessionId: string) {
+  if (sessionId === chatState.currentSessionId) return;
+
+  chatState.currentSessionId = sessionId;
+  await loadChatSession(sessionId);
+  loadSessionsList(); // Refresh to update active state
+}
+
+async function deleteSessionWithConfirmation(sessionId: string) {
+  // if (!confirm('Are you sure you want to delete this conversation?')) {
+  //   return;
+  // }
+
+  try {
+    const response = await apiRequest(`/chat/session/${sessionId}`, {
+      method: 'DELETE'
+    });
+
+    if (response && response.ok) {
+      // If deleted session was current, create new one
+      if (sessionId === chatState.currentSessionId) {
+        await createNewChatSession();
+      }
+
+      // Refresh sessions list
+      loadSessionsList();
+    }
+  } catch (error) {
+    console.error('Failed to delete session:', error);
+  }
+}
+
+async function createNewChatSession() {
+  try {
+    const response = await apiRequest('/chat/create_session', {
+      method: 'POST'
+    });
+
+    if (response && response.ok) {
+      chatState.currentSessionId = response.session_id;
+
+      // Clear current messages
+      chatState.messages = [];
+      const messagesContainer = document.getElementById('chat-messages');
+      if (messagesContainer) {
+        messagesContainer.innerHTML = '';
+      }
+
+      // Refresh sessions list
+      loadSessionsList();
+
+      console.log('Created new chat session:', response.session_id);
+
+      // Add welcome message
+      addChatMessage("Welcome back Boss! Fluffy is standing by. How can I help you today?", 'fluffy');
+    }
+  } catch (error) {
+    console.error('Failed to create new session:', error);
+  }
+}
+
+// Initialize sidebar event listeners
+const toggleHistoryBtn = document.getElementById('toggle-history-btn');
+if (toggleHistoryBtn) {
+  toggleHistoryBtn.onclick = toggleHistorySidebar;
+}
+
+const closeHistoryBtn = document.getElementById('close-history-btn');
+if (closeHistoryBtn) {
+  closeHistoryBtn.onclick = toggleHistorySidebar;
+}
+
+const newChatBtn = document.getElementById('new-chat-btn');
+if (newChatBtn) {
+  newChatBtn.onclick = createNewChatSession;
+}
+
+// Load sessions list on init
+loadSessionsList();
+
+
+console.log('✅ Chat interface initialized');
+
+// Initial Welcome Message
+
+// Initial Welcome Message Logic (Moved to createNewChatSession/initializeChatSession if needed, 
+// or kept here for app start if no history)
+window.addEventListener('DOMContentLoaded', () => {
+  // We check in initializeChatSession
+});
+
+// Stop TTS when window loses focus or is closed
+window.addEventListener('blur', () => {
+  stopTTS();
+});
+
+window.addEventListener('beforeunload', () => {
+  stopTTS();
+});

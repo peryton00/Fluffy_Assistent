@@ -13,14 +13,12 @@ app = Flask(__name__)
 
 
 @app.after_request
-def add_csp_headers(response):
-    response.headers["Content-Security-Policy"] = (
-        "default-src 'self'; "
-        "script-src 'self'; "
-        "style-src 'self'; "
-        "img-src 'self'; "
-        "connect-src 'self';"
-    )
+def add_cors_headers(response):
+    # Allow CORS from Tauri dev server
+    response.headers["Access-Control-Allow-Origin"] = "*"
+    response.headers["Access-Control-Allow-Methods"] = "GET, POST, PUT, DELETE, OPTIONS"
+    response.headers["Access-Control-Allow-Headers"] = "Content-Type, X-Fluffy-Token"
+    response.headers["Access-Control-Max-Age"] = "3600"
     return response
 
 
@@ -154,6 +152,13 @@ def trust_process():
     from guardian_manager import GUARDIAN_BASELINE
     import time
     
+    # Add to long-term memory (persists across restarts)
+    try:
+        from memory.long_term_memory import add_trusted_process
+        add_trusted_process(process_name)
+    except Exception as e:
+        print(f"⚠️ Failed to add to long-term memory: {e}")
+    
     baseline = GUARDIAN_BASELINE.get_baseline(process_name)
     if not baseline:
         # Create minimal baseline entry for newly trusted process
@@ -175,10 +180,10 @@ def trust_process():
             "restart_count": 0
         }
         GUARDIAN_BASELINE.save()
-        state.add_execution_log(f"Manual trust: {process_name} marked as trusted (baseline created)", "info")
+        state.add_execution_log(f"Manual trust: {process_name} marked as trusted (baseline created + memory saved)", "info")
     else:
         GUARDIAN_BASELINE.mark_trusted(process_name)
-        state.add_execution_log(f"Manual trust: {process_name} behaviors are now whitelisted", "info")
+        state.add_execution_log(f"Manual trust: {process_name} behaviors are now whitelisted (saved to memory)", "info")
     
     return jsonify({"ok": True, "message": f"Behavior for {process_name} marked as trusted."})
 
@@ -233,13 +238,24 @@ def ui_connected():
         state.add_execution_log("UI Dashboard connected", "system")
     return jsonify({"status": "UI_CONNECTED", "ui_active": state.UI_ACTIVE})
 
-
 @app.route("/ui_disconnected", methods=["GET", "POST"])
 def ui_disconnected():
     if state.UI_ACTIVE:
         state.UI_ACTIVE = False
+        from voice import stop_speech
+        stop_speech()
         state.add_execution_log("UI Dashboard disconnected", "system")
     return jsonify({"status": "UI_DISCONNECTED", "ui_active": state.UI_ACTIVE})
+
+@app.route("/stop_tts", methods=["POST"])
+def stop_tts():
+    """Stop all current and pending speech."""
+    if request.remote_addr not in ("127.0.0.1", "::1"):
+        return jsonify({"error": "Forbidden"}), 403
+    
+    from voice import stop_speech
+    stop_speech()
+    return jsonify({"ok": True})
 
 
 # Browser Dashboard (ui/frontend) routes removed per user request.
@@ -435,6 +451,851 @@ def uninstall_application():
             return jsonify({"error": "Failed to trigger uninstaller"}), 500
     except Exception as e:
         return jsonify({"error": str(e)}), 500
+
+
+@app.route("/execute_command", methods=["POST"])
+def execute_command():
+    """
+    Execute a voice command using the unified AI flow.
+    Parses, validates, and executes with TTS feedback.
+    """
+    if request.remote_addr not in ("127.0.0.1", "::1"):
+        return jsonify({"error": "Forbidden"}), 403
+    token = request.headers.get("X-Fluffy-Token")
+    if token != FLUFFY_TOKEN:
+        return jsonify({"error": "Unauthorized"}), 401
+    
+    try:
+        data = request.get_json()
+        command_text = data.get("command", "").strip()
+        
+        if not command_text:
+            return jsonify({"error": "No command provided"}), 400
+        
+        # Import LLM service - add project root to path
+        import os, sys
+        project_root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+        if project_root not in sys.path:
+            sys.path.insert(0, project_root)
+
+        from ai.src.llm_service import get_service
+        from voice import speak_custom, stop_speech
+        
+        # Stop any ongoing speech
+        stop_speech()
+        
+        # Use unified AI flow
+        llm_service = get_service()
+        result = llm_service.process_message(command_text)
+        
+        # Handle execution and TTS
+        response_text = result.get("message", "")
+        if response_text:
+            speak_custom(response_text)
+            state.add_execution_log(f"Voice Command: {command_text} -> {response_text}", "action")
+        
+        return jsonify({
+            "ok": True,
+            "command": command_text,
+            "type": result["type"],
+            "result": result.get("result") or result
+        })
+        
+    except ImportError as e:
+        error_msg = f"Module not found: {e}"
+        state.add_execution_log(error_msg, "error")
+        return jsonify({"error": error_msg}), 500
+    except Exception as e:
+        error_msg = f"Command execution failed: {str(e)}"
+        state.add_execution_log(error_msg, "error")
+        return jsonify({"error": error_msg}), 500
+
+
+@app.route("/pending_confirmations", methods=["GET"])
+def get_pending_confirmations():
+    """Get list of commands awaiting confirmation"""
+    if request.remote_addr not in ("127.0.0.1", "::1"):
+        return jsonify({"error": "Forbidden"}), 403
+    token = request.headers.get("X-Fluffy-Token")
+    if token != FLUFFY_TOKEN:
+        return jsonify({"error": "Unauthorized"}), 401
+    
+    # Placeholder for now - will implement confirmation queue later
+    return jsonify({"pending": []})
+
+
+# ============================================================================
+# CHAT HISTORY ENDPOINTS
+# ============================================================================
+
+@app.route("/chat/create_session", methods=["POST"])
+def create_chat_session():
+    """Create a new chat session"""
+    if request.remote_addr not in ("127.0.0.1", "::1"):
+        return jsonify({"error": "Forbidden"}), 403
+    
+    try:
+        from chat_history import ChatHistory
+        history = ChatHistory()
+        session_id = history.create_session()
+        
+        return jsonify({
+            "ok": True,
+            "session_id": session_id
+        })
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+
+@app.route("/chat/save_message", methods=["POST"])
+def save_chat_message():
+    """Save a message to the current session"""
+    if request.remote_addr not in ("127.0.0.1", "::1"):
+        return jsonify({"error": "Forbidden"}), 403
+    
+    try:
+        from chat_history import ChatHistory
+        history = ChatHistory()
+        
+        data = request.get_json()
+        session_id = data.get("session_id")
+        message = data.get("message")
+        
+        if not session_id or not message:
+            return jsonify({"error": "Missing session_id or message"}), 400
+        
+        success = history.save_message(session_id, message)
+        
+        return jsonify({
+            "ok": success
+        })
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+
+@app.route("/chat/sessions", methods=["GET"])
+def list_chat_sessions():
+    """List all chat sessions"""
+    if request.remote_addr not in ("127.0.0.1", "::1"):
+        return jsonify({"error": "Forbidden"}), 403
+    
+    try:
+        from chat_history import ChatHistory
+        history = ChatHistory()
+        sessions = history.list_sessions()
+        
+        return jsonify({
+            "ok": True,
+            "sessions": sessions
+        })
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+
+@app.route("/chat/session/<session_id>", methods=["GET"])
+def get_chat_session(session_id):
+    """Get a specific chat session"""
+    if request.remote_addr not in ("127.0.0.1", "::1"):
+        return jsonify({"error": "Forbidden"}), 403
+    
+    try:
+        from chat_history import ChatHistory
+        history = ChatHistory()
+        session = history.load_session(session_id)
+        
+        if not session:
+            return jsonify({"error": "Session not found"}), 404
+        
+        return jsonify({
+            "ok": True,
+            "session": session
+        })
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+
+@app.route("/chat/session/<session_id>", methods=["DELETE"])
+def delete_chat_session(session_id):
+    """Delete a chat session"""
+    if request.remote_addr not in ("127.0.0.1", "::1"):
+        return jsonify({"error": "Forbidden"}), 403
+    
+    try:
+        from chat_history import ChatHistory
+        history = ChatHistory()
+        success = history.delete_session(session_id)
+        
+        return jsonify({
+            "ok": success
+        })
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+
+@app.route("/chat/current_session", methods=["GET"])
+def get_current_session():
+    """Get the current active session ID"""
+    if request.remote_addr not in ("127.0.0.1", "::1"):
+        return jsonify({"error": "Forbidden"}), 403
+    
+    try:
+        from chat_history import ChatHistory
+        history = ChatHistory()
+        session_id = history.get_current_session_id()
+        
+        return jsonify({
+            "ok": True,
+            "session_id": session_id
+        })
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+
+# ============================================================================
+# LLM CHAT ENDPOINTS
+# ============================================================================
+
+@app.route("/chat/message", methods=["POST"])
+def chat_message():
+    """
+    Process a chat message - either execute as command or query LLM
+    Returns immediate response for commands, streaming response for LLM queries
+    """
+    if request.remote_addr not in ("127.0.0.1", "::1"):
+        return jsonify({"error": "Forbidden"}), 403
+    token = request.headers.get("X-Fluffy-Token")
+    if token != FLUFFY_TOKEN:
+        return jsonify({"error": "Unauthorized"}), 401
+    
+    try:
+        data = request.get_json()
+        user_message = data.get("message", "").strip()
+        session_id = data.get("session_id")
+        use_voice = data.get("use_voice", False)  # Whether to use TTS
+        
+        if not user_message:
+            return jsonify({"error": "No message provided"}), 400
+        
+        # Import LLM service - add project root to path
+        project_root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+        if project_root not in sys.path:
+            sys.path.insert(0, project_root)
+        
+        from ai.src.llm_service import get_service
+        from voice import speak_custom, speak_stream, stop_speech
+        
+        # Stop any ongoing speech
+        if use_voice:
+            stop_speech()
+        
+        # Load chat history for context if session_id provided
+        context_messages = []
+        if session_id:
+            try:
+                from chat_history import ChatHistory
+                history_manager = ChatHistory()
+                session_data = history_manager.load_session(session_id)
+                
+                if session_data and "messages" in session_data:
+                    # Get last 10 messages for context
+                    for msg in session_data["messages"][-10:]:
+                        # Handle different message formats (legacy vs new)
+                        role = msg.get("role")
+                        if not role:
+                            msg_type = msg.get("type")
+                            role = "user" if msg_type == "user" else "assistant"
+                        
+                        content = msg.get("content") or msg.get("text") or ""
+                        
+                        if content:
+                            context_messages.append({"role": role, "content": content})
+            except Exception as e:
+                print(f"Error loading context history: {e}")
+        
+        # Process message through LLM service with context
+        llm_service = get_service()
+        result = llm_service.process_message(user_message, context_messages=context_messages)
+        
+        # Save user message to chat history
+        if session_id:
+            from chat_history import ChatHistory
+            history = ChatHistory()
+            history.save_message(session_id, {
+                "role": "user",
+                "content": user_message,
+                "timestamp": __import__('time').time()
+            })
+        
+        if result["type"] == "command":
+            # Local command execution - immediate response
+            response_text = result["message"]
+            
+            # Save assistant response to history
+            if session_id:
+                history.save_message(session_id, {
+                    "role": "assistant",
+                    "content": response_text,
+                    "timestamp": __import__('time').time(),
+                    "command_result": result["result"]
+                })
+            
+            # Speak if voice enabled
+            if use_voice:
+                speak_custom(response_text)
+            
+            state.add_execution_log(f"Command: {user_message} → {response_text}", "action")
+            
+            return jsonify({
+                "ok": True,
+                "type": "command",
+                "message": response_text,
+                "result": result["result"]
+            })
+        
+        else:
+            # LLM query - collect streaming response
+            response_chunks = []
+            
+            for chunk in result["stream"]:
+                response_chunks.append(chunk)
+            
+            full_response = "".join(response_chunks)
+            
+            # Add to service history
+            llm_service.add_assistant_message(full_response)
+            
+            # Save assistant response to history
+            if session_id:
+                history.save_message(session_id, {
+                    "role": "assistant",
+                    "content": full_response,
+                    "timestamp": __import__('time').time()
+                })
+            
+            # Speak if voice enabled
+            if use_voice:
+                speak_custom(full_response)
+            
+            state.add_execution_log(f"LLM Query: {user_message[:50]}...", "action")
+            
+            return jsonify({
+                "ok": True,
+                "type": "llm",
+                "message": full_response
+            })
+    
+    except ImportError as e:
+        error_msg = f"LLM module not found: {e}"
+        state.add_execution_log(error_msg, "error")
+        return jsonify({"error": error_msg}), 500
+    except Exception as e:
+        error_msg = f"Chat processing failed: {str(e)}"
+        state.add_execution_log(error_msg, "error")
+        return jsonify({"error": error_msg}), 500
+
+
+@app.route("/chat/stream", methods=["POST"])
+def chat_stream():
+    """
+    Stream LLM response with Server-Sent Events
+    Use this for real-time streaming responses in the UI
+    """
+    if request.remote_addr not in ("127.0.0.1", "::1"):
+        return jsonify({"error": "Forbidden"}), 403
+    token = request.headers.get("X-Fluffy-Token")
+    if token != FLUFFY_TOKEN:
+        return jsonify({"error": "Unauthorized"}), 401
+    
+    try:
+        data = request.get_json()
+        user_message = data.get("message", "").strip()
+        use_voice = data.get("use_voice", False)
+        
+        if not user_message:
+            return jsonify({"error": "No message provided"}), 400
+        
+        # Import LLM service
+        # Import LLM service - add project root to path
+        project_root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+        if project_root not in sys.path:
+            sys.path.insert(0, project_root)
+        
+        from ai.src.llm_service import get_service
+        from flask import Response, stream_with_context
+        from voice import speak_stream, stop_speech
+        
+        # Stop any ongoing speech
+        if use_voice:
+            stop_speech()
+        
+        # Process message
+        llm_service = get_service()
+        result = llm_service.process_message(user_message)
+        
+        if result["type"] == "command":
+            # Return command result immediately (not streaming)
+            return jsonify({
+                "ok": True,
+                "type": "command",
+                "message": result["message"]
+            })
+        
+        # Stream LLM response
+        def generate():
+            """Generator for SSE streaming"""
+            chunks_for_voice = []
+            
+            for chunk in result["stream"]:
+                # Send chunk to client
+                yield f"data: {json.dumps({'chunk': chunk})}\n\n"
+                
+                # Collect for voice
+                if use_voice:
+                    chunks_for_voice.append(chunk)
+            
+            # Send completion signal
+            yield f"data: {json.dumps({'done': True})}\n\n"
+            
+            # Speak collected response
+            if use_voice and chunks_for_voice:
+                full_text = "".join(chunks_for_voice)
+                llm_service.add_assistant_message(full_text)
+                
+                # Use streaming TTS
+                def chunk_generator():
+                    yield full_text
+                
+                speak_stream(chunk_generator())
+        
+        return Response(
+            stream_with_context(generate()),
+            mimetype='text/event-stream',
+            headers={
+                'Cache-Control': 'no-cache',
+                'X-Accel-Buffering': 'no'
+            }
+        )
+    
+    except Exception as e:
+        error_msg = f"Streaming failed: {str(e)}"
+        state.add_execution_log(error_msg, "error")
+        return jsonify({"error": error_msg}), 500
+
+
+# ============================================================================
+# LLM SETTINGS ENDPOINTS
+# ============================================================================
+
+@app.route("/llm/config", methods=["GET"])
+def get_llm_config():
+    """Get current LLM configuration"""
+    if request.remote_addr not in ("127.0.0.1", "::1"):
+        return jsonify({"error": "Forbidden"}), 403
+    token = request.headers.get("X-Fluffy-Token")
+    if token != FLUFFY_TOKEN:
+        return jsonify({"error": "Unauthorized"}), 401
+    
+    try:
+        # Import LLM config - add project root to path
+        project_root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+        if project_root not in sys.path:
+            sys.path.insert(0, project_root)
+        
+        from ai.src.llm_config import get_config
+        
+        config = get_config()
+        return jsonify({
+            "ok": True,
+            "config": config.get_config_dict()
+        })
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+
+@app.route("/llm/config", methods=["POST"])
+def update_llm_config():
+    """Update LLM configuration (API key and/or model)"""
+    if request.remote_addr not in ("127.0.0.1", "::1"):
+        return jsonify({"error": "Forbidden"}), 403
+    token = request.headers.get("X-Fluffy-Token")
+    if token != FLUFFY_TOKEN:
+        return jsonify({"error": "Unauthorized"}), 401
+    
+    try:
+        data = request.get_json()
+        api_key = data.get("api_key")
+        model = data.get("model")
+        
+        if not api_key and not model:
+            return jsonify({"error": "No configuration provided"}), 400
+        
+        # Import LLM config - add project root to path
+        project_root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+        if project_root not in sys.path:
+            sys.path.insert(0, project_root)
+        
+        from ai.src.llm_config import get_config
+        
+        config = get_config()
+        success = config.update_config(api_key=api_key, model=model)
+        
+        if success:
+            state.add_execution_log("LLM configuration updated", "action")
+            return jsonify({
+                "ok": True,
+                "message": "Configuration updated successfully",
+                "config": config.get_config_dict()
+            })
+        else:
+            return jsonify({"error": "Failed to update configuration"}), 500
+    
+    except Exception as e:
+        error_msg = f"Failed to update LLM config: {str(e)}"
+        state.add_execution_log(error_msg, "error")
+        return jsonify({"error": error_msg}), 500
+
+
+@app.route("/tts/speak", methods=["POST"])
+def tts_speak():
+    """
+    Speak text using TTS engine (for 'Say' button in UI)
+    """
+    if request.remote_addr not in ("127.0.0.1", "::1"):
+        return jsonify({"error": "Forbidden"}), 403
+    token = request.headers.get("X-Fluffy-Token")
+    if token != FLUFFY_TOKEN:
+        return jsonify({"error": "Unauthorized"}), 401
+    
+    try:
+        data = request.get_json()
+        text = data.get("text", "").strip()
+        
+        if not text:
+            return jsonify({"error": "No text provided"}), 400
+            
+        from voice import speak_custom, stop_speech
+        
+        # Stop any ongoing speech
+        try:
+            stop_speech()
+        except:
+            pass
+            
+        # Speak text
+        speak_custom(text)
+        
+        return jsonify({"ok": True})
+        
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+
+
+@app.route("/tts/stop", methods=["POST"])
+def tts_stop():
+    """
+    Stop current speech (respects priority).
+    """
+    if request.remote_addr not in ("127.0.0.1", "::1"):
+        return jsonify({"error": "Forbidden"}), 403
+    
+    try:
+        print("[API] Received /tts/stop request", file=sys.stderr)
+        from voice import stop_speech
+        stop_speech(force=False) # Only stop if not HIGH priority
+        return jsonify({"ok": True})
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+
+@app.route("/llm/models", methods=["GET"])
+def get_available_models():
+    """Get list of available LLM models"""
+    if request.remote_addr not in ("127.0.0.1", "::1"):
+        return jsonify({"error": "Forbidden"}), 403
+    token = request.headers.get("X-Fluffy-Token")
+    if token != FLUFFY_TOKEN:
+        return jsonify({"error": "Unauthorized"}), 401
+    
+    # List of popular OpenRouter models
+    models = [
+        {
+            "id": "moonshotai/kimi-k2:free",
+            "name": "Kimi K2 (Free)",
+            "description": "Free tier model with 60 RPM, 500K tokens/day",
+            "cost": "Free",
+            "recommended": True
+        },
+        {
+            "id": "openai/gpt-3.5-turbo",
+            "name": "GPT-3.5 Turbo",
+            "description": "Fast and affordable OpenAI model",
+            "cost": "Paid"
+        },
+        {
+            "id": "openai/gpt-4",
+            "name": "GPT-4",
+            "description": "Most capable OpenAI model",
+            "cost": "Paid"
+        },
+        {
+            "id": "anthropic/claude-3-haiku",
+            "name": "Claude 3 Haiku",
+            "description": "Fast and balanced Anthropic model",
+            "cost": "Paid"
+        },
+        {
+            "id": "anthropic/claude-3-opus",
+            "name": "Claude 3 Opus",
+            "description": "Most capable Anthropic model",
+            "cost": "Paid"
+        },
+        {
+            "id": "meta-llama/llama-3.1-8b-instruct",
+            "name": "Llama 3.1 8B",
+            "description": "Open source Meta model",
+            "cost": "Paid"
+        },
+        {
+            "id": "google/gemini-pro",
+            "name": "Gemini Pro",
+            "description": "Google's Gemini Pro model",
+            "cost": "Paid"
+        }
+    ]
+    
+    return jsonify({
+        "ok": True,
+        "models": models
+    })
+
+
+# ========== Memory System Endpoints ==========
+
+@app.route("/memory", methods=["GET"])
+def get_memory():
+    """Get user's long-term memory"""
+    if request.remote_addr not in ("127.0.0.1", "::1"):
+        return jsonify({"error": "Forbidden"}), 403
+    
+    try:
+        from memory.long_term_memory import load_memory
+        memory = load_memory()
+        return jsonify({"ok": True, "memory": memory})
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+
+@app.route("/memory", methods=["POST"])
+def update_memory_endpoint():
+    """Update user's long-term memory"""
+    if request.remote_addr not in ("127.0.0.1", "::1"):
+        return jsonify({"error": "Forbidden"}), 403
+    
+    token = request.headers.get("X-Fluffy-Token")
+    if token != FLUFFY_TOKEN:
+        return jsonify({"error": "Unauthorized"}), 401
+    
+    data = request.get_json(silent=True)
+    if not data:
+        return jsonify({"error": "Invalid payload"}), 400
+    
+    try:
+        from memory.long_term_memory import update_memory
+        memory = update_memory(data)
+        return jsonify({"ok": True, "memory": memory})
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+
+@app.route("/memory/preferences", methods=["GET"])
+def get_preferences():
+    """Get user preferences"""
+    if request.remote_addr not in ("127.0.0.1", "::1"):
+        return jsonify({"error": "Forbidden"}), 403
+    
+    try:
+        from memory.long_term_memory import load_memory
+        memory = load_memory()
+        prefs = memory.get("user_profile", {}).get("preferences", {})
+        
+        # Extract values
+        result = {}
+        for key, val in prefs.items():
+            if isinstance(val, dict) and "value" in val:
+                result[key] = val["value"]
+        
+        return jsonify({"ok": True, "preferences": result})
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+
+@app.route("/memory/preferences", methods=["POST"])
+def set_preference_endpoint():
+    """Set a specific preference"""
+    if request.remote_addr not in ("127.0.0.1", "::1"):
+        return jsonify({"error": "Forbidden"}), 403
+    
+    token = request.headers.get("X-Fluffy-Token")
+    if token != FLUFFY_TOKEN:
+        return jsonify({"error": "Unauthorized"}), 401
+    
+    data = request.get_json(silent=True)
+    if not data or "key" not in data or "value" not in data:
+        return jsonify({"error": "Missing key or value"}), 400
+    
+    try:
+        from memory.long_term_memory import set_preference
+        set_preference(data["key"], data["value"])
+        return jsonify({"ok": True})
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+
+@app.route("/memory/trusted_processes", methods=["GET"])
+def get_trusted_processes():
+    """Get list of trusted processes"""
+    if request.remote_addr not in ("127.0.0.1", "::1"):
+        return jsonify({"error": "Forbidden"}), 403
+    
+    try:
+        from memory.long_term_memory import get_trusted_processes
+        trusted = get_trusted_processes()
+        return jsonify({"ok": True, "trusted_processes": trusted})
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+
+@app.route("/memory/trusted_processes", methods=["POST"])
+def add_trusted_process_endpoint():
+    """Add a process to trusted list"""
+    if request.remote_addr not in ("127.0.0.1", "::1"):
+        return jsonify({"error": "Forbidden"}), 403
+    
+    token = request.headers.get("X-Fluffy-Token")
+    if token != FLUFFY_TOKEN:
+        return jsonify({"error": "Unauthorized"}), 401
+    
+    data = request.get_json(silent=True)
+    if not data or "process_name" not in data:
+        return jsonify({"error": "Missing process_name"}), 400
+    
+    try:
+        from memory.long_term_memory import add_trusted_process
+        add_trusted_process(data["process_name"])
+        state.add_execution_log(f"Added {data['process_name']} to trusted processes (memory)", "info")
+        return jsonify({"ok": True})
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+
+@app.route("/memory/trusted_processes", methods=["DELETE"])
+def remove_trusted_process_endpoint():
+    """Remove a process from trusted list"""
+    if request.remote_addr not in ("127.0.0.1", "::1"):
+        return jsonify({"error": "Forbidden"}), 403
+    
+    token = request.headers.get("X-Fluffy-Token")
+    if token != FLUFFY_TOKEN:
+        return jsonify({"error": "Unauthorized"}), 401
+    
+    data = request.get_json(silent=True)
+    if not data or "process_name" not in data:
+        return jsonify({"error": "Missing process_name"}), 400
+    
+    try:
+        from memory.long_term_memory import remove_trusted_process
+        remove_trusted_process(data["process_name"])
+        state.add_execution_log(f"Removed {data['process_name']} from trusted processes", "info")
+        return jsonify({"ok": True})
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+
+@app.route("/session/reset", methods=["POST"])
+def reset_session():
+    """Reset session memory"""
+    if request.remote_addr not in ("127.0.0.1", "::1"):
+        return jsonify({"error": "Forbidden"}), 403
+    
+    token = request.headers.get("X-Fluffy-Token")
+    if token != FLUFFY_TOKEN:
+        return jsonify({"error": "Unauthorized"}), 401
+    
+    try:
+        from memory.session_memory import reset_session_memory
+        reset_session_memory()
+        return jsonify({"ok": True, "message": "Session memory reset"})
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+
+@app.route("/session/status", methods=["GET"])
+def get_session_status():
+    """Get current session status (pending intents, etc.)"""
+    if request.remote_addr not in ("127.0.0.1", "::1"):
+        return jsonify({"error": "Forbidden"}), 403
+    
+    try:
+        from memory.session_memory import get_session_memory
+        session = get_session_memory()
+        context = session.get_context_summary()
+        return jsonify({"ok": True, "session": context})
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+
+# ========== Interrupt Command Endpoints ==========
+
+@app.route("/interrupt", methods=["POST"])
+def interrupt():
+    """Handle interrupt command (stop/cancel)"""
+    if request.remote_addr not in ("127.0.0.1", "::1"):
+        return jsonify({"error": "Forbidden"}), 403
+    
+    token = request.headers.get("X-Fluffy-Token")
+    if token != FLUFFY_TOKEN:
+        return jsonify({"error": "Unauthorized"}), 401
+    
+    try:
+        from interrupt_handler import handle_interrupt
+        result = handle_interrupt()
+        return jsonify({"ok": True, **result})
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+
+@app.route("/interrupt/check", methods=["POST"])
+def check_interrupt():
+    """Check if text contains interrupt command"""
+    if request.remote_addr not in ("127.0.0.1", "::1"):
+        return jsonify({"error": "Forbidden"}), 403
+    
+    data = request.get_json(silent=True)
+    if not data or "text" not in data:
+        return jsonify({"error": "Missing text"}), 400
+    
+    try:
+        from interrupt_handler import is_interrupt_command
+        is_interrupt = is_interrupt_command(data["text"])
+        return jsonify({"ok": True, "is_interrupt": is_interrupt})
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+
+@app.route("/cancellable_actions", methods=["GET"])
+def get_cancellable_actions():
+    """Get list of currently cancellable actions"""
+    if request.remote_addr not in ("127.0.0.1", "::1"):
+        return jsonify({"error": "Forbidden"}), 403
+    
+    try:
+        from interrupt_handler import get_cancellable_actions
+        actions = get_cancellable_actions()
+        return jsonify({"ok": True, "actions": actions})
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
 
 def start_api():
     app.run(host="127.0.0.1", port=5123, debug=False, use_reloader=False)

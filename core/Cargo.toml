@@ -17,4 +17,8 @@ uuid = { version = "1", features = ["v4"] }
 windows-sys = { version = "0.52", features = ["Win32_Security", "Win32_System_Registry", "Win32_Foundation"] }
 dashmap = "6.1"
 ferrisetw = "1.2"
+dirs = "5.0"
+
+[target.'cfg(windows)'.dependencies]
+winreg = "0.52"
 

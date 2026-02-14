@@ -1,0 +1,63 @@
+{
+    "long_term": {
+        "user_profile": {
+            "identity": {
+                "name": {
+                    "type": "string",
+                    "value": null
+                },
+                "location": {
+                    "type": "string",
+                    "value": null
+                }
+            },
+            "preferences": {
+                "theme": {
+                    "type": "string",
+                    "value": "dark"
+                },
+                "voice_speed": {
+                    "type": "float",
+                    "value": 1.0
+                },
+                "auto_normalize": {
+                    "type": "boolean",
+                    "value": false
+                },
+                "alert_threshold": {
+                    "type": "integer",
+                    "value": 60
+                }
+            },
+            "system_preferences": {
+                "trusted_processes": {
+                    "type": "array",
+                    "value": []
+                },
+                "ignored_processes": {
+                    "type": "array",
+                    "value": []
+                },
+                "pinned_processes": {
+                    "type": "array",
+                    "value": []
+                }
+            }
+        },
+        "metadata": {
+            "created_at": null,
+            "last_updated": null,
+            "version": "1.0"
+        }
+    },
+    "session": {
+        "pending_intents": [],
+        "conversation_history": [],
+        "action_context": {
+            "last_search": null,
+            "last_killed_process": null,
+            "last_trusted_process": null,
+            "last_guardian_action": null
+        }
+    }
+}

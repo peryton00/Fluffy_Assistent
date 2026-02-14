@@ -41,7 +41,10 @@ export default defineConfig(async () => ({
       '/test_stt': 'http://127.0.0.1:5123',
       '/stop_stt': 'http://127.0.0.1:5123',
       '/stt_status': 'http://127.0.0.1:5123',
-      '/apps': 'http://127.0.0.1:5123'
+      '/apps': 'http://127.0.0.1:5123',
+      '/chat': 'http://127.0.0.1:5123',
+      '/stop_tts': 'http://127.0.0.1:5123',
+      '/tts': 'http://127.0.0.1:5123'
     }
   },
 }));

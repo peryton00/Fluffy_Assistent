@@ -1,0 +1,27 @@
+{
+  "id": "0101485c-1853-4c8b-8a98-9d56a2ecbbf8",
+  "created": "2026-02-14T14:26:00.673423",
+  "last_updated": "2026-02-14T14:26:02.832890",
+  "messages": [
+    {
+      "role": "user",
+      "content": "My name is FluffyTester.",
+      "timestamp": 1771059360.7345512
+    },
+    {
+      "role": "assistant",
+      "content": "Hello again, FluffyTester. What's on your mind today? Need help with something or just want to talk?",
+      "timestamp": 1771059361.657113
+    },
+    {
+      "role": "user",
+      "content": "What is my name?",
+      "timestamp": 1771059361.684273
+    },
+    {
+      "role": "assistant",
+      "content": "Your name is FluffyTester.",
+      "timestamp": 1771059362.8323514
+    }
+  ]
+}

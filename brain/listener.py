@@ -1,3 +1,5 @@
+import os
+os.environ["FLASK_SKIP_DOTENV"] = "1"
 from state import update_state, add_execution_log
 from web_api import start_api
 from threading import Thread
@@ -347,9 +349,10 @@ def main():
     ipc_socket = connect_ipc()
     print("[Fluffy Brain] Connected to IPC", file=sys.stderr)
     
-    # Speak welcome message (non-blocking)
-    if VOICE_AVAILABLE:
+    # Speak welcome message (non-blocking, guarded)
+    if VOICE_AVAILABLE and not state.WELCOME_SPOKEN:
         speak_welcome()
+        state.WELCOME_SPOKEN = True
 
     def background_app_scanner():
         """Periodic silent app scan every 24 hours."""

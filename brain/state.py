@@ -8,6 +8,8 @@ MONITOR = None
 UI_ACTIVE = False
 LOCK = Lock()
 SHUTDOWN_MODE = False
+PENDING_CHAT_COMMAND = None  # Stores (command, validation) tuple
+WELCOME_SPOKEN = False
 
 
 def update_state(state_update):

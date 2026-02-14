@@ -4,6 +4,8 @@ from .voice_controller import (
     speak_welcome,
     speak_guardian_alert,
     speak_custom,
+    speak_stream,
+    stop_speech,
     start_stt_test,
     stop_stt_test,
     get_stt_status
@@ -14,6 +16,8 @@ __all__ = [
     'speak_welcome',
     'speak_guardian_alert',
     'speak_custom',
+    'speak_stream',
+    'stop_speech',
     'start_stt_test',
     'stop_stt_test',
     'get_stt_status'

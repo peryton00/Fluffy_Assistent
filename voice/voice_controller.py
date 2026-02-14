@@ -30,6 +30,7 @@ class VoiceController:
         self.last_spoken: Dict[str, float] = {}  # message_key -> timestamp
         self.cooldown_seconds = 60  # Don't repeat same message within 60s
         self.enabled = self.speaker is not None
+        self.current_priority = "NORMAL" # NORMAL or HIGH
         
         # STT engine
         self.stt_engine = get_stt_engine() if STT_AVAILABLE else None
@@ -49,7 +50,7 @@ class VoiceController:
         message_key = "welcome"
         
         # Use speak_custom logic for consistency and parallel processing
-        self.speak_custom(message, message_key=message_key, blocking=False)
+        self.speak_custom(message, message_key=message_key, blocking=False, priority="NORMAL")
     
     def _clean_process_name(self, process_name: str) -> str:
         """
@@ -103,6 +104,7 @@ class VoiceController:
                            ram: float = None, network: float = None):
         """
         Speak Guardian alert in conversational format.
+        High Priority: Cannot be interrupted by normal UI events.
         """
         if not self.enabled:
             return
@@ -119,7 +121,7 @@ class VoiceController:
         message = self._build_guardian_message(verdict, cpu, ram, network)
         message_key = f"guardian_{process}_{level}"
         
-        self.speak_custom(message, message_key=message_key, blocking=False)
+        self.speak_custom(message, message_key=message_key, blocking=False, priority="HIGH")
     
     def _split_text_hybrid(self, text: str) -> List[str]:
         """
@@ -155,9 +157,10 @@ class VoiceController:
                 final_chunks.append(part)
         return final_chunks
 
-    def speak_custom(self, text: str, message_key: Optional[str] = None, blocking: bool = False):
+    def speak_custom(self, text: str, message_key: Optional[str] = None, blocking: bool = False, priority: str = "NORMAL"):
         """
         Speak custom text with hybrid chunking and parallel pipeline.
+        priority: "NORMAL" (interruptible) or "HIGH" (protected)
         """
         if not self.enabled: return
         
@@ -167,16 +170,36 @@ class VoiceController:
         chunks = self._split_text_hybrid(text)
         if not chunks: return
 
+        # Set priority for this speech segment
+        self.current_priority = priority
+        
         self.speaker.speak_pipeline(chunks)
         if blocking:
             self.speaker.speech_queue.join()
+            self.current_priority = "NORMAL" # Reset after blocking speech
     
-    def speak_stream(self, chunks_iterable):
+    def speak_stream(self, chunks_iterable, priority: str = "NORMAL"):
         """
         LLM-Ready Streaming Interface.
         """
         if not self.enabled: return
+        self.current_priority = priority
         self.speaker.speak_stream(chunks_iterable)
+
+    def stop_speech(self, force: bool = False):
+        """
+        Immediately stop all current and queued speech.
+        force: If True, interrupts even HIGH priority speech.
+               If False, HIGH priority speech continues.
+        """
+        if not self.enabled: return
+        
+        if self.current_priority == "HIGH" and not force:
+            print("[Voice] Ignoring stop request for HIGH priority speech", file=sys.stderr)
+            return
+
+        self.speaker.interrupt()
+        self.current_priority = "NORMAL" # Reset priority on stop
 
     def _should_speak(self, message_key: str) -> bool:
         """Check if message should be spoken based on cooldown."""
@@ -235,11 +258,14 @@ def speak_welcome():
 def speak_guardian_alert(verdict: dict, cpu: float = None, ram: float = None, network: float = None):
     get_voice_controller().speak_guardian_alert(verdict, cpu, ram, network)
 
-def speak_custom(text: str, message_key: Optional[str] = None, blocking: bool = False):
-    get_voice_controller().speak_custom(text, message_key, blocking)
+def speak_custom(text: str, message_key: Optional[str] = None, blocking: bool = False, priority: str = "NORMAL"):
+    get_voice_controller().speak_custom(text, message_key, blocking, priority)
 
-def speak_stream(chunks_iterable):
-    get_voice_controller().speak_stream(chunks_iterable)
+def speak_stream(chunks_iterable, priority: str = "NORMAL"):
+    get_voice_controller().speak_stream(chunks_iterable, priority)
+
+def stop_speech(force: bool = False):
+    get_voice_controller().stop_speech(force)
 
 # STT convenience functions
 def start_stt_test() -> bool:

@@ -2,6 +2,7 @@ import subprocess
 import tempfile
 import os
 import sys
+import time
 import winsound
 import queue
 import concurrent.futures
@@ -21,6 +22,8 @@ class PiperSpeaker:
         self.model_path = self.project_root / "assets" / "piper" / "models" / "en_US-ljspeech-high.onnx"
         
         self.speech_queue = queue.Queue()
+        self.interrupt_flag = False
+        self.interruption_counter = 0 # Increments on every interrupt
         self.enabled = self._validate_setup()
         
         if self.enabled:
@@ -32,71 +35,81 @@ class PiperSpeaker:
             self.executor = concurrent.futures.ThreadPoolExecutor(max_workers=4)
     
     def _validate_setup(self) -> bool:
-        """Validate Piper installation."""
+        """Validate that Piper executable and model exist."""
         if not self.piper_exe.exists():
-            print(f"[Voice] ERROR: Piper executable not found at {self.piper_exe}", file=sys.stderr)
+            print(f"[Voice] Piper executable not found at {self.piper_exe}", file=sys.stderr)
             return False
         
         if not self.model_path.exists():
-            print(f"[Voice] ERROR: Piper model not found at {self.model_path}", file=sys.stderr)
+            print(f"[Voice] Piper model not found at {self.model_path}", file=sys.stderr)
             return False
-            
-        print(f"[Voice] Piper TTS initialized (4-Worker Multi-Buffer)", file=sys.stderr)
+        
         return True
     
-    def _generate_chunk_sync(self, text: str) -> Path:
-        """
-        Synchronous generation of a single chunk. 
-        Designed to be run in the ThreadPool.
-        """
-        if not text or not text.strip():
+    def _generate_chunk_sync(self, text: str):
+        """Generate audio for a single chunk synchronously."""
+        if not text.strip():
             return None
-            
+        
         try:
-            with tempfile.NamedTemporaryFile(suffix='.wav', delete=False) as tmp:
-                temp_wav = Path(tmp.name)
+            # Create temp WAV file
+            temp_wav = tempfile.NamedTemporaryFile(suffix=".wav", delete=False)
+            temp_wav.close()
+            wav_path = Path(temp_wav.name)
             
-            cmd = [
-                str(self.piper_exe),
-                "--model", str(self.model_path),
-                "--output_file", str(temp_wav)
-            ]
+            # Run Piper
             result = subprocess.run(
-                cmd,
-                input=text.encode('utf-8'),
+                [str(self.piper_exe), "-m", str(self.model_path), "-f", str(wav_path)],
+                input=text,
+                text=True,
                 capture_output=True,
-                timeout=20,
-                creationflags=subprocess.CREATE_NO_WINDOW if sys.platform == 'win32' else 0
+                timeout=10
             )
             
-            if result.returncode == 0 and temp_wav.exists():
-                return temp_wav
-            else:
-                if temp_wav.exists(): os.unlink(temp_wav)
+            if result.returncode != 0:
+                print(f"[Voice] Piper error: {result.stderr}", file=sys.stderr)
                 return None
+            
+            return wav_path
         except Exception as e:
-            print(f"[Voice] Chunk Gen Error: {e}", file=sys.stderr)
+            print(f"[Voice] Generation error: {e}", file=sys.stderr)
             return None
-
+    
     def _playback_consumer(self):
-        """Sequential playback thread (Consumer)."""
+        """Consumer thread that plays WAV files sequentially."""
         while True:
             try:
-                # Blocks until a WAV file is ready in the queue
-                msg = self.speech_queue.get()
-                if msg is None: break
+                wav_path, chunk_text = self.speech_queue.get(timeout=1)
                 
-                wav_path, original_text = msg
+                # Check interrupt flag
+                if self.interrupt_flag:
+                    if wav_path and wav_path.exists():
+                        try:
+                            wav_path.unlink()
+                        except:
+                            pass
+                    self.speech_queue.task_done()
+                    continue
                 
+                # Play the audio
                 if wav_path and wav_path.exists():
-                    winsound.PlaySound(str(wav_path), winsound.SND_FILENAME)
                     try:
-                        wav_path.unlink() # Cleanup after playing
-                    except: pass
+                        winsound.PlaySound(str(wav_path), winsound.SND_FILENAME)
+                    except Exception as e:
+                        print(f"[Voice] Playback error: {e}", file=sys.stderr)
+                    finally:
+                        # Clean up WAV file
+                        try:
+                            wav_path.unlink()
+                        except:
+                            pass
                 
                 self.speech_queue.task_done()
+            except queue.Empty:
+                continue
             except Exception as e:
-                print(f"[Voice] Playback Error: {e}", file=sys.stderr)
+                print(f"[Voice] Consumer error: {e}", file=sys.stderr)
+
 
     def speak_stream(self, chunks_iterable):
         """
@@ -106,11 +119,18 @@ class PiperSpeaker:
         """
         if not self.enabled: return
 
+        # Capture current interruption state
+        current_counter = self.interruption_counter
+
         def stream_feeder():
             # Process chunks as they arrive from the iterator
             for chunk in chunks_iterable:
                 if not chunk: continue
                 
+                # Check for interruption
+                if self.interruption_counter != current_counter:
+                    return
+
                 # Submit to pool and wait for THIS specific chunk
                 # We use a small look-ahead or just parallelize single arrivals
                 future = self.executor.submit(self._generate_chunk_sync, chunk)
@@ -118,6 +138,13 @@ class PiperSpeaker:
                 def queue_when_ready(f, c):
                     try:
                         wp = f.result()
+                        # Check again
+                        if self.interruption_counter != current_counter:
+                            if wp and wp.exists():
+                                try: wp.unlink()
+                                except: pass
+                            return
+                            
                         if wp:
                             self.speech_queue.put((wp, c))
                     except Exception as ex:
@@ -135,14 +162,30 @@ class PiperSpeaker:
         """
         if not self.enabled: return
 
+        # Capture current interruption state
+        current_counter = self.interruption_counter
+
         def feeder():
             # Submit all chunks to the pool immediately for parallel work
             futures = [self.executor.submit(self._generate_chunk_sync, chunk) for chunk in chunks]
             
             # Collect results in order and feed the playback queue
             for i, future in enumerate(futures):
+                # Check for interruption before waiting or adding
+                if self.interruption_counter != current_counter:
+                    # Cancelled by new interrupt
+                    return
+
                 try:
                     wav_path = future.result()
+                    
+                    # Check again after generating
+                    if self.interruption_counter != current_counter:
+                         if wav_path and wav_path.exists():
+                             try: wav_path.unlink()
+                             except: pass
+                         return
+
                     if wav_path:
                         self.speech_queue.put((wav_path, chunks[i]))
                 except Exception as e:
@@ -157,6 +200,39 @@ class PiperSpeaker:
         self.speak_pipeline([text])
         if blocking:
             self.speech_queue.join()
+
+    def interrupt(self):
+        """Stop all current and pending speech."""
+        if not self.enabled: return
+        
+        # Increment counter to invalidate pending feeders
+        self.interruption_counter += 1
+        
+        # Set flag to stop current playback loop
+        self.interrupt_flag = True
+        
+        # 1. Stop current winsound playback immediately
+        try:
+            winsound.PlaySound(None, winsound.SND_PURGE)
+        except: pass
+        
+        # 2. Clear the queue
+        while not self.speech_queue.empty():
+            try:
+                msg = self.speech_queue.get_nowait()
+                if msg:
+                   wav_path, _ = msg
+                   if wav_path and wav_path.exists():
+                       try: wav_path.unlink()
+                       except: pass
+                self.speech_queue.task_done()
+            except queue.Empty:
+                break
+        
+        # Small sleep to ensure consumer thread sees the flag
+        time.sleep(0.1)
+        self.interrupt_flag = False
+        print("[Voice] Speech interrupted and queue cleared.", file=sys.stderr)
 
 
 # Global singleton instance

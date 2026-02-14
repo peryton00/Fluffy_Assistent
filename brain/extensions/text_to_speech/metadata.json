@@ -1,0 +1,16 @@
+{
+  "name": "text_to_speech",
+  "version": "1.0.0",
+  "description": "Use pyttsx3 library for text-to-speech conversion",
+  "author": "Fluffy AI",
+  "created": "2026-02-14T17:52:07.625296",
+  "intent": "text_to_speech",
+  "patterns": [
+    "r\"text to speech\\s+(.+)\""
+  ],
+  "parameters": {
+    "text": "Hello world",
+    "voice": "default"
+  },
+  "safety_level": "needs_confirmation"
+}

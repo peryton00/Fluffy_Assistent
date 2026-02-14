@@ -7,6 +7,7 @@
   <title>Fluffy Desktop Dashboard</title>
   <link rel="stylesheet" href="/src/styles.css" />
   <link rel="stylesheet" href="/src/styles-enhanced.css" />
+  <link rel="stylesheet" href="/src/chat-styles.css" />
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700&display=swap" rel="stylesheet">
@@ -317,6 +318,7 @@
         </div>
       </section>
 
+
       <!-- VIEW: APPS -->
       <section id="section-apps" class="view-section">
         <div class="card full-width">
@@ -490,6 +492,69 @@
         </div>
       </section>
 
+      <!-- VIEW: CHAT -->
+      <section id="section-chat" class="view-section">
+        <div class="chat-layout">
+          <!-- History Sidebar -->
+          <aside id="chat-history-sidebar" class="chat-history-sidebar">
+            <div class="history-header">
+              <h3>📜 Chat History</h3>
+              <button id="close-history-btn" class="icon-btn" title="Close">
+                <i data-lucide="x"></i>
+              </button>
+            </div>
+
+            <button id="new-chat-btn" class="btn-primary new-chat-btn">
+              <i data-lucide="plus"></i>
+              New Chat
+            </button>
+
+            <div id="sessions-list" class="sessions-list">
+              <!-- Sessions will be populated here -->
+              <p class="empty-state">No chat history yet</p>
+            </div>
+          </aside>
+
+          <!-- Chat Container -->
+          <div class="chat-container">
+            <div class="chat-header">
+              <button id="toggle-history-btn" class="icon-btn" title="Toggle History">
+                <i data-lucide="history"></i>
+              </button>
+              <h2>Chat with Fluffy</h2>
+              <div class="chat-status" id="chat-status">
+                <span class="status-dot"></span>
+                <span>Ready</span>
+              </div>
+            </div>
+
+            <div id="chat-messages" class="chat-messages">
+              <div class="chat-watermark">
+                <img src="/logo.png" alt="Fluffy Watermark" />
+              </div>
+              <!-- Messages will be rendered here -->
+            </div>
+
+            <div class="chat-input-container">
+              <div class="input-mode-toggle">
+                <button id="text-mode-btn" class="mode-btn active" title="Text Mode">
+                  <i data-lucide="keyboard"></i>
+                </button>
+                <button id="voice-mode-btn" class="mode-btn" title="Voice Mode">
+                  <i data-lucide="mic"></i>
+                </button>
+              </div>
+
+              <input type="text" id="chat-input" placeholder="Type a command or question..." autocomplete="off" />
+
+              <button id="send-btn" class="btn-send">
+                <i data-lucide="send"></i>
+              </button>
+            </div>
+          </div>
+        </div>
+      </section>
+
     </main>
   </div>
 
@@ -599,6 +664,10 @@
       <p class="empty-notif">No new security suggestions.</p>
     </div>
   </div>
+
+  <button id="fab-chat" class="fab-chat" title="Chat with Fluffy">
+    <i data-lucide="message-circle"></i>
+  </button>
 
   <script type="module" src="/src/main.ts"></script>
   <!-- Health Details Modal -->
