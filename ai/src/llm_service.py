@@ -139,6 +139,11 @@ class LLMService:
     def _execute_unified_command(self, understanding) -> Dict[str, Any]:
         """Execute a command directly from LLM understanding strings"""
         from brain.command_parser import Command, Intent
+        import time
+        
+        # Check if this is a multi-step command
+        if understanding.intent == "multi_step" and understanding.steps:
+            return self._execute_multi_step_command(understanding)
         
         try:
             intent_obj = Intent(understanding.intent)
@@ -171,6 +176,67 @@ class LLMService:
             "message": response_text,
             "stream": None,
             "result": result
+        }
+    
+    def _execute_multi_step_command(self, understanding) -> Dict[str, Any]:
+        """Execute a multi-step command sequentially with delays"""
+        from brain.command_parser import Command, Intent
+        import time
+        
+        results = []
+        all_success = True
+        
+        for i, step in enumerate(understanding.steps):
+            try:
+                # Convert step to Command object
+                try:
+                    intent_obj = Intent(step.get("intent"))
+                except ValueError:
+                    intent_obj = step.get("intent")
+                
+                cmd = Command(
+                    intent=intent_obj,
+                    parameters=step.get("parameters", {}),
+                    raw_text=understanding.original_text
+                )
+                
+                # Validate and execute
+                validation = self.validator.validate(cmd)
+                result = self.executor.execute(cmd, validation)
+                
+                results.append({
+                    "step": i + 1,
+                    "success": result.get("success", False),
+                    "message": step.get("text", result.get("message", ""))
+                })
+                
+                if not result.get("success", False):
+                    all_success = False
+                    break  # Stop on first failure
+                
+                # Add delay between steps (except after the last step)
+                if i < len(understanding.steps) - 1:
+                    time.sleep(2)  # 2 second delay to allow apps to launch
+                    
+            except Exception as e:
+                results.append({
+                    "step": i + 1,
+                    "success": False,
+                    "message": f"Error: {str(e)}"
+                })
+                all_success = False
+                break
+        
+        return {
+            "type": "command",
+            "success": all_success,
+            "message": understanding.text if all_success else f"I completed {len([r for r in results if r['success']])} of {len(understanding.steps)} steps.",
+            "stream": None,
+            "result": {
+                "multi_step": True,
+                "steps": results,
+                "total_steps": len(understanding.steps)
+            }
         }
 
     def _query_llm(self, user_message: str, context_messages: Optional[List[Dict[str, str]]] = None) -> Dict[str, Any]:

@@ -104,7 +104,6 @@ body {
    SIDEBAR
 ========================= */
 .sidebar {
-  width: var(--sidebar-width);
   background: var(--bg-secondary);
   backdrop-filter: blur(12px);
   -webkit-backdrop-filter: blur(12px);
@@ -388,7 +387,8 @@ body.light-mode .upgrade-btn {
   color: var(--text-primary);
   outline: none;
   font-size: 14px;
-  width: 240px;
+  width: 100%;
+  max-width: 240px;
   font-family: inherit;
 }
 
@@ -598,6 +598,15 @@ body.light-mode .upgrade-btn {
   justify-content: space-between;
   align-items: center;
   margin-bottom: 20px;
+  flex-wrap: wrap;
+  gap: var(--space-md);
+}
+
+.header-actions {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  flex-wrap: wrap;
 }
 
 .card-icon {
@@ -990,13 +999,63 @@ button:active {
   color: var(--text-secondary);
 }
 
-.form-group input {
+.form-group input,
+.form-group select,
+.form-group textarea {
   background: var(--bg-primary);
   border: 1px solid var(--border);
   color: var(--text-primary);
   padding: 10px;
   border-radius: 8px;
   outline: none;
+  font-family: inherit;
+  transition: var(--transition);
+}
+
+.form-group input:focus,
+.form-group select:focus,
+.form-group textarea:focus {
+  border-color: var(--accent);
+  box-shadow: 0 0 0 2px var(--accent-light);
+}
+
+/* =========================
+   SEARCH BOX STYLES
+========================= */
+.search-box {
+  display: flex;
+  align-items: center;
+  gap: var(--space-sm);
+  background: var(--bg-secondary);
+  padding: 8px 16px;
+  border-radius: var(--radius-lg);
+  border: 1px solid var(--border);
+  transition: var(--transition);
+  box-shadow: inset 0 2px 4px rgba(0, 0, 0, 0.1);
+  width: 100%;
+}
+
+.search-box:focus-within {
+  border-color: var(--accent);
+  box-shadow: 0 0 0 2px var(--accent-light);
+  background: var(--bg-primary);
+}
+
+.search-box i {
+  color: var(--text-secondary);
+  opacity: 0.6;
+  width: 18px;
+  height: 18px;
+}
+
+.search-box input {
+  background: transparent;
+  border: none;
+  color: var(--text-primary);
+  outline: none;
+  font-size: 14px;
+  width: 100%;
+  font-family: inherit;
 }
 
 /* =========================
@@ -2954,7 +3013,6 @@ input:checked+.slider:before {
 
   .nav-item {
     justify-content: center;
-    padding: var(--space-md) 0;
     gap: 0;
   }
 
@@ -3002,7 +3060,6 @@ input:checked+.slider:before {
   }
 
   .nav-item {
-    padding: var(--space-sm);
     gap: 0;
   }
 

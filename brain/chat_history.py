@@ -146,8 +146,10 @@ class ChatHistory:
     def _get_session_preview(self, session: Dict[str, Any]) -> str:
         """Get a preview of the session (first user message)"""
         for msg in session["messages"]:
-            if msg.get("type") == "user":
-                text = msg.get("text", "")
+            # Handle both new format (role/content) and legacy format (type/text)
+            is_user = msg.get("role") == "user" or msg.get("type") == "user"
+            if is_user:
+                text = msg.get("content") or msg.get("text") or ""
                 return text[:50] + "..." if len(text) > 50 else text
         return "New conversation"
     
@@ -181,7 +183,9 @@ class ChatHistory:
                     continue
                     
                 for msg in session["messages"]:
-                    if query_lower in msg.get("text", "").lower():
+                    # Search in both content and text fields
+                    text = msg.get("content") or msg.get("text") or ""
+                    if query_lower in text.lower():
                         results.append({
                             "session_id": session["id"],
                             "message": msg,

@@ -2287,7 +2287,20 @@ async function switchToSession(sessionId: string) {
 
   chatState.currentSessionId = sessionId;
   await loadChatSession(sessionId);
-  loadSessionsList(); // Refresh to update active state
+
+  // Update active state manually without re-rendering the entire list
+  const sessionItems = document.querySelectorAll('.session-item');
+  sessionItems.forEach(item => {
+    item.classList.remove('active');
+  });
+
+  // Find and activate the current session
+  sessionItems.forEach(item => {
+    const deleteBtn = item.querySelector('.session-delete') as HTMLElement;
+    if (deleteBtn && deleteBtn.dataset.sessionId === sessionId) {
+      item.classList.add('active');
+    }
+  });
 }
 
 async function deleteSessionWithConfirmation(sessionId: string) {

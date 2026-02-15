@@ -1,6 +1,6 @@
 # Fluffy Assistant: Ultimate Information Dossier 🐰
 
-This document serves as the single source of truth for the **Fluffy Assistant Desktop** project. It consolidates all architectural, functional, and technical documentation into one structured guide.
+This document serves as the single source of truth for the **Fluffy Integrated Assistant System** project. It consolidates all architectural, functional, and technical documentation into one structured guide.
 
 ---
 
@@ -19,7 +19,7 @@ This document serves as the single source of truth for the **Fluffy Assistant De
 ---
 
 ## 1. Project Overview
-**Fluffy Assistant Desktop** is a lightweight, privacy-focused system monitor and security guardian for Windows. It combines high-performance native system monitoring (Rust), intelligent behavioral analysis (Python), and a modern, responsive dashboard (Tauri/TypeScript).
+**Fluffy Integrated Assistant System** is a lightweight, privacy-focused system monitor and security guardian for Windows. It combines high-performance native system monitoring (Rust), intelligent behavioral analysis (Python), and a modern, responsive dashboard (Tauri/TypeScript).
 
 ### Key Principles:
 - **100% Local Processing**: All telemetry and analysis stay on the machine.

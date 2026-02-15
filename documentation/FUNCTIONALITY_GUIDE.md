@@ -1,8 +1,8 @@
-# Fluffy Assistant Desktop - Comprehensive Functionality Guide
+# Fluffy Integrated Assistant System - Comprehensive Functionality Guide
 
 ## Executive Summary
 
-**Fluffy Assistant Desktop** is an advanced, privacy-focused system monitoring and security platform for Windows. It combines high-performance native system monitoring (Rust), intelligent behavioral analysis (Python), and a modern desktop interface (Tauri/TypeScript) to provide users with real-time insights into system health, detect suspicious behavior, and offer intelligent assistance through voice commands and LLM-powered chat.
+**Fluffy Integrated Assistant System** is an advanced, privacy-focused system monitoring and security platform for Windows. It combines high-performance native system monitoring (Rust), intelligent behavioral analysis (Python), and a modern desktop interface (Tauri/TypeScript) to provide users with real-time insights into system health, detect suspicious behavior, and offer intelligent assistance through voice commands and LLM-powered chat.
 
 **Key Highlights:**
 - **100% Local Processing** - No cloud dependencies, complete privacy
@@ -609,7 +609,7 @@ The Guardian engine runs on every telemetry update:
 
 ## Conclusion
 
-Fluffy Assistant Desktop represents a new paradigm in system monitoring: **intelligent, privacy-preserving, and user-friendly**. By combining cutting-edge technologies (Rust, Python, Tauri, LLMs) with thoughtful UX design, it empowers users to understand and control their systems like never before.
+Fluffy Integrated Assistant System represents a new paradigm in system monitoring: **intelligent, privacy-preserving, and user-friendly**. By combining cutting-edge technologies (Rust, Python, Tauri, LLMs) with thoughtful UX design, it empowers users to understand and control their systems like never before.
 
 The Guardian behavioral engine, in particular, demonstrates the potential of **signature-less threat detection** through machine learning and statistical analysis. As the system learns your unique usage patterns, it becomes increasingly accurate at identifying genuine threats while minimizing false positives.
 

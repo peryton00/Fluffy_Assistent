@@ -1,7 +1,7 @@
-# Fluffy Assistant Desktop - Project Review & Agent Briefing
+# Fluffy Integrated Assistant System - Project Review & Agent Briefing
 
 ## 🚀 Project Overview
-**Fluffy Assistant Desktop** is a lightweight, privacy-focused system monitor and security guardian for Windows. It combines high-performance native system monitoring (Rust), intelligent behavioral analysis (Python), and a modern, responsive dashboard (Tauri/TypeScript).
+**Fluffy Integrated Assistant System** is a lightweight, privacy-focused system monitor and security guardian for Windows. It combines high-performance native system monitoring (Rust), intelligent behavioral analysis (Python), and a modern, responsive dashboard (Tauri/TypeScript).
 
 The goal is to provide users with real-time insights into their system's health, detect suspicious behavior (malware-like patterns), and offer quick "normalization" tools to optimize their environment.
 

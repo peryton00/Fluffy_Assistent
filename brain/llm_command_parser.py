@@ -29,6 +29,9 @@ class CommandUnderstanding:
         # Self-improvement fields
         self.requires_new_functionality = data.get("requires_new_functionality", False)
         self.suggested_implementation = data.get("suggested_implementation", "")
+        
+        # Multi-step command support
+        self.steps = data.get("steps", [])
     
     def __repr__(self):
         return f"CommandUnderstanding(intent={self.intent}, clarify={self.needs_clarification})"
@@ -43,7 +46,8 @@ class CommandUnderstanding:
             "memory_update": self.memory_update,
             "original_text": self.original_text,
             "requires_new_functionality": self.requires_new_functionality,
-            "suggested_implementation": self.suggested_implementation
+            "suggested_implementation": self.suggested_implementation,
+            "steps": self.steps
         }
     
     @classmethod
@@ -181,17 +185,22 @@ Available Intents and Parameters:
 {json.dumps(self.intent_schema, indent=2)}
 
 Your task:
-4. If the user asks for a feature you don't have, or gives a command you can't match:
-   - Set intent: a_descriptive_underscored_name (e.g., 'zip_files', 'rename_files')
+1. If the user gives a MULTI-STEP command (e.g., "open notepad and write hello world"):
+   - Set intent: "multi_step"
+   - Set steps: array of step objects, each with intent, parameters, and text
+   - Set text: Overall response describing what you'll do
+2. If the user asks for a feature you don't have:
+   - Set intent: a_descriptive_underscored_name
    - Set requires_new_functionality: true
-   - Set suggested_implementation: A short technical description of how to implement it.
-5. If it's just chat, set intent: "chat" and provide a warm 1-2 sentence response.
-6. If the user shares something personal (name, likes, etc.), include it in 'memory_update'.
+   - Set suggested_implementation: Technical description
+3. If it's just chat, set intent: "chat" and provide a warm 1-2 sentence response.
+4. If the user shares something personal, include it in 'memory_update'.
 
 Return ONLY a JSON object (no markdown, no blocks):
 {{
-    "intent": "intent_name, 'unknown', or 'chat'",
+    "intent": "intent_name, 'multi_step', 'unknown', or 'chat'",
     "parameters": {{}},
+    "steps": [],
     "needs_clarification": false,
     "requires_new_functionality": false,
     "suggested_implementation": "",
@@ -213,6 +222,24 @@ User: "open chrome"
     "text": "Sure! I'm opening Chrome for you now."
 }}
 
+User: "open notepad and write hello world program in it"
+{{
+    "intent": "multi_step",
+    "steps": [
+        {{
+            "intent": "open_app",
+            "parameters": {{"app_name": "notepad"}},
+            "text": "Opening Notepad..."
+        }},
+        {{
+            "intent": "type_text",
+            "parameters": {{"text": "print('Hello, World!')"}},
+            "text": "Writing the hello world program..."
+        }}
+    ],
+    "text": "Sure! I'll open Notepad and write a hello world program for you."
+}}
+
 User: "my name is Alex"
 {{
     "intent": "chat",
@@ -224,14 +251,6 @@ User: "my name is Alex"
             "identity": {{"name": "Alex"}}
         }}
     }}
-}}
-
-User: "I want a feature to compress folders"
-{{
-    "intent": "unknown",
-    "requires_new_functionality": true,
-    "suggested_implementation": "A tool that uses the zipfile library to compress a given path.",
-    "text": "I don't have that yet, but I can learn it!"
 }}
 
 User: "I want a feature to compress folders"

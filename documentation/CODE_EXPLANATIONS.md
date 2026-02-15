@@ -1,4 +1,4 @@
-# Fluffy Assistant Desktop - Code Block Explanations
+# Fluffy Integrated Assistant System - Code Block Explanations
 
 ## Introduction
 

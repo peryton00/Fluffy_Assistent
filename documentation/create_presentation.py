@@ -27,7 +27,7 @@ def create_presentation():
     slide = prs.slides.add_slide(prs.slide_layouts[6])
     add_rectangle(slide, 0, 0, 13.33, 7.5, PRIMARY_COLOR)
     
-    title = add_text(slide, "Fluffy Assistant Desktop", 5, 2.5, 8, 1.5, 64, WHITE, bold=True)
+    title = add_text(slide, "Fluffy Integrated Assistant System", 5, 2.5, 8, 1.5, 64, WHITE, bold=True)
     title.alignment = PP_ALIGN.CENTER
     
     subtitle = add_text(slide, "A Detailed Technical Analysis & System Documentation", 5, 4, 8, 0.8, 28, WHITE)
