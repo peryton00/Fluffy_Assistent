@@ -1297,5 +1297,217 @@ def get_cancellable_actions():
         return jsonify({"error": str(e)}), 500
 
 
+# ============================================================================
+# FTP SERVER ENDPOINTS
+# ============================================================================
+
+@app.route("/ftp/start", methods=["POST"])
+def ftp_start():
+    """Start the FTP server"""
+    if request.remote_addr not in ("127.0.0.1", "::1"):
+        return jsonify({"error": "Forbidden"}), 403
+    token = request.headers.get("X-Fluffy-Token")
+    if token != FLUFFY_TOKEN:
+        return jsonify({"error": "Unauthorized"}), 401
+    
+    try:
+        # Add services directory to path
+        services_path = os.path.join(os.path.dirname(os.path.dirname(__file__)), "services")
+        if services_path not in sys.path:
+            sys.path.insert(0, services_path)
+        
+        from ftp_service import start_ftp_server
+        from utils.qr_generator import generate_ftp_qr
+        
+        # Get optional shared_dir from request body
+        data = request.get_json() or {}
+        shared_dir = data.get("shared_dir")
+        
+        result = start_ftp_server(shared_dir=shared_dir)
+        
+        if result["success"]:
+            # Generate QR code
+            qr_code = generate_ftp_qr(
+                result["username"],
+                result["password"],
+                result["ip"],
+                result["port"]
+            )
+            result["qr_code"] = qr_code
+            
+            state.add_execution_log(f"FTP server started on {result['ip']}:{result['port']}", "action")
+        
+        return jsonify(result)
+    
+    except ImportError as e:
+        error_msg = f"FTP service not available: {e}. Install dependencies: pip install pyftpdlib qrcode[pil]"
+        state.add_execution_log(error_msg, "error")
+        return jsonify({"success": False, "error": error_msg}), 500
+    except Exception as e:
+        error_msg = f"Failed to start FTP server: {str(e)}"
+        state.add_execution_log(error_msg, "error")
+        return jsonify({"success": False, "error": error_msg}), 500
+
+
+@app.route("/ftp/stop", methods=["POST"])
+def ftp_stop():
+    """Stop the FTP server"""
+    if request.remote_addr not in ("127.0.0.1", "::1"):
+        return jsonify({"error": "Forbidden"}), 403
+    token = request.headers.get("X-Fluffy-Token")
+    if token != FLUFFY_TOKEN:
+        return jsonify({"error": "Unauthorized"}), 401
+    
+    try:
+        services_path = os.path.join(os.path.dirname(os.path.dirname(__file__)), "services")
+        if services_path not in sys.path:
+            sys.path.insert(0, services_path)
+        
+        from ftp_service import stop_ftp_server
+        
+        result = stop_ftp_server()
+        
+        if result["success"]:
+            state.add_execution_log("FTP server stopped", "action")
+        
+        return jsonify(result)
+    
+    except ImportError as e:
+        return jsonify({"success": False, "error": f"FTP service not available: {e}"}), 500
+    except Exception as e:
+        error_msg = f"Failed to stop FTP server: {str(e)}"
+        state.add_execution_log(error_msg, "error")
+        return jsonify({"success": False, "error": error_msg}), 500
+
+
+@app.route("/ftp/status", methods=["GET"])
+def ftp_status():
+    """Get FTP server status"""
+    if request.remote_addr not in ("127.0.0.1", "::1"):
+        return jsonify({"error": "Forbidden"}), 403
+    token = request.headers.get("X-Fluffy-Token")
+    if token != FLUFFY_TOKEN:
+        return jsonify({"error": "Unauthorized"}), 401
+    
+    try:
+        services_path = os.path.join(os.path.dirname(os.path.dirname(__file__)), "services")
+        if services_path not in sys.path:
+            sys.path.insert(0, services_path)
+        
+        from ftp_service import get_ftp_status
+        from utils.qr_generator import generate_ftp_qr
+        
+        status = get_ftp_status()
+        
+        # Add QR code if server is running
+        if status["status"] == "running":
+            qr_code = generate_ftp_qr(
+                status["username"],
+                status["password"],
+                status["ip"],
+                status["port"]
+            )
+            status["qr_code"] = qr_code
+        
+        return jsonify(status)
+    
+    except ImportError as e:
+        return jsonify({"status": "unavailable", "error": f"FTP service not available: {e}"}), 500
+    except Exception as e:
+        return jsonify({"status": "error", "error": str(e)}), 500
+
+
+@app.route("/ftp/logs", methods=["GET"])
+def ftp_logs():
+    """Get FTP activity logs"""
+    if request.remote_addr not in ("127.0.0.1", "::1"):
+        return jsonify({"error": "Forbidden"}), 403
+    token = request.headers.get("X-Fluffy-Token")
+    if token != FLUFFY_TOKEN:
+        return jsonify({"error": "Unauthorized"}), 401
+    
+    try:
+        services_path = os.path.join(os.path.dirname(os.path.dirname(__file__)), "services")
+        if services_path not in sys.path:
+            sys.path.insert(0, services_path)
+        
+        from ftp_service import get_logs
+        
+        # Get limit from query params (default: 50)
+        limit = request.args.get("limit", 50, type=int)
+        logs = get_logs(limit=limit)
+        
+        return jsonify({"ok": True, "logs": logs})
+    
+    except ImportError as e:
+        return jsonify({"error": f"FTP service not available: {e}"}), 500
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+
+@app.route("/ftp/clear_logs", methods=["POST"])
+def ftp_clear_logs():
+    """Clear FTP activity logs"""
+    if request.remote_addr not in ("127.0.0.1", "::1"):
+        return jsonify({"error": "Forbidden"}), 403
+    token = request.headers.get("X-Fluffy-Token")
+    if token != FLUFFY_TOKEN:
+        return jsonify({"error": "Unauthorized"}), 401
+    
+    try:
+        services_path = os.path.join(os.path.dirname(os.path.dirname(__file__)), "services")
+        if services_path not in sys.path:
+            sys.path.insert(0, services_path)
+        
+        from ftp_service import clear_logs
+        
+        clear_logs()
+        state.add_execution_log("FTP logs cleared", "action")
+        
+        return jsonify({"ok": True, "message": "Logs cleared successfully"})
+    
+    except ImportError as e:
+        return jsonify({"error": f"FTP service not available: {e}"}), 500
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+
+@app.route("/ftp/qr", methods=["GET"])
+def ftp_qr():
+    """Get FTP QR code (only if server is running)"""
+    if request.remote_addr not in ("127.0.0.1", "::1"):
+        return jsonify({"error": "Forbidden"}), 403
+    token = request.headers.get("X-Fluffy-Token")
+    if token != FLUFFY_TOKEN:
+        return jsonify({"error": "Unauthorized"}), 401
+    
+    try:
+        services_path = os.path.join(os.path.dirname(os.path.dirname(__file__)), "services")
+        if services_path not in sys.path:
+            sys.path.insert(0, services_path)
+        
+        from ftp_service import get_ftp_status
+        from utils.qr_generator import generate_ftp_qr
+        
+        status = get_ftp_status()
+        
+        if status["status"] != "running":
+            return jsonify({"error": "FTP server is not running"}), 400
+        
+        qr_code = generate_ftp_qr(
+            status["username"],
+            status["password"],
+            status["ip"],
+            status["port"]
+        )
+        
+        return jsonify({"ok": True, "qr_code": qr_code})
+    
+    except ImportError as e:
+        return jsonify({"error": f"FTP service not available: {e}"}), 500
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+
 def start_api():
     app.run(host="127.0.0.1", port=5123, debug=False, use_reloader=False)

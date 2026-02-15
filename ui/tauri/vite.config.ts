@@ -44,7 +44,13 @@ export default defineConfig(async () => ({
       '/apps': 'http://127.0.0.1:5123',
       '/chat': 'http://127.0.0.1:5123',
       '/stop_tts': 'http://127.0.0.1:5123',
-      '/tts': 'http://127.0.0.1:5123'
+      '/tts': 'http://127.0.0.1:5123',
+      '/ftp/start': 'http://127.0.0.1:5123',
+      '/ftp/stop': 'http://127.0.0.1:5123',
+      '/ftp/status': 'http://127.0.0.1:5123',
+      '/ftp/logs': 'http://127.0.0.1:5123',
+      '/ftp/clear_logs': 'http://127.0.0.1:5123',
+      '/ftp/qr': 'http://127.0.0.1:5123'
     }
   },
 }));

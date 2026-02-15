@@ -1,5 +1,6 @@
 import { invoke } from "@tauri-apps/api/core";
 import { listen } from '@tauri-apps/api/event';
+import { open } from '@tauri-apps/plugin-dialog';
 
 const FLUFFY_TOKEN = "fluffy_dev_token";
 const expandedPids = new Set<number>();
@@ -2394,3 +2395,396 @@ window.addEventListener('blur', () => {
 window.addEventListener('beforeunload', () => {
   stopTTS();
 });
+
+
+// FTP Server Control Functions
+// Add these functions to main.ts at the end of the file
+
+/* =========================
+   FTP SERVER CONTROL
+========================= */
+
+let ftpStatusPollInterval: number | null = null;
+let ftpPasswordVisible = false;
+let ftpActualPassword = "";
+let ftpSelectedFolder = localStorage.getItem("ftp_shared_folder") || "";
+
+async function startFtpServer() {
+  const startBtn = document.getElementById("btn-start-ftp") as HTMLButtonElement;
+  const stopBtn = document.getElementById("btn-stop-ftp") as HTMLButtonElement;
+
+  if (!startBtn || !stopBtn) return;
+
+  startBtn.disabled = true;
+  startBtn.innerText = "Starting...";
+
+  try {
+    // Get selected folder
+    const sharedDir = ftpSelectedFolder || undefined;
+
+    const result = await apiRequest("/ftp/start", {
+      method: "POST",
+      body: JSON.stringify({ shared_dir: sharedDir })
+    });
+
+    if (result && result.success) {
+      showToast("FTP server started successfully", "success");
+      addLog(`FTP server started on ${result.ip}:${result.port}`, "action");
+
+      // Update UI
+      updateFtpUI(result);
+
+      // Start polling for status updates
+      startFtpStatusPolling();
+    } else {
+      showToast(result?.error || "Failed to start FTP server", "error");
+      startBtn.disabled = false;
+      startBtn.innerHTML = '<i data-lucide="play"></i> Start Server';
+      if ((window as any).lucide) (window as any).lucide.createIcons();
+    }
+  } catch (error) {
+    showToast("Error starting FTP server", "error");
+    startBtn.disabled = false;
+    startBtn.innerHTML = '<i data-lucide="play"></i> Start Server';
+    if ((window as any).lucide) (window as any).lucide.createIcons();
+  }
+}
+
+async function stopFtpServer() {
+  const startBtn = document.getElementById("btn-start-ftp") as HTMLButtonElement;
+  const stopBtn = document.getElementById("btn-stop-ftp") as HTMLButtonElement;
+
+  if (!startBtn || !stopBtn) return;
+
+  stopBtn.disabled = true;
+  stopBtn.innerText = "Stopping...";
+
+  try {
+    const result = await apiRequest("/ftp/stop", { method: "POST" });
+
+    if (result && result.success) {
+      showToast("FTP server stopped", "success");
+      addLog("FTP server stopped", "action");
+
+      // Update UI to stopped state
+      updateFtpUItoStopped();
+
+      // Stop polling
+      stopFtpStatusPolling();
+    } else {
+      showToast(result?.error || "Failed to stop FTP server", "error");
+      stopBtn.disabled = false;
+      stopBtn.innerHTML = '<i data-lucide="stop-circle"></i> Stop Server';
+      if ((window as any).lucide) (window as any).lucide.createIcons();
+    }
+  } catch (error) {
+    showToast("Error stopping FTP server", "error");
+    stopBtn.disabled = false;
+    stopBtn.innerHTML = '<i data-lucide="stop-circle"></i> Stop Server';
+    if ((window as any).lucide) (window as any).lucide.createIcons();
+  }
+}
+
+async function fetchFtpStatus() {
+  try {
+    const status = await apiRequest("/ftp/status", { method: "GET" });
+
+    if (status && status.status === "running") {
+      updateFtpUI(status);
+    } else {
+      updateFtpUItoStopped();
+    }
+  } catch (error) {
+    console.error("Error fetching FTP status:", error);
+  }
+}
+
+async function fetchFtpLogs() {
+  try {
+    const result = await apiRequest("/ftp/logs?limit=20", { method: "GET" });
+
+    if (result && result.ok) {
+      renderFtpLogs(result.logs);
+    }
+  } catch (error) {
+    console.error("Error fetching FTP logs:", error);
+  }
+}
+
+async function clearFtpLogs() {
+  if (!confirm("Clear all FTP activity logs?")) return;
+
+  try {
+    const result = await apiRequest("/ftp/clear_logs", { method: "POST" });
+
+    if (result && result.ok) {
+      showToast("FTP logs cleared", "success");
+      renderFtpLogs([]);
+    }
+  } catch (error) {
+    showToast("Error clearing logs", "error");
+  }
+}
+
+function updateFtpUI(data: any) {
+  const statusBadge = document.getElementById("ftp-status-badge");
+  const statusText = document.getElementById("ftp-status-text");
+  const startBtn = document.getElementById("btn-start-ftp") as HTMLButtonElement;
+  const stopBtn = document.getElementById("btn-stop-ftp") as HTMLButtonElement;
+  const serverInfo = document.getElementById("ftp-server-info");
+  const stoppedInfo = document.getElementById("ftp-stopped-info");
+
+  if (statusBadge) statusBadge.classList.add("running");
+  if (statusText) statusText.innerText = "Running";
+
+  if (startBtn) {
+    startBtn.disabled = true;
+    startBtn.innerHTML = '<i data-lucide="play"></i> Start Server';
+  }
+  if (stopBtn) {
+    stopBtn.disabled = false;
+    stopBtn.innerHTML = '<i data-lucide="stop-circle"></i> Stop Server';
+  }
+
+  // Show server info, hide stopped info
+  if (serverInfo) serverInfo.style.display = "block";
+  if (stoppedInfo) stoppedInfo.style.display = "none";
+
+  // Update connection details
+  const addressEl = document.getElementById("ftp-address");
+  const usernameEl = document.getElementById("ftp-username");
+  const passwordEl = document.getElementById("ftp-password");
+  const clientsCountEl = document.getElementById("ftp-clients-count");
+  const qrCodeEl = document.getElementById("ftp-qr-code") as HTMLImageElement;
+  const folderInput = document.getElementById("ftp-shared-folder") as HTMLInputElement;
+
+  if (addressEl) addressEl.innerText = data.url || `ftp://${data.ip}:${data.port}`;
+  if (folderInput && data.shared_dir) folderInput.value = data.shared_dir;
+  if (usernameEl) usernameEl.innerText = data.username || "fluffy";
+
+  // Store actual password
+  ftpActualPassword = data.password || "";
+  if (passwordEl) {
+    if (ftpPasswordVisible) {
+      passwordEl.innerText = ftpActualPassword;
+      passwordEl.classList.remove("password-masked");
+    } else {
+      passwordEl.innerText = "••••••••••••••••";
+      passwordEl.classList.add("password-masked");
+    }
+  }
+
+  if (clientsCountEl) clientsCountEl.innerText = (data.connected_clients || 0).toString();
+
+  // Update QR code
+  if (qrCodeEl && data.qr_code) {
+    qrCodeEl.src = `data:image/png;base64,${data.qr_code}`;
+  }
+
+  // Refresh icons
+  if ((window as any).lucide) (window as any).lucide.createIcons();
+
+  // Fetch logs
+  fetchFtpLogs();
+}
+
+function updateFtpUItoStopped() {
+  const statusBadge = document.getElementById("ftp-status-badge");
+  const statusText = document.getElementById("ftp-status-text");
+  const startBtn = document.getElementById("btn-start-ftp") as HTMLButtonElement;
+  const stopBtn = document.getElementById("btn-stop-ftp") as HTMLButtonElement;
+  const serverInfo = document.getElementById("ftp-server-info");
+  const stoppedInfo = document.getElementById("ftp-stopped-info");
+
+  if (statusBadge) statusBadge.classList.remove("running");
+  if (statusText) statusText.innerText = "Stopped";
+
+  if (startBtn) {
+    startBtn.disabled = false;
+    startBtn.innerHTML = '<i data-lucide="play"></i> Start Server';
+  }
+  if (stopBtn) {
+    stopBtn.disabled = true;
+    stopBtn.innerHTML = '<i data-lucide="stop-circle"></i> Stop Server';
+  }
+
+  // Hide server info, show stopped info
+  if (serverInfo) serverInfo.style.display = "none";
+  if (stoppedInfo) stoppedInfo.style.display = "block";
+
+  // Clear password
+  ftpActualPassword = "";
+  ftpPasswordVisible = false;
+
+  // Refresh icons
+  if ((window as any).lucide) (window as any).lucide.createIcons();
+}
+
+function renderFtpLogs(logs: any[]) {
+  const logsList = document.getElementById("ftp-logs-list");
+  if (!logsList) return;
+
+  if (!logs || logs.length === 0) {
+    logsList.innerHTML = '<p class="empty-logs">No activity yet</p>';
+    return;
+  }
+
+  logsList.innerHTML = "";
+
+  logs.forEach(log => {
+    const logItem = document.createElement("div");
+    logItem.className = "ftp-log-item";
+
+    const timestamp = new Date(log.timestamp).toLocaleTimeString();
+    const event = log.event.replace(/_/g, " ");
+
+    let icon = "activity";
+    if (log.event.includes("server_started")) icon = "play-circle";
+    else if (log.event.includes("server_stopped")) icon = "stop-circle";
+    else if (log.event.includes("connected")) icon = "user-plus";
+    else if (log.event.includes("disconnected")) icon = "user-minus";
+    else if (log.event.includes("uploaded")) icon = "upload";
+    else if (log.event.includes("downloaded")) icon = "download";
+    else if (log.event.includes("deleted")) icon = "trash-2";
+
+    let details = "";
+    if (log.client_ip) details += ` from ${log.client_ip}`;
+    if (log.filename) details += ` - ${log.filename}`;
+
+    logItem.innerHTML = `
+      <div class="log-icon"><i data-lucide="${icon}"></i></div>
+      <div class="log-content">
+        <span class="log-event">${event}</span>
+        <span class="log-details">${details}</span>
+      </div>
+      <span class="log-time">${timestamp}</span>
+    `;
+
+    logsList.appendChild(logItem);
+  });
+
+  // Refresh icons
+  if ((window as any).lucide) (window as any).lucide.createIcons();
+}
+
+function toggleFtpPassword() {
+  const passwordEl = document.getElementById("ftp-password");
+  const toggleBtn = document.getElementById("btn-toggle-password");
+
+  if (!passwordEl || !toggleBtn) return;
+
+  ftpPasswordVisible = !ftpPasswordVisible;
+
+  if (ftpPasswordVisible) {
+    passwordEl.innerText = ftpActualPassword;
+    passwordEl.classList.remove("password-masked");
+    toggleBtn.innerHTML = '<i data-lucide="eye-off"></i>';
+  } else {
+    passwordEl.innerText = "••••••••••••••••";
+    passwordEl.classList.add("password-masked");
+    toggleBtn.innerHTML = '<i data-lucide="eye"></i>';
+  }
+
+  if ((window as any).lucide) (window as any).lucide.createIcons();
+}
+
+async function copyFtpPassword() {
+  if (!ftpActualPassword) {
+    showToast("No password to copy", "info");
+    return;
+  }
+
+  try {
+    await navigator.clipboard.writeText(ftpActualPassword);
+    showToast("Password copied to clipboard", "success");
+  } catch (error) {
+    showToast("Failed to copy password", "error");
+  }
+}
+
+function startFtpStatusPolling() {
+  // Poll every 3 seconds
+  if (ftpStatusPollInterval) clearInterval(ftpStatusPollInterval);
+
+  ftpStatusPollInterval = window.setInterval(() => {
+    fetchFtpStatus();
+  }, 3000);
+}
+
+function stopFtpStatusPolling() {
+  if (ftpStatusPollInterval) {
+    clearInterval(ftpStatusPollInterval);
+    ftpStatusPollInterval = null;
+  }
+}
+
+
+async function browseFtpFolder() {
+    const statusBadge = document.getElementById("ftp-status-badge");
+    const isRunning = statusBadge?.classList.contains("running");
+    
+    if (isRunning) {
+        showToast("Stop the FTP server before changing the shared folder", "warning");
+        return;
+    }
+    
+    try {
+        const selected = await open({
+            directory: true,
+            multiple: false,
+            title: 'Select Folder to Share via FTP'
+        });
+        
+        if (selected) {
+            ftpSelectedFolder = selected as string;
+            localStorage.setItem("ftp_shared_folder", ftpSelectedFolder);
+            
+            const folderInput = document.getElementById("ftp-shared-folder") as HTMLInputElement;
+            if (folderInput) {
+                folderInput.value = ftpSelectedFolder;
+            }
+            
+            showToast("Folder selected successfully", "success");
+        }
+    } catch (error) {
+        console.error("Error selecting folder:", error);
+        showToast("Failed to select folder", "error");
+    }
+}
+
+// Setup FTP event listeners
+const btnStartFtp = document.getElementById("btn-start-ftp");
+if (btnStartFtp) {
+  btnStartFtp.onclick = () => startFtpServer();
+}
+
+const btnStopFtp = document.getElementById("btn-stop-ftp");
+if (btnStopFtp) {
+  btnStopFtp.onclick = () => stopFtpServer();
+}
+
+const btnCopyPassword = document.getElementById("btn-copy-password");
+if (btnCopyPassword) {
+  btnCopyPassword.onclick = () => copyFtpPassword();
+}
+
+const btnTogglePassword = document.getElementById("btn-toggle-password");
+if (btnTogglePassword) {
+  btnTogglePassword.onclick = () => toggleFtpPassword();
+}
+
+const btnClearFtpLogs = document.getElementById("btn-clear-ftp-logs");
+if (btnClearFtpLogs) {
+  btnClearFtpLogs.onclick = () => clearFtpLogs();
+}
+
+
+const btnBrowseFolder = document.getElementById("btn-browse-folder");
+if (btnBrowseFolder) {
+    btnBrowseFolder.onclick = () => browseFtpFolder();
+}
+
+// Check FTP status on page load
+fetchFtpStatus();
+
+console.log('✅ FTP control interface initialized');

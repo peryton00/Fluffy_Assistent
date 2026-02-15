@@ -1,0 +1,755 @@
+[
+  {
+    "timestamp": "2026-02-15T22:06:27.781530",
+    "event": "server_started",
+    "details": {
+      "ip": "10.180.173.28",
+      "port": 2121,
+      "shared_dir": "C:\\Users\\sudip\\OneDrive\\Desktop\\webProjects\\FluffyAssistent\\FluffyShared"
+    }
+  },
+  {
+    "timestamp": "2026-02-15T22:08:51.236574",
+    "event": "server_started",
+    "details": {
+      "ip": "10.180.173.28",
+      "port": 2121,
+      "shared_dir": "C:\\Users\\sudip\\OneDrive\\Desktop\\webProjects\\FluffyAssistent\\FluffyShared"
+    }
+  },
+  {
+    "timestamp": "2026-02-15T22:10:59.157201",
+    "event": "client_disconnected",
+    "client_ip": "10.180.173.216"
+  },
+  {
+    "timestamp": "2026-02-15T22:11:04.870555",
+    "event": "client_disconnected",
+    "client_ip": "10.180.173.216"
+  },
+  {
+    "timestamp": "2026-02-15T22:14:59.546213",
+    "event": "server_stopped"
+  },
+  {
+    "timestamp": "2026-02-15T22:15:03.617659",
+    "event": "server_started",
+    "details": {
+      "ip": "10.180.173.28",
+      "port": 2121,
+      "shared_dir": "C:\\Users\\sudip\\OneDrive\\Desktop\\webProjects\\FluffyAssistent\\FluffyShared"
+    }
+  },
+  {
+    "timestamp": "2026-02-15T22:23:09.230242",
+    "event": "server_stopped"
+  },
+  {
+    "timestamp": "2026-02-15T22:24:29.247349",
+    "event": "server_started",
+    "details": {
+      "ip": "10.180.173.28",
+      "port": 2121,
+      "shared_dir": "C:\\Users\\sudip\\OneDrive\\Desktop\\webProjects\\FluffyAssistent\\FluffyShared"
+    }
+  },
+  {
+    "timestamp": "2026-02-15T22:24:33.971982",
+    "event": "server_stopped"
+  },
+  {
+    "timestamp": "2026-02-15T22:24:35.216932",
+    "event": "server_started",
+    "details": {
+      "ip": "10.180.173.28",
+      "port": 2121,
+      "shared_dir": "C:\\Users\\sudip\\OneDrive\\Desktop\\webProjects\\FluffyAssistent\\FluffyShared"
+    }
+  },
+  {
+    "timestamp": "2026-02-15T22:24:36.179115",
+    "event": "server_stopped"
+  },
+  {
+    "timestamp": "2026-02-15T22:43:59.008934",
+    "event": "server_started",
+    "details": {
+      "ip": "10.180.173.28",
+      "port": 2121,
+      "shared_dir": "C:\\Users\\sudip\\Downloads"
+    }
+  },
+  {
+    "timestamp": "2026-02-15T22:45:08.772438",
+    "event": "client_disconnected",
+    "client_ip": "10.180.173.72"
+  },
+  {
+    "timestamp": "2026-02-15T22:46:47.535139",
+    "event": "server_stopped"
+  },
+  {
+    "timestamp": "2026-02-15T22:48:37.873443",
+    "event": "server_started",
+    "details": {
+      "ip": "10.180.173.28",
+      "port": 2121,
+      "shared_dir": "C:\\Users\\sudip\\Downloads"
+    }
+  },
+  {
+    "timestamp": "2026-02-15T22:49:04.658575",
+    "event": "client_disconnected",
+    "client_ip": "10.180.173.72"
+  },
+  {
+    "timestamp": "2026-02-15T22:49:55.413944",
+    "event": "client_connected",
+    "client_ip": "10.180.173.72",
+    "details": {
+      "username": "fluffy"
+    }
+  },
+  {
+    "timestamp": "2026-02-15T22:49:55.488107",
+    "event": "client_disconnected",
+    "client_ip": "10.180.173.72"
+  },
+  {
+    "timestamp": "2026-02-15T22:49:55.993630",
+    "event": "client_connected",
+    "client_ip": "10.180.173.72",
+    "details": {
+      "username": "fluffy"
+    }
+  },
+  {
+    "timestamp": "2026-02-15T22:49:57.827953",
+    "event": "file_download_incomplete",
+    "client_ip": "10.180.173.72",
+    "filename": "20260209_214955.jpg.jpeg"
+  },
+  {
+    "timestamp": "2026-02-15T22:49:57.960425",
+    "event": "file_downloaded",
+    "client_ip": "10.180.173.72",
+    "filename": "51d88f163ae7d00901a55a15aaff134c.jpg"
+  },
+  {
+    "timestamp": "2026-02-15T22:49:58.088210",
+    "event": "file_downloaded",
+    "client_ip": "10.180.173.72",
+    "filename": "7a474e92a1d6928557ee42d9fc368fe6.jpg"
+  },
+  {
+    "timestamp": "2026-02-15T22:49:58.562432",
+    "event": "file_downloaded",
+    "client_ip": "10.180.173.72",
+    "filename": "Aesthetic Instagram Frame Ideas_ Cute Backgrounds & Story Inspiration.jpg"
+  },
+  {
+    "timestamp": "2026-02-15T22:49:58.677808",
+    "event": "file_downloaded",
+    "client_ip": "10.180.173.72",
+    "filename": "Apexify_ Sales & Marketing Dashboard - 2025s Dark Mode UI Design Inspo.jpg"
+  },
+  {
+    "timestamp": "2026-02-15T22:49:58.829946",
+    "event": "file_downloaded",
+    "client_ip": "10.180.173.72",
+    "filename": "download (1).jpg"
+  },
+  {
+    "timestamp": "2026-02-15T22:49:58.986834",
+    "event": "file_downloaded",
+    "client_ip": "10.180.173.72",
+    "filename": "download (2).jpg"
+  },
+  {
+    "timestamp": "2026-02-15T22:49:59.100185",
+    "event": "file_downloaded",
+    "client_ip": "10.180.173.72",
+    "filename": "download (3).jpg"
+  },
+  {
+    "timestamp": "2026-02-15T22:49:59.241264",
+    "event": "file_downloaded",
+    "client_ip": "10.180.173.72",
+    "filename": "download (4).jpg"
+  },
+  {
+    "timestamp": "2026-02-15T22:49:59.370876",
+    "event": "file_downloaded",
+    "client_ip": "10.180.173.72",
+    "filename": "download.jpg"
+  },
+  {
+    "timestamp": "2026-02-15T22:49:59.497613",
+    "event": "file_download_incomplete",
+    "client_ip": "10.180.173.72",
+    "filename": "DSC_5233.JPG.jpeg"
+  },
+  {
+    "timestamp": "2026-02-15T22:49:59.624581",
+    "event": "file_download_incomplete",
+    "client_ip": "10.180.173.72",
+    "filename": "DSC_5541.JPG.jpeg"
+  },
+  {
+    "timestamp": "2026-02-15T22:49:59.770677",
+    "event": "file_downloaded",
+    "client_ip": "10.180.173.72",
+    "filename": "\ud83d\udc97\ud83e\udd8b.jpg"
+  },
+  {
+    "timestamp": "2026-02-15T22:49:59.894017",
+    "event": "file_downloaded",
+    "client_ip": "10.180.173.72",
+    "filename": "Glass.jpg"
+  },
+  {
+    "timestamp": "2026-02-15T22:50:00.026609",
+    "event": "file_download_incomplete",
+    "client_ip": "10.180.173.72",
+    "filename": "IMG-20260120-WA0009.jpg.jpeg"
+  },
+  {
+    "timestamp": "2026-02-15T22:50:00.152619",
+    "event": "file_download_incomplete",
+    "client_ip": "10.180.173.72",
+    "filename": "IMG-20260120-WA0013.jpg.jpeg"
+  },
+  {
+    "timestamp": "2026-02-15T22:50:00.679383",
+    "event": "file_download_incomplete",
+    "client_ip": "10.180.173.72",
+    "filename": "photo.jpg"
+  },
+  {
+    "timestamp": "2026-02-15T22:50:00.845776",
+    "event": "file_download_incomplete",
+    "client_ip": "10.180.173.72",
+    "filename": "photo00.jpeg"
+  },
+  {
+    "timestamp": "2026-02-15T22:50:00.978634",
+    "event": "file_download_incomplete",
+    "client_ip": "10.180.173.72",
+    "filename": "photo1.jpeg"
+  },
+  {
+    "timestamp": "2026-02-15T22:50:01.089579",
+    "event": "file_download_incomplete",
+    "client_ip": "10.180.173.72",
+    "filename": "photo2.jpeg"
+  },
+  {
+    "timestamp": "2026-02-15T22:50:01.219183",
+    "event": "file_download_incomplete",
+    "client_ip": "10.180.173.72",
+    "filename": "photo4.jpeg"
+  },
+  {
+    "timestamp": "2026-02-15T22:50:01.355024",
+    "event": "file_download_incomplete",
+    "client_ip": "10.180.173.72",
+    "filename": "photo6.jpeg"
+  },
+  {
+    "timestamp": "2026-02-15T22:50:08.729753",
+    "event": "file_download_incomplete",
+    "client_ip": "10.180.173.72",
+    "filename": "Premium Template Pack Easistar - Dashboard User Interface Template Pack.jpg"
+  },
+  {
+    "timestamp": "2026-02-15T22:50:08.956318",
+    "event": "file_downloaded",
+    "client_ip": "10.180.173.72",
+    "filename": "signature.jpg"
+  },
+  {
+    "timestamp": "2026-02-15T22:50:09.121870",
+    "event": "file_downloaded",
+    "client_ip": "10.180.173.72",
+    "filename": "signature00.jpeg"
+  },
+  {
+    "timestamp": "2026-02-15T22:50:09.273677",
+    "event": "file_downloaded",
+    "client_ip": "10.180.173.72",
+    "filename": "signature000.jpg"
+  },
+  {
+    "timestamp": "2026-02-15T22:50:09.428535",
+    "event": "file_downloaded",
+    "client_ip": "10.180.173.72",
+    "filename": "signature78.jpg"
+  },
+  {
+    "timestamp": "2026-02-15T22:50:09.596186",
+    "event": "file_downloaded",
+    "client_ip": "10.180.173.72",
+    "filename": "Solo Leveling Reawakening Smiley Face 4K.jpg"
+  },
+  {
+    "timestamp": "2026-02-15T22:50:46.973977",
+    "event": "file_downloaded",
+    "client_ip": "10.180.173.72",
+    "filename": "aircraft_report.py"
+  },
+  {
+    "timestamp": "2026-02-15T22:50:47.435384",
+    "event": "file_downloaded",
+    "client_ip": "10.180.173.72",
+    "filename": "open_app.py"
+  },
+  {
+    "timestamp": "2026-02-15T22:50:48.099693",
+    "event": "file_downloaded",
+    "client_ip": "10.180.173.72",
+    "filename": "send_message.py"
+  },
+  {
+    "timestamp": "2026-02-15T22:50:48.434287",
+    "event": "file_downloaded",
+    "client_ip": "10.180.173.72",
+    "filename": "weather_report.py"
+  },
+  {
+    "timestamp": "2026-02-15T22:50:48.541128",
+    "event": "file_downloaded",
+    "client_ip": "10.180.173.72",
+    "filename": "web_search.py"
+  },
+  {
+    "timestamp": "2026-02-15T22:50:48.681556",
+    "event": "file_downloaded",
+    "client_ip": "10.180.173.72",
+    "filename": "tts.py"
+  },
+  {
+    "timestamp": "2026-02-15T22:50:48.838307",
+    "event": "file_downloaded",
+    "client_ip": "10.180.173.72",
+    "filename": "prompt.txt"
+  },
+  {
+    "timestamp": "2026-02-15T22:50:49.177478",
+    "event": "file_downloaded",
+    "client_ip": "10.180.173.72",
+    "filename": "face.png"
+  },
+  {
+    "timestamp": "2026-02-15T22:50:49.297556",
+    "event": "file_downloaded",
+    "client_ip": "10.180.173.72",
+    "filename": "llm.py"
+  },
+  {
+    "timestamp": "2026-02-15T22:50:49.418012",
+    "event": "file_downloaded",
+    "client_ip": "10.180.173.72",
+    "filename": "main.py"
+  },
+  {
+    "timestamp": "2026-02-15T22:50:50.116887",
+    "event": "file_downloaded",
+    "client_ip": "10.180.173.72",
+    "filename": "__init__.py"
+  },
+  {
+    "timestamp": "2026-02-15T22:50:50.325999",
+    "event": "file_downloaded",
+    "client_ip": "10.180.173.72",
+    "filename": "memory_manager.py"
+  },
+  {
+    "timestamp": "2026-02-15T22:50:50.967182",
+    "event": "file_downloaded",
+    "client_ip": "10.180.173.72",
+    "filename": "temporary_memory.py"
+  },
+  {
+    "timestamp": "2026-02-15T22:50:51.530190",
+    "event": "file_downloaded",
+    "client_ip": "10.180.173.72",
+    "filename": "README.txt"
+  },
+  {
+    "timestamp": "2026-02-15T22:50:52.236834",
+    "event": "file_downloaded",
+    "client_ip": "10.180.173.72",
+    "filename": "speech_to_text.py"
+  },
+  {
+    "timestamp": "2026-02-15T22:50:52.448491",
+    "event": "file_downloaded",
+    "client_ip": "10.180.173.72",
+    "filename": "tts.py"
+  },
+  {
+    "timestamp": "2026-02-15T22:50:52.592221",
+    "event": "file_downloaded",
+    "client_ip": "10.180.173.72",
+    "filename": "ui.py"
+  },
+  {
+    "timestamp": "2026-02-15T22:51:29.511671",
+    "event": "client_connected",
+    "client_ip": "10.180.173.72",
+    "details": {
+      "username": "fluffy"
+    }
+  },
+  {
+    "timestamp": "2026-02-15T22:51:29.664904",
+    "event": "file_uploaded",
+    "client_ip": "10.180.173.72",
+    "filename": "settings.json"
+  },
+  {
+    "timestamp": "2026-02-15T22:51:29.835285",
+    "event": "file_uploaded",
+    "client_ip": "10.180.173.72",
+    "filename": "array.c"
+  },
+  {
+    "timestamp": "2026-02-15T22:51:29.982894",
+    "event": "file_uploaded",
+    "client_ip": "10.180.173.72",
+    "filename": "array.exe"
+  },
+  {
+    "timestamp": "2026-02-15T22:51:30.133222",
+    "event": "file_uploaded",
+    "client_ip": "10.180.173.72",
+    "filename": "first.c"
+  },
+  {
+    "timestamp": "2026-02-15T22:51:30.302031",
+    "event": "file_uploaded",
+    "client_ip": "10.180.173.72",
+    "filename": "first.exe"
+  },
+  {
+    "timestamp": "2026-02-15T22:51:30.464484",
+    "event": "file_uploaded",
+    "client_ip": "10.180.173.72",
+    "filename": "hello.c"
+  },
+  {
+    "timestamp": "2026-02-15T22:51:30.654531",
+    "event": "file_uploaded",
+    "client_ip": "10.180.173.72",
+    "filename": "hello.exe"
+  },
+  {
+    "timestamp": "2026-02-15T22:51:31.558175",
+    "event": "file_uploaded",
+    "client_ip": "10.180.173.72",
+    "filename": "lenth .c"
+  },
+  {
+    "timestamp": "2026-02-15T22:51:31.697780",
+    "event": "file_uploaded",
+    "client_ip": "10.180.173.72",
+    "filename": "mod.c"
+  },
+  {
+    "timestamp": "2026-02-15T22:51:31.873020",
+    "event": "file_uploaded",
+    "client_ip": "10.180.173.72",
+    "filename": "mod.exe"
+  },
+  {
+    "timestamp": "2026-02-15T22:51:32.015656",
+    "event": "file_uploaded",
+    "client_ip": "10.180.173.72",
+    "filename": "radius.c"
+  },
+  {
+    "timestamp": "2026-02-15T22:51:32.202892",
+    "event": "file_uploaded",
+    "client_ip": "10.180.173.72",
+    "filename": "radius.exe"
+  },
+  {
+    "timestamp": "2026-02-15T22:51:32.353056",
+    "event": "file_uploaded",
+    "client_ip": "10.180.173.72",
+    "filename": "squar.c"
+  },
+  {
+    "timestamp": "2026-02-15T22:51:32.524824",
+    "event": "file_uploaded",
+    "client_ip": "10.180.173.72",
+    "filename": "squar.exe"
+  },
+  {
+    "timestamp": "2026-02-15T22:51:32.664678",
+    "event": "file_uploaded",
+    "client_ip": "10.180.173.72",
+    "filename": "switch .c"
+  },
+  {
+    "timestamp": "2026-02-15T22:51:33.264938",
+    "event": "client_disconnected",
+    "client_ip": "10.180.173.72"
+  },
+  {
+    "timestamp": "2026-02-15T22:51:46.730507",
+    "event": "file_download_incomplete",
+    "client_ip": "10.180.173.72",
+    "filename": "20260209_214955.jpg.jpeg"
+  },
+  {
+    "timestamp": "2026-02-15T22:51:46.834409",
+    "event": "file_downloaded",
+    "client_ip": "10.180.173.72",
+    "filename": "51d88f163ae7d00901a55a15aaff134c.jpg"
+  },
+  {
+    "timestamp": "2026-02-15T22:51:46.963861",
+    "event": "file_downloaded",
+    "client_ip": "10.180.173.72",
+    "filename": "7a474e92a1d6928557ee42d9fc368fe6.jpg"
+  },
+  {
+    "timestamp": "2026-02-15T22:51:47.036243",
+    "event": "file_downloaded",
+    "client_ip": "10.180.173.72",
+    "filename": "Aesthetic Instagram Frame Ideas_ Cute Backgrounds & Story Inspiration.jpg"
+  },
+  {
+    "timestamp": "2026-02-15T22:51:48.081281",
+    "event": "file_downloaded",
+    "client_ip": "10.180.173.72",
+    "filename": "Apexify_ Sales & Marketing Dashboard - 2025s Dark Mode UI Design Inspo.jpg"
+  },
+  {
+    "timestamp": "2026-02-15T22:51:48.261272",
+    "event": "file_downloaded",
+    "client_ip": "10.180.173.72",
+    "filename": "download (1).jpg"
+  },
+  {
+    "timestamp": "2026-02-15T22:51:48.423307",
+    "event": "file_downloaded",
+    "client_ip": "10.180.173.72",
+    "filename": "download (2).jpg"
+  },
+  {
+    "timestamp": "2026-02-15T22:51:48.511710",
+    "event": "file_downloaded",
+    "client_ip": "10.180.173.72",
+    "filename": "download (3).jpg"
+  },
+  {
+    "timestamp": "2026-02-15T22:51:48.671428",
+    "event": "file_downloaded",
+    "client_ip": "10.180.173.72",
+    "filename": "download (4).jpg"
+  },
+  {
+    "timestamp": "2026-02-15T22:51:48.761513",
+    "event": "file_downloaded",
+    "client_ip": "10.180.173.72",
+    "filename": "download.jpg"
+  },
+  {
+    "timestamp": "2026-02-15T22:51:48.875285",
+    "event": "file_download_incomplete",
+    "client_ip": "10.180.173.72",
+    "filename": "DSC_5233.JPG.jpeg"
+  },
+  {
+    "timestamp": "2026-02-15T22:51:48.980291",
+    "event": "file_download_incomplete",
+    "client_ip": "10.180.173.72",
+    "filename": "DSC_5541.JPG.jpeg"
+  },
+  {
+    "timestamp": "2026-02-15T22:51:49.354571",
+    "event": "file_downloaded",
+    "client_ip": "10.180.173.72",
+    "filename": "\ud83d\udc97\ud83e\udd8b.jpg"
+  },
+  {
+    "timestamp": "2026-02-15T22:51:50.091140",
+    "event": "file_downloaded",
+    "client_ip": "10.180.173.72",
+    "filename": "Glass.jpg"
+  },
+  {
+    "timestamp": "2026-02-15T22:51:50.202824",
+    "event": "file_download_incomplete",
+    "client_ip": "10.180.173.72",
+    "filename": "IMG-20260120-WA0009.jpg.jpeg"
+  },
+  {
+    "timestamp": "2026-02-15T22:51:50.321157",
+    "event": "file_download_incomplete",
+    "client_ip": "10.180.173.72",
+    "filename": "IMG-20260120-WA0013.jpg.jpeg"
+  },
+  {
+    "timestamp": "2026-02-15T22:51:50.434925",
+    "event": "file_download_incomplete",
+    "client_ip": "10.180.173.72",
+    "filename": "photo.jpg"
+  },
+  {
+    "timestamp": "2026-02-15T22:51:50.591148",
+    "event": "file_download_incomplete",
+    "client_ip": "10.180.173.72",
+    "filename": "photo00.jpeg"
+  },
+  {
+    "timestamp": "2026-02-15T22:51:50.734145",
+    "event": "file_download_incomplete",
+    "client_ip": "10.180.173.72",
+    "filename": "photo1.jpeg"
+  },
+  {
+    "timestamp": "2026-02-15T22:51:50.851268",
+    "event": "file_download_incomplete",
+    "client_ip": "10.180.173.72",
+    "filename": "photo2.jpeg"
+  },
+  {
+    "timestamp": "2026-02-15T22:51:50.973614",
+    "event": "file_download_incomplete",
+    "client_ip": "10.180.173.72",
+    "filename": "photo4.jpeg"
+  },
+  {
+    "timestamp": "2026-02-15T22:52:07.850427",
+    "event": "file_download_incomplete",
+    "client_ip": "10.180.173.72",
+    "filename": "photo6.jpeg"
+  },
+  {
+    "timestamp": "2026-02-15T22:52:44.554917",
+    "event": "server_stopped"
+  },
+  {
+    "timestamp": "2026-02-15T22:53:52.919610",
+    "event": "server_started",
+    "details": {
+      "ip": "10.180.173.28",
+      "port": 2121,
+      "shared_dir": "C:\\Users\\sudip\\Downloads"
+    }
+  },
+  {
+    "timestamp": "2026-02-15T22:53:57.013865",
+    "event": "server_stopped"
+  },
+  {
+    "timestamp": "2026-02-15T22:54:08.416055",
+    "event": "server_started",
+    "details": {
+      "ip": "10.180.173.28",
+      "port": 2121,
+      "shared_dir": "C:\\Users\\sudip\\Downloads"
+    }
+  },
+  {
+    "timestamp": "2026-02-15T22:54:15.615863",
+    "event": "server_stopped"
+  },
+  {
+    "timestamp": "2026-02-15T22:55:16.590539",
+    "event": "server_started",
+    "details": {
+      "ip": "10.180.173.28",
+      "port": 2121,
+      "shared_dir": "C:\\Users\\sudip\\OneDrive\\Desktop"
+    }
+  },
+  {
+    "timestamp": "2026-02-15T22:55:31.346333",
+    "event": "client_disconnected",
+    "client_ip": "10.180.173.72"
+  },
+  {
+    "timestamp": "2026-02-15T22:55:49.454894",
+    "event": "client_connected",
+    "client_ip": "10.180.173.72",
+    "details": {
+      "username": "fluffy"
+    }
+  },
+  {
+    "timestamp": "2026-02-15T22:55:56.390156",
+    "event": "client_connected",
+    "client_ip": "10.180.173.72",
+    "details": {
+      "username": "fluffy"
+    }
+  },
+  {
+    "timestamp": "2026-02-15T22:56:51.809420",
+    "event": "file_downloaded",
+    "client_ip": "10.180.173.72",
+    "filename": "memory_adventure.png"
+  },
+  {
+    "timestamp": "2026-02-15T22:56:52.757624",
+    "event": "file_downloaded",
+    "client_ip": "10.180.173.72",
+    "filename": "memory_joy.png"
+  },
+  {
+    "timestamp": "2026-02-15T22:56:53.848831",
+    "event": "file_downloaded",
+    "client_ip": "10.180.173.72",
+    "filename": "memory_spark.png"
+  },
+  {
+    "timestamp": "2026-02-15T22:56:54.079086",
+    "event": "file_downloaded",
+    "client_ip": "10.180.173.72",
+    "filename": "data.json"
+  },
+  {
+    "timestamp": "2026-02-15T22:56:54.390059",
+    "event": "file_downloaded",
+    "client_ip": "10.180.173.72",
+    "filename": "index.html"
+  },
+  {
+    "timestamp": "2026-02-15T22:56:54.599003",
+    "event": "file_downloaded",
+    "client_ip": "10.180.173.72",
+    "filename": "script.js"
+  },
+  {
+    "timestamp": "2026-02-15T22:56:54.736604",
+    "event": "file_downloaded",
+    "client_ip": "10.180.173.72",
+    "filename": "style.css"
+  },
+  {
+    "timestamp": "2026-02-15T22:57:16.044774",
+    "event": "client_disconnected",
+    "client_ip": "10.180.173.72"
+  },
+  {
+    "timestamp": "2026-02-15T22:57:16.070609",
+    "event": "server_stopped"
+  },
+  {
+    "timestamp": "2026-02-15T22:57:20.062639",
+    "event": "server_started",
+    "details": {
+      "ip": "10.180.173.28",
+      "port": 2121,
+      "shared_dir": "C:\\Users\\sudip\\OneDrive\\Desktop"
+    }
+  },
+  {
+    "timestamp": "2026-02-15T22:57:22.984340",
+    "event": "server_stopped"
+  }
+]

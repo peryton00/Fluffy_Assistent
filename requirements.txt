@@ -1,4 +1,6 @@
 flask
 requests
+pyftpdlib
+qrcode[pil]
 python-dotenv
 sseclient-py

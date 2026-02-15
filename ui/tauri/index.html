@@ -470,6 +470,112 @@
             </div>
           </div>
 
+          <!-- FTP Server Section - Add this after the Guardian Intelligence section in Settings -->
+          <div class="card settings-group">
+            <div class="settings-group-header">
+              <div class="group-icon"><i data-lucide="folder-sync"></i></div>
+              <div>
+                <h3>FTP File Sharing</h3>
+                <p>Share files over local network with secure FTP server.</p>
+              </div>
+            </div>
+
+            <div class="ftp-container">
+              <!-- FTP Status Header -->
+              <div class="ftp-status-header">
+                <div class="ftp-status-badge" id="ftp-status-badge">
+                  <span class="status-dot"></span>
+                  <span id="ftp-status-text">Stopped</span>
+                </div>
+                <div class="ftp-controls">
+                  <button id="btn-start-ftp" class="btn-primary">
+                    <i data-lucide="play"></i> Start Server
+                  </button>
+                  <button id="btn-stop-ftp" class="btn-outline" disabled>
+                    <i data-lucide="stop-circle"></i> Stop Server
+                  </button>
+                </div>
+              </div>
+
+              <!-- Folder Selector -->
+              <div class="ftp-folder-selector">
+                <label for="ftp-shared-folder"><i data-lucide="folder"></i> Shared Folder:</label>
+                <div class="folder-input-group">
+                  <input type="text" id="ftp-shared-folder" readonly placeholder="Select a folder to share...">
+                  <button id="btn-browse-folder" class="btn-outline btn-sm">
+                    <i data-lucide="folder-open"></i> Browse...
+                  </button>
+                </div>
+                <p class="folder-hint">Choose which folder to share via FTP (server must be stopped to change)</p>
+              </div>
+              <!-- FTP Server Info (shown when running) -->
+              <div id="ftp-server-info" class="ftp-server-info" style="display: none;">
+                <div class="ftp-info-grid">
+                  <!-- Connection Details -->
+                  <div class="ftp-info-card">
+                    <h4><i data-lucide="server"></i> Connection Details</h4>
+                    <div class="ftp-detail-row">
+                      <span class="detail-label">Address:</span>
+                      <span id="ftp-address" class="detail-value">--</span>
+                    </div>
+                    <div class="ftp-detail-row">
+                      <span class="detail-label">Username:</span>
+                      <span id="ftp-username" class="detail-value">fluffy</span>
+                    </div>
+                    <div class="ftp-detail-row">
+                      <span class="detail-label">Password:</span>
+                      <div class="password-container">
+                        <span id="ftp-password" class="detail-value password-masked">••••••••••••••••</span>
+                        <button id="btn-copy-password" class="btn-icon" title="Copy Password">
+                          <i data-lucide="copy"></i>
+                        </button>
+                        <button id="btn-toggle-password" class="btn-icon" title="Show/Hide Password">
+                          <i data-lucide="eye"></i>
+                        </button>
+                      </div>
+                    </div>
+                    <div class="ftp-detail-row">
+                      <span class="detail-label">Connected Clients:</span>
+                      <span id="ftp-clients-count" class="detail-value badge">0</span>
+                    </div>
+                  </div>
+
+                  <!-- QR Code -->
+                  <div class="ftp-info-card qr-card">
+                    <h4><i data-lucide="qr-code"></i> Quick Connect</h4>
+                    <div class="qr-code-container">
+                      <img id="ftp-qr-code" src="" alt="FTP QR Code" class="qr-code-img">
+                      <p class="qr-hint">Scan with mobile FTP app</p>
+                    </div>
+                  </div>
+                </div>
+
+                <!-- Activity Logs -->
+                <div class="ftp-logs-card">
+                  <div class="logs-header">
+                    <h4><i data-lucide="activity"></i> Activity Log</h4>
+                    <button id="btn-clear-ftp-logs" class="btn-outline btn-sm">Clear Logs</button>
+                  </div>
+                  <div id="ftp-logs-list" class="ftp-logs-list">
+                    <p class="empty-logs">No activity yet</p>
+                  </div>
+                </div>
+              </div>
+
+              <!-- FTP Info Message (shown when stopped) -->
+              <div id="ftp-stopped-info" class="ftp-stopped-info">
+                <div class="info-icon"><i data-lucide="info"></i></div>
+                <p>Start the FTP server to share files with devices on your local network.</p>
+                <ul class="info-list">
+                  <li>Secure random password generated per session</li>
+                  <li>Files shared from <code>/FluffyShared/</code> directory</li>
+                  <li>Server runs until manually stopped</li>
+                  <li>QR code for easy mobile connection</li>
+                </ul>
+              </div>
+            </div>
+          </div>
+
           <!-- Category: Security -->
           <div class="card settings-group danger-zone">
             <div class="settings-group-header">
@@ -488,6 +594,7 @@
               <button id="btn-clear-guardian" class="btn-outline btn-danger">Clear Knowledge Base</button>
             </div>
           </div>
+
 
         </div>
       </section>
