@@ -53,9 +53,36 @@ class LLMService:
         from brain.llm_command_parser import get_llm_parser
         parser = get_llm_parser()
         
-        # 0. Check for pending confirmations (Self-Improvement)
+        # 0. Check for pending confirmations
         from brain.memory.session_memory import get_session_memory
         session = get_session_memory()
+        
+        # Check for pending validation confirmation first
+        if session.has_pending_validation():
+            confirmations = ["yes", "y", "sure", "do it", "proceed", "okay", "ok"]
+            is_confirmation = any(word in user_message.lower() for word in confirmations)
+            
+            if is_confirmation:
+                print(f"[LLMService] 🚀 Validation confirmed, executing command...")
+                pending_cmd, pending_validation = session.get_pending_validation()
+                session.clear_pending_validation()
+                
+                # Execute the command
+                result = self.executor.execute(pending_cmd, pending_validation)
+                
+                return {
+                    "type": "command",
+                    "success": result.get("success", False),
+                    "message": result.get("message", "Command executed!"),
+                    "stream": None,
+                    "result": result
+                }
+            else:
+                # User declined
+                print("[LLMService] Validation confirmation declined.")
+                session.clear_pending_validation()
+        
+        # Check for pending self-improvement confirmation
         pending_improvement = session.get_pending_improvement()
         
         if pending_improvement:
@@ -157,6 +184,9 @@ class LLMService:
             parameters=understanding.parameters,
             raw_text=understanding.original_text
         )
+        
+        # Attach LLM response for chat intent handling
+        cmd.llm_response = understanding.text
         
         # Validate and execute
         validation = self.validator.validate(cmd)

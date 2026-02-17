@@ -121,6 +121,25 @@ Say 'yes' to proceed or 'no' to cancel.
                 parameters=understanding.parameters
             )
             
+            # Check if code generation failed after retries
+            if generated_code is None:
+                return {
+                    "success": False,
+                    "message": (
+                        "❌ **Code Generation Failed**\n\n"
+                        "I tried 3 times to generate valid code for this functionality, "
+                        "but encountered syntax errors each time.\n\n"
+                        "**Possible reasons:**\n"
+                        "- The functionality is too complex for automatic generation\n"
+                        "- The LLM is having trouble with the specific requirements\n\n"
+                        "**What you can do:**\n"
+                        "1. Try rephrasing your request with more details\n"
+                        "2. Break it into smaller, simpler tasks\n"
+                        "3. Report this issue if it persists"
+                    ),
+                    "action": "error"
+                }
+            
             print(f"[SelfImprover] ✓ Code generated ({len(generated_code.executor_method)} chars)")
             
             # Step 2: Create extension
@@ -148,9 +167,18 @@ Say 'yes' to proceed or 'no' to cancel.
             self.extension_loader.load_all_extensions()
             
             if not self.extension_loader.has_extension(actual_intent):
+                # Get detailed error from last load attempt
+                error_details = self.extension_loader.get_last_load_error(actual_intent)
+                
                 return {
                     "success": False,
-                    "message": "Extension created but failed to load",
+                    "message": f"⚠️ Extension '{actual_intent}' was created but failed to load.\n\n"
+                               f"**Error:** {error_details}\n\n"
+                               f"**Troubleshooting:**\n"
+                               f"1. Check the extension files in: `brain/extensions/{actual_intent}/`\n"
+                               f"2. Look for syntax errors in `handler.py` and `validator.py`\n"
+                               f"3. Try restarting Fluffy to reload all extensions\n\n"
+                               f"The extension files have been saved and can be manually fixed.",
                     "action": "error"
                 }
             
@@ -175,9 +203,21 @@ Say 'yes' to proceed or 'no' to cancel.
             
             print(f"[SelfImprover] ✓ Command executed")
             
-            # Add success message
+            # Add enhanced success message
             if result.get("success"):
-                result["message"] = f"✓ New capability '{final_intent}' added and executed!\n\n{result.get('message', '')}"
+                result["message"] = (
+                    f"🎉 **Extension '{final_intent}' is now active!**\n\n"
+                    f"Your command has been executed successfully.\n\n"
+                    f"**Result:**\n{result.get('message', '')}\n\n"
+                    f"💡 You can use this capability anytime now - no restart needed!"
+                )
+            else:
+                # Extension loaded but execution failed
+                result["message"] = (
+                    f"✅ Extension '{final_intent}' was created and loaded successfully.\n\n"
+                    f"⚠️ However, execution failed:\n{result.get('message', 'Unknown error')}\n\n"
+                    f"The extension is installed and can be debugged in `brain/extensions/{final_intent}/`"
+                )
             
             return result
             

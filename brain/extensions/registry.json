@@ -1,0 +1,37 @@
+{
+  "bluetooth_control": {
+    "name": "Bluetooth Control",
+    "intent": "bluetooth_control",
+    "patterns": [
+      "turn on bluetooth",
+      "turn off bluetooth",
+      "enable bluetooth",
+      "disable bluetooth",
+      "bluetooth on",
+      "bluetooth off",
+      "switch on bluetooth",
+      "switch off bluetooth"
+    ],
+    "description": "Control Bluetooth on Windows - turn on/off, enable/disable Bluetooth adapter",
+    "directory": "bluetooth_control",
+    "created": "2026-02-17T22:41:00",
+    "version": "1.0.0",
+    "enabled": true,
+    "author": "Fluffy AI"
+  },
+  "scan_wifi": {
+    "name": "scan_wifi",
+    "intent": "scan_wifi",
+    "patterns": [
+      "scan\\s+wifi",
+      "list\\s+nearby\\s+wifi",
+      "wifi\\s+networks"
+    ],
+    "description": "A tool that utilizes the system's network scanning capabilities to list nearby WiFi networks, possibly using libraries such as scapy for Python or WiFi API for Windows.",
+    "directory": "scan_wifi",
+    "created": "2026-02-17T23:33:33.443501",
+    "version": "1.0.0",
+    "enabled": true,
+    "author": "Fluffy AI"
+  }
+}

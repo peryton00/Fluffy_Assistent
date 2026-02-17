@@ -50,46 +50,87 @@ class CodeGenerator:
         self,
         intent_name: str,
         description: str,
-        parameters: Dict[str, Any]
+        parameters: Dict[str, Any],
+        max_retries: int = 3
     ) -> GeneratedCode:
         """
-        Generate all code needed for a new intent
+        Generate all code needed for a new intent with automatic validation and fixing
         
         Args:
             intent_name: Name of the intent (e.g., "download_file")
             description: What this intent does
             parameters: Parameters needed for this intent
+            max_retries: Maximum attempts to fix syntax errors (default: 3)
             
         Returns:
-            GeneratedCode object with all necessary code blocks
+            GeneratedCode object with all necessary code blocks, or None if failed
         """
         
         llm = self._get_llm()
         if not llm:
             return self._generate_fallback_code(intent_name, description, parameters)
         
-        # Build prompt
-        prompt = self._build_generation_prompt(intent_name, description, parameters)
+        # Import validator
+        from brain.code_validator import validate_extension_code
         
-        try:
-            # Query LLM
-            result = llm.query_llm(prompt)
-            
-            # Collect streaming response
-            full_response = ""
-            for chunk in result["stream"]:
-                full_response += chunk
-            
-            print(f"[CodeGenerator] Generated {len(full_response)} chars of code")
-            
-            # Parse response
-            generated = self._parse_generated_code(full_response, intent_name, description)
-            
-            return generated
-            
-        except Exception as e:
-            print(f"[CodeGenerator] Error: {e}, using fallback")
-            return self._generate_fallback_code(intent_name, description, parameters)
+        # Try generating and validating code
+        for attempt in range(max_retries):
+            try:
+                print(f"[CodeGenerator] Attempt {attempt + 1}/{max_retries}")
+                
+                # Build prompt (use fix prompt if retrying)
+                if attempt == 0:
+                    prompt = self._build_generation_prompt(intent_name, description, parameters)
+                else:
+                    prompt = self._build_fix_prompt(generated, validation_result, intent_name, description)
+                
+                # Query LLM
+                result = llm.query_llm(prompt)
+                
+                # Collect streaming response
+                full_response = ""
+                for chunk in result["stream"]:
+                    full_response += chunk
+                
+                print(f"[CodeGenerator] Generated {len(full_response)} chars of code")
+                
+                # Parse response
+                generated = self._parse_generated_code(full_response, intent_name, description)
+                
+                # Validate the generated code
+                validation_result = validate_extension_code(
+                    generated.executor_method,
+                    generated.validation
+                )
+                
+                if validation_result["valid"]:
+                    print(f"[CodeGenerator] ✓ Code validation passed!")
+                    return generated
+                else:
+                    # Log validation errors
+                    if not validation_result["handler_valid"]:
+                        error = validation_result["handler_error"]
+                        print(f"[CodeGenerator] ✗ Handler error: {error['error']} (line {error['line']})")
+                        print(f"[CodeGenerator]   Suggestion: {error['suggestion']}")
+                    
+                    if not validation_result["validator_valid"]:
+                        error = validation_result["validator_error"]
+                        print(f"[CodeGenerator] ✗ Validator error: {error['error']} (line {error['line']})")
+                        print(f"[CodeGenerator]   Suggestion: {error['suggestion']}")
+                    
+                    if attempt < max_retries - 1:
+                        print(f"[CodeGenerator] Retrying with LLM fix...")
+                    else:
+                        print(f"[CodeGenerator] ✗ Failed after {max_retries} attempts")
+                        return None
+                
+            except Exception as e:
+                print(f"[CodeGenerator] Error on attempt {attempt + 1}: {e}")
+                if attempt == max_retries - 1:
+                    print(f"[CodeGenerator] Using fallback code")
+                    return self._generate_fallback_code(intent_name, description, parameters)
+        
+        return None
     
     def _build_generation_prompt(
         self,
@@ -160,6 +201,71 @@ Make the code:
 Generate code for: {intent_name}
 """
         
+        return prompt
+    
+    def _build_fix_prompt(
+        self,
+        generated_code: GeneratedCode,
+        validation_result: Dict[str, Any],
+        intent_name: str,
+        description: str
+    ) -> str:
+        """Build prompt for LLM to fix syntax errors"""
+        
+        # Determine which code has errors
+        errors = []
+        if not validation_result["handler_valid"]:
+            error = validation_result["handler_error"]
+            errors.append(f"""
+**Handler Code Error:**
+- Error: {error['error']}
+- Line: {error['line']}
+- Suggestion: {error['suggestion']}
+
+Handler Code:
+```python
+{generated_code.executor_method}
+```
+""")
+        
+        if not validation_result["validator_valid"]:
+            error = validation_result["validator_error"]
+            errors.append(f"""
+**Validator Code Error:**
+- Error: {error['error']}
+- Line: {error['line']}
+- Suggestion: {error['suggestion']}
+
+Validator Code:
+```python
+{generated_code.validation}
+```
+""")
+        
+        prompt = f"""The Python code you generated has syntax errors. Please fix them.
+
+Intent: {intent_name}
+Description: {description}
+
+{''.join(errors)}
+
+**Instructions:**
+1. Fix ALL syntax errors
+2. Ensure proper string escaping (use triple quotes for multi-line strings)
+3. Balance all quotes, parentheses, and braces
+4. Return the COMPLETE corrected code in the same JSON format
+
+Return JSON:
+{{
+    "intent_enum": "{generated_code.intent_enum}",
+    "patterns": {json.dumps(generated_code.patterns)},
+    "executor_method": "FIXED executor code here",
+    "validation": "FIXED validation code here",
+    "description": "{description}"
+}}
+
+CRITICAL: Escape all special characters properly in JSON strings.
+"""
         return prompt
     
     def _parse_generated_code(

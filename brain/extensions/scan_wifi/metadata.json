@@ -1,0 +1,15 @@
+{
+  "name": "scan_wifi",
+  "version": "1.0.0",
+  "description": "A tool that utilizes the system's network scanning capabilities to list nearby WiFi networks, possibly using libraries such as scapy for Python or WiFi API for Windows.",
+  "author": "Fluffy AI",
+  "created": "2026-02-17T23:33:33.443501",
+  "intent": "scan_wifi",
+  "patterns": [
+    "scan\\s+wifi",
+    "list\\s+nearby\\s+wifi",
+    "wifi\\s+networks"
+  ],
+  "parameters": {},
+  "safety_level": "needs_confirmation"
+}

@@ -50,7 +50,8 @@ export default defineConfig(async () => ({
       '/ftp/status': 'http://127.0.0.1:5123',
       '/ftp/logs': 'http://127.0.0.1:5123',
       '/ftp/clear_logs': 'http://127.0.0.1:5123',
-      '/ftp/qr': 'http://127.0.0.1:5123'
+      '/ftp/qr': 'http://127.0.0.1:5123',
+      '/ftp/disconnect': 'http://127.0.0.1:5123'
     }
   },
 }));

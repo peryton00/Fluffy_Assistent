@@ -8,6 +8,8 @@
   <link rel="stylesheet" href="/src/styles.css" />
   <link rel="stylesheet" href="/src/styles-enhanced.css" />
   <link rel="stylesheet" href="/src/chat-styles.css" />
+  <link rel="stylesheet" href="/src/cluster-styles.css" />
+  <link rel="stylesheet" href="/src/ftp-styles.css" />
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700&display=swap" rel="stylesheet">
@@ -534,10 +536,6 @@
                         </button>
                       </div>
                     </div>
-                    <div class="ftp-detail-row">
-                      <span class="detail-label">Connected Clients:</span>
-                      <span id="ftp-clients-count" class="detail-value badge">0</span>
-                    </div>
                   </div>
 
                   <!-- QR Code -->
@@ -547,6 +545,14 @@
                       <img id="ftp-qr-code" src="" alt="FTP QR Code" class="qr-code-img">
                       <p class="qr-hint">Scan with mobile FTP app</p>
                     </div>
+                  </div>
+                </div>
+
+                <!-- Connected Clients Section -->
+                <div class="ftp-clients-section">
+                  <h4><i data-lucide="users"></i> Connected Clients (<span id="ftp-clients-count">0</span>)</h4>
+                  <div id="ftp-clients-list" class="ftp-clients-list">
+                    <!-- Populated dynamically via JavaScript -->
                   </div>
                 </div>
 

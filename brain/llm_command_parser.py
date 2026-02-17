@@ -61,7 +61,19 @@ class LLMCommandParser:
     
     def __init__(self):
         self.llm = None  # Lazy load
+        self.extension_loader = None  # Lazy load
         self._load_available_intents()
+    
+    def _get_extension_loader(self):
+        """Lazy load extension loader"""
+        if self.extension_loader is None:
+            try:
+                from extension_loader import get_extension_loader
+                self.extension_loader = get_extension_loader()
+            except Exception as e:
+                print(f"[LLMCommandParser] Failed to load ExtensionLoader: {e}")
+                self.extension_loader = None
+        return self.extension_loader
     
     def _load_available_intents(self):
         """Load list of currently available intents with descriptions and parameters"""
@@ -111,6 +123,17 @@ class LLMCommandParser:
             }
         }
         self.available_intents = list(self.intent_schema.keys())
+        
+        # Load extension intents
+        loader = self._get_extension_loader()
+        if loader:
+            for ext in loader.list_extensions():
+                self.intent_schema[ext['intent']] = {
+                    "description": ext['description'],
+                    "parameters": ext.get('metadata', {}).get('parameters', {}),
+                    "patterns": ext.get('patterns', [])
+                }
+                self.available_intents.append(ext['intent'])
     
     def _get_llm(self):
         """Lazy load LLM service"""
@@ -128,6 +151,15 @@ class LLMCommandParser:
         Use LLM to understand command and convert to structured format
         Uses MarkX approach: Unified intent, response text, and memory update.
         """
+        
+        # Hot-reload any new extensions from registry
+        loader = self._get_extension_loader()
+        if loader:
+            newly_loaded = loader.refresh_extensions()
+            if newly_loaded:
+                print(f"[LLMCommandParser] Hot-loaded extensions: {newly_loaded}")
+                # Reload intents to include new extensions
+                self._load_available_intents()
         
         llm = self._get_llm()
         if not llm:
@@ -196,9 +228,14 @@ Your task:
 3. If it's just chat, set intent: "chat" and provide a warm 1-2 sentence response.
 4. If the user shares something personal, include it in 'memory_update'.
 
+IMPORTANT: When the user requests new functionality you don't have:
+- Generate a descriptive intent name using underscores (e.g., "scan_wifi", "compress_folder", "take_screenshot")
+- DO NOT use "unknown" as the intent name
+- The intent name should clearly describe the action
+
 Return ONLY a JSON object (no markdown, no blocks):
 {{
-    "intent": "intent_name, 'multi_step', 'unknown', or 'chat'",
+    "intent": "specific_intent_name (e.g., 'open_app', 'scan_wifi', 'chat')",
     "parameters": {{}},
     "steps": [],
     "needs_clarification": false,

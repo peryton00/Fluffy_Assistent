@@ -1,1 +1,0 @@
-"""Extension: test_extension"""

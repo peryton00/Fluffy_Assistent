@@ -1,0 +1,18 @@
+{
+    "name": "bluetooth_control",
+    "version": "1.0.0",
+    "description": "Control Bluetooth on Windows - turn on/off, enable/disable Bluetooth adapter",
+    "author": "Fluffy AI",
+    "created": "2026-02-17T22:41:00",
+    "intent": "bluetooth_control",
+    "patterns": [
+        "turn\\s+(on|off)\\s+bluetooth",
+        "(enable|disable)\\s+bluetooth",
+        "bluetooth\\s+(on|off)",
+        "switch\\s+(on|off)\\s+bluetooth"
+    ],
+    "parameters": {
+        "action": "on or off"
+    },
+    "safety_level": "safe"
+}

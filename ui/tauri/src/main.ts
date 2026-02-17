@@ -106,7 +106,7 @@ function updatePing(ms: number) {
 /* =========================
    UI FEEDBACK (TOASTS)
 ========================= */
-function showToast(message: string, type: "success" | "error" | "info" = "success") {
+function showToast(message: string, type: "success" | "error" | "info" | "warning" = "success") {
   const container = document.getElementById("toast-container");
   if (!container) return;
 
@@ -127,7 +127,7 @@ function showToast(message: string, type: "success" | "error" | "info" = "succes
    NAVIGATION & SEARCH
 ========================= */
 function setupNavigation() {
-  const navItems = ["dashboard", "processes", "guardian", "apps", "analytics", "startup", "settings"];
+  const navItems = ["dashboard", "processes", "guardian", "apps", "analytics", "startup", "cluster", "settings"];
   navItems.forEach(id => {
     const btn = document.getElementById(`nav-${id}`);
     if (btn) {
@@ -2576,6 +2576,9 @@ function updateFtpUI(data: any) {
 
   if (clientsCountEl) clientsCountEl.innerText = (data.connected_clients || 0).toString();
 
+  // Render connected clients
+  renderFtpClients(data.clients || []);
+
   // Update QR code
   if (qrCodeEl && data.qr_code) {
     qrCodeEl.src = `data:image/png;base64,${data.qr_code}`;
@@ -2702,6 +2705,150 @@ async function copyFtpPassword() {
   }
 }
 
+function renderFtpClients(clients: any[]) {
+  const clientsList = document.getElementById("ftp-clients-list");
+  if (!clientsList) return;
+
+  if (!clients || clients.length === 0) {
+    clientsList.innerHTML = '<div class="empty-clients">No clients connected</div>';
+    return;
+  }
+
+  clientsList.innerHTML = "";
+
+  clients.forEach(client => {
+    const card = document.createElement("div");
+    card.className = "ftp-client-card";
+
+    // Determine client icon based on hostname or IP
+    const clientIcon = client.hostname && client.hostname !== client.ip
+      ? (client.hostname.toLowerCase().includes("phone") || client.hostname.toLowerCase().includes("iphone") || client.hostname.toLowerCase().includes("android") ? "📱" : "💻")
+      : "🖥️";
+
+    // Format transfer speeds
+    const uploadSpeed = formatTransferSpeed(client.current_upload_speed || 0);
+    const downloadSpeed = formatTransferSpeed(client.current_download_speed || 0);
+
+    // Check if actively transferring
+    const isActive = client.active_transfer || client.current_upload_speed > 0 || client.current_download_speed > 0;
+
+    // Calculate connection duration
+    const connectedAt = new Date(client.connected_at);
+    const now = new Date();
+    const durationMs = now.getTime() - connectedAt.getTime();
+    const connectionTime = formatDuration(durationMs);
+
+    // Format total transferred data
+    const totalUploaded = formatBytes(client.total_uploaded || 0);
+    const totalDownloaded = formatBytes(client.total_downloaded || 0);
+
+    card.innerHTML = `
+      <div class="client-header">
+        <span class="client-icon">${clientIcon}</span>
+        <div class="client-info">
+          <strong class="client-hostname">${client.hostname || client.ip}</strong>
+          ${client.hostname && client.hostname !== client.ip ? `<span class="client-ip">${client.ip}</span>` : ''}
+        </div>
+        <button class="btn-disconnect" data-client-ip="${client.ip}" title="Disconnect client">
+          <i data-lucide="x-circle"></i>
+        </button>
+      </div>
+      <div class="client-stats">
+        <div class="stat-item">
+          <span class="stat-label">⬆️ Upload:</span>
+          <span class="stat-value ${client.current_upload_speed > 0 ? 'active' : ''}">${uploadSpeed}</span>
+        </div>
+        <div class="stat-item">
+          <span class="stat-label">⬇️ Download:</span>
+          <span class="stat-value ${client.current_download_speed > 0 ? 'active' : ''}">${downloadSpeed}</span>
+        </div>
+      </div>
+      <div class="client-activity ${isActive ? '' : 'idle'}">
+        <span class="activity-label">${isActive ? 'Transferring' : 'Status'}:</span>
+        ${isActive && client.active_transfer
+        ? `<span class="activity-file">${client.active_transfer}</span>`
+        : '<span class="activity-idle">Idle</span>'}
+      </div>
+      <div class="client-footer">
+        <span class="connection-time">Connected ${connectionTime} ago</span>
+        <div class="client-total-stats">
+          <span title="Total Uploaded">⬆️ ${totalUploaded}</span>
+          <span title="Total Downloaded">⬇️ ${totalDownloaded}</span>
+        </div>
+      </div>
+    `;
+
+    // Add disconnect button event listener
+    const disconnectBtn = card.querySelector('.btn-disconnect');
+    if (disconnectBtn) {
+      disconnectBtn.addEventListener('click', async () => {
+        const clientIp = disconnectBtn.getAttribute('data-client-ip');
+        if (!clientIp) return;
+
+        if (!confirm(`Disconnect client ${client.hostname || clientIp}?`)) {
+          return;
+        }
+
+        try {
+          const response = await fetch('/ftp/disconnect', {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+              'X-Fluffy-Token': FLUFFY_TOKEN
+            },
+            body: JSON.stringify({ client_ip: clientIp })
+          });
+
+          const data = await response.json();
+
+          if (data.ok) {
+            showToast(`Client ${client.hostname || clientIp} disconnected`, 'success');
+            // Refresh the client list
+            fetchFtpStatus();
+          } else {
+            showToast(data.error || 'Failed to disconnect client', 'error');
+          }
+        } catch (error) {
+          console.error('Error disconnecting client:', error);
+          showToast('Failed to disconnect client', 'error');
+        }
+      });
+    }
+
+    clientsList.appendChild(card);
+  });
+
+  // Refresh icons
+  if ((window as any).lucide) (window as any).lucide.createIcons();
+}
+
+function formatTransferSpeed(bytesPerSec: number): string {
+  if (bytesPerSec === 0) return "0 KB/s";
+  if (bytesPerSec < 1024) return `${bytesPerSec.toFixed(0)} B/s`;
+  if (bytesPerSec < 1024 * 1024) return `${(bytesPerSec / 1024).toFixed(1)} KB/s`;
+  return `${(bytesPerSec / (1024 * 1024)).toFixed(1)} MB/s`;
+}
+
+function formatBytes(bytes: number): string {
+  if (bytes === 0) return "0 B";
+  if (bytes < 1024) return `${bytes} B`;
+  if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
+  if (bytes < 1024 * 1024 * 1024) return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
+  return `${(bytes / (1024 * 1024 * 1024)).toFixed(2)} GB`;
+}
+
+function formatDuration(ms: number): string {
+  const seconds = Math.floor(ms / 1000);
+  const minutes = Math.floor(seconds / 60);
+  const hours = Math.floor(minutes / 60);
+  const days = Math.floor(hours / 24);
+
+  if (days > 0) return `${days}d`;
+  if (hours > 0) return `${hours}h`;
+  if (minutes > 0) return `${minutes}m`;
+  return `${seconds}s`;
+}
+
 function startFtpStatusPolling() {
   // Poll every 3 seconds
   if (ftpStatusPollInterval) clearInterval(ftpStatusPollInterval);
@@ -2720,36 +2867,36 @@ function stopFtpStatusPolling() {
 
 
 async function browseFtpFolder() {
-    const statusBadge = document.getElementById("ftp-status-badge");
-    const isRunning = statusBadge?.classList.contains("running");
-    
-    if (isRunning) {
-        showToast("Stop the FTP server before changing the shared folder", "warning");
-        return;
+  const statusBadge = document.getElementById("ftp-status-badge");
+  const isRunning = statusBadge?.classList.contains("running");
+
+  if (isRunning) {
+    showToast("Stop the FTP server before changing the shared folder", "warning");
+    return;
+  }
+
+  try {
+    const selected = await open({
+      directory: true,
+      multiple: false,
+      title: 'Select Folder to Share via FTP'
+    });
+
+    if (selected) {
+      ftpSelectedFolder = selected as string;
+      localStorage.setItem("ftp_shared_folder", ftpSelectedFolder);
+
+      const folderInput = document.getElementById("ftp-shared-folder") as HTMLInputElement;
+      if (folderInput) {
+        folderInput.value = ftpSelectedFolder;
+      }
+
+      showToast("Folder selected successfully", "success");
     }
-    
-    try {
-        const selected = await open({
-            directory: true,
-            multiple: false,
-            title: 'Select Folder to Share via FTP'
-        });
-        
-        if (selected) {
-            ftpSelectedFolder = selected as string;
-            localStorage.setItem("ftp_shared_folder", ftpSelectedFolder);
-            
-            const folderInput = document.getElementById("ftp-shared-folder") as HTMLInputElement;
-            if (folderInput) {
-                folderInput.value = ftpSelectedFolder;
-            }
-            
-            showToast("Folder selected successfully", "success");
-        }
-    } catch (error) {
-        console.error("Error selecting folder:", error);
-        showToast("Failed to select folder", "error");
-    }
+  } catch (error) {
+    console.error("Error selecting folder:", error);
+    showToast("Failed to select folder", "error");
+  }
 }
 
 // Setup FTP event listeners
@@ -2781,10 +2928,11 @@ if (btnClearFtpLogs) {
 
 const btnBrowseFolder = document.getElementById("btn-browse-folder");
 if (btnBrowseFolder) {
-    btnBrowseFolder.onclick = () => browseFtpFolder();
+  btnBrowseFolder.onclick = () => browseFtpFolder();
 }
 
 // Check FTP status on page load
 fetchFtpStatus();
 
 console.log('✅ FTP control interface initialized');
+

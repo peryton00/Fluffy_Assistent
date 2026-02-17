@@ -38,7 +38,20 @@ class CommandExecutor:
             }
         
         if validation.safety_level == SafetyLevel.NEEDS_CONFIRMATION:
-            return {
+            # Save to session memory so user can confirm
+            try:
+                from brain.memory.session_memory import get_session_memory
+                session = get_session_memory()
+                # Mark validation as confirmed so it can execute
+                confirmed_validation = ValidationResult(
+                    is_valid=True,
+                    safety_level=SafetyLevel.SAFE,
+                    message="User confirmed"
+                )
+                session.set_pending_validation(command, confirmed_validation)
+            except Exception as e:
+                print(f"[CommandExecutor] Failed to save pending validation: {e}\n")
+                return {
                 "success": False,
                 "message": validation.message,
                 "action": "needs_confirmation",
@@ -85,9 +98,12 @@ class CommandExecutor:
         elif command.intent == Intent.HELP:
             return self._execute_help(command)
         
+        elif command.intent == Intent.CHAT:
+            return self._execute_chat(command)
+        
         # Try extensions (plugin system)
         try:
-            from extension_loader import get_extension_loader
+            from brain.extension_loader import get_extension_loader
             loader = get_extension_loader()
             
             if loader.has_extension(command.intent.value):
@@ -98,7 +114,7 @@ class CommandExecutor:
         # Unknown command - try self-improvement
         if command.intent == Intent.UNKNOWN:
             try:
-                from self_improver import get_self_improver
+                from brain.self_improver import get_self_improver
                 improver = get_self_improver()
                 return improver.handle_unknown_command(command.original_text)
             except Exception as e:
@@ -109,6 +125,25 @@ class CommandExecutor:
             "message": "I didn't quite get that. Type 'help' to see what I can do!",
             "action": "error"
         }
+    
+    def _execute_chat(self, command: Command) -> Dict[str, Any]:
+        """Handle conversational queries using LLM response"""
+        # The LLM has already generated the response
+        response_text = getattr(command, 'llm_response', None)
+        
+        if response_text:
+            return {
+                "success": True,
+                "message": response_text,
+                "action": "chat"
+            }
+        else:
+            # Fallback if no LLM response available
+            return {
+                "success": True,
+                "message": "I'm here to help! You can ask me questions or give me commands.",
+                "action": "chat"
+            }
     
     def _execute_open_app(self, command: Command) -> Dict[str, Any]:
         """Execute app launch command"""
@@ -489,7 +524,7 @@ class CommandExecutor:
         import subprocess
         import re
         from pathlib import Path
-        from project_generator import get_generator
+        from brain.project_generator import get_generator
         
         project_type = command.parameters.get("project_type", "website")
         description = command.parameters.get("description", "")

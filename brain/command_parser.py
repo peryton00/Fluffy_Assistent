@@ -23,7 +23,9 @@ class Intent(Enum):
     OPEN_APP = "open_app"
     TYPE_TEXT = "type_text"  # NEW: For keyboard automation
     CREATE_PROJECT = "create_project"  # NEW: For AI project generation
+    BLUETOOTH_CONTROL = "bluetooth_control"  # NEW: For Bluetooth hardware control
     RESEARCH = "research"
+    CHAT = "chat"  # NEW: For conversational queries and general knowledge
     HELP = "help"
     CONFIRM = "confirm"
     CANCEL = "cancel"

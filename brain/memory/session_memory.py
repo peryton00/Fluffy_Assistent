@@ -30,6 +30,10 @@ class SessionMemory:
         # Self-improvement state
         self.pending_improvement_understanding: Optional[dict] = None
         
+        # Validation confirmation state
+        self.pending_validation_command: Optional[Any] = None
+        self.pending_validation_result: Optional[Any] = None
+        
         self.last_user_text: Optional[str] = None
         self.last_ai_response: Optional[str] = None
         
@@ -81,6 +85,28 @@ class SessionMemory:
         """Clear the pending improvement"""
         self.pending_improvement_understanding = None
         print("✅ Cleared pending improvement")
+    
+    # === Validation Confirmation Management ===
+    
+    def set_pending_validation(self, command: Any, validation_result: Any):
+        """Set a pending validation confirmation"""
+        self.pending_validation_command = command
+        self.pending_validation_result = validation_result
+        print("🔄 Pending validation confirmation set")
+    
+    def get_pending_validation(self) -> tuple:
+        """Get pending validation command and result"""
+        return (self.pending_validation_command, self.pending_validation_result)
+    
+    def has_pending_validation(self) -> bool:
+        """Check if there's a pending validation confirmation"""
+        return self.pending_validation_command is not None
+    
+    def clear_pending_validation(self):
+        """Clear pending validation confirmation"""
+        self.pending_validation_command = None
+        self.pending_validation_result = None
+        print("✅ Cleared pending validation")
     
     # === Parameter Management ===
     
