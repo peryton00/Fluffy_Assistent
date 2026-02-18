@@ -3067,8 +3067,50 @@ async function fetchAvailabilityStatus() {
       const ipEl = document.getElementById("availability-running-ip");
       if (ipEl) ipEl.innerText = data.ip;
     }
+
+    // If server is running, also fetch active admin connections
+    if (data.running) {
+      fetchAdminConnections();
+    }
   }
 }
+
+async function fetchAdminConnections() {
+  const data = await apiRequest("/network/availability/connections", { method: "GET" });
+  if (data && data.ok) {
+    updateAdminConnectionBanner(data.admins || []);
+  }
+}
+
+function updateAdminConnectionBanner(admins: string[]) {
+  let banner = document.getElementById("admin-connection-banner");
+
+  if (admins.length === 0) {
+    if (banner) banner.style.display = "none";
+    return;
+  }
+
+  // Create banner if it doesn't exist
+  if (!banner) {
+    banner = document.createElement("div");
+    banner.id = "admin-connection-banner";
+    banner.className = "admin-connection-banner";
+    // Insert at top of availability-running div
+    const runningDiv = document.getElementById("availability-running");
+    if (runningDiv) runningDiv.prepend(banner);
+  }
+
+  banner.style.display = "flex";
+  banner.innerHTML = `
+    <i data-lucide="eye"></i>
+    <div>
+      <strong>Admin Connected</strong>
+      <span>${admins.length === 1 ? admins[0] : `${admins.length} admins`} ${admins.length === 1 ? "is" : "are"} monitoring this machine</span>
+    </div>
+  `;
+  if ((window as any).lucide) (window as any).lucide.createIcons();
+}
+
 
 function updateAvailabilityUI(running: boolean, port: number) {
   const stoppedDiv = document.getElementById("availability-stopped");
@@ -3269,23 +3311,39 @@ function renderMachineData(data: any) {
   const networkEl = document.getElementById("remote-network");
   if (networkEl) networkEl.innerText = `${(sys.network ?? 0).toFixed(1)} KB/s`;
 
-  // Render top processes
+  // Render full process table (like local processes tab)
   const processList = document.getElementById("remote-processes-list");
   if (processList && data.processes) {
-    processList.innerHTML = "";
+    // Get current search filter if any
+    const searchEl = document.getElementById("remote-process-search") as HTMLInputElement;
+    const filter = searchEl?.value?.toLowerCase() || "";
 
-    data.processes.slice(0, 10).forEach((proc: any) => {
-      const item = document.createElement("div");
-      item.className = "remote-process-item";
-      item.innerHTML = `
-        <span class="remote-process-name">${proc.name}</span>
-        <div class="remote-process-stats">
-          <span>${(proc.cpu ?? 0).toFixed(1)}% CPU</span>
-          <span>${(proc.ram ?? 0).toFixed(0)} MB</span>
-        </div>
-      `;
-      processList.appendChild(item);
-    });
+    const filtered = filter
+      ? data.processes.filter((p: any) => p.name?.toLowerCase().includes(filter))
+      : data.processes;
+
+    processList.innerHTML = `
+      <table class="remote-process-table">
+        <thead>
+          <tr>
+            <th>Process</th>
+            <th>PID</th>
+            <th>CPU %</th>
+            <th>RAM (MB)</th>
+          </tr>
+        </thead>
+        <tbody>
+          ${filtered.map((proc: any) => `
+            <tr>
+              <td class="proc-name">${proc.name || "—"}</td>
+              <td class="proc-pid">${proc.pid ?? "—"}</td>
+              <td class="proc-cpu ${(proc.cpu ?? 0) > 10 ? "high-cpu" : ""}">${(proc.cpu ?? 0).toFixed(1)}%</td>
+              <td class="proc-ram">${(proc.ram ?? 0).toFixed(0)}</td>
+            </tr>
+          `).join("")}
+        </tbody>
+      </table>
+    `;
   }
 }
 

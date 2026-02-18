@@ -1863,6 +1863,27 @@ def get_availability_status():
         return jsonify({"error": str(e)}), 500
 
 
+@app.route("/network/availability/connections", methods=["GET"])
+def get_availability_connections():
+    """Get list of admin IPs currently connected (polling) this client."""
+    if request.remote_addr not in ("127.0.0.1", "::1"):
+        return jsonify({"error": "Forbidden"}), 403
+    token = request.headers.get("X-Fluffy-Token")
+    if token != FLUFFY_TOKEN:
+        return jsonify({"error": "Unauthorized"}), 401
+
+    try:
+        sys.path.insert(0, os.path.join(os.path.dirname(os.path.dirname(__file__)), "fluffy", "network"))
+        from server import get_availability_server
+
+        server = get_availability_server()
+        admins = server.get_active_admins() if server.is_running() else []
+        return jsonify({"ok": True, "admins": admins})
+
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+
 # ── Admin endpoints ────────────────────────────────────────────────────────────
 
 @app.route("/network/admin/add", methods=["POST"])

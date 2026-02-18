@@ -1,8 +1,9 @@
 """
 Availability Server - Simple HTTP server for client (availability) mode.
 
-Exposes /data and /ping endpoints so admin machines can poll for live
-system monitoring data (CPU, RAM, processes, etc.).
+Exposes /data, /ping, and /connections endpoints so admin machines can poll
+for live system monitoring data (CPU, RAM, processes, etc.).
+Tracks which admin IPs are actively polling and notifies the client UI.
 No authentication required.
 """
 
@@ -11,8 +12,9 @@ import socket
 import sys
 import os
 import threading
+import time
 from http.server import HTTPServer, BaseHTTPRequestHandler
-from typing import Optional
+from typing import Optional, Dict
 
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..', '..'))
 
@@ -29,6 +31,29 @@ def get_local_ip() -> str:
         return ip
     except Exception:
         return "127.0.0.1"
+
+
+# Global registry of active admin connections: { ip -> last_seen_timestamp }
+_admin_connections: Dict[str, float] = {}
+_admin_connections_lock = threading.Lock()
+ADMIN_TIMEOUT = 10.0  # seconds without a poll before considered disconnected
+
+
+def record_admin_poll(ip: str):
+    """Record that an admin at this IP just polled."""
+    with _admin_connections_lock:
+        _admin_connections[ip] = time.time()
+
+
+def get_active_admins() -> list:
+    """Return list of admin IPs that polled within the last ADMIN_TIMEOUT seconds."""
+    now = time.time()
+    with _admin_connections_lock:
+        # Prune stale entries
+        stale = [ip for ip, ts in _admin_connections.items() if now - ts > ADMIN_TIMEOUT]
+        for ip in stale:
+            del _admin_connections[ip]
+        return list(_admin_connections.keys())
 
 
 class _DataHandler(BaseHTTPRequestHandler):
@@ -48,6 +73,8 @@ class _DataHandler(BaseHTTPRequestHandler):
         self.wfile.write(body)
 
     def do_GET(self):
+        client_ip = self.client_address[0]
+
         if self.path == "/ping":
             self._send_json({
                 "ok": True,
@@ -56,8 +83,15 @@ class _DataHandler(BaseHTTPRequestHandler):
             })
 
         elif self.path == "/data":
+            # Track this admin as active
+            record_admin_poll(client_ip)
             data = format_monitoring_data()
             self._send_json({"ok": True, "data": data})
+
+        elif self.path == "/connections":
+            # Return list of currently active admin IPs
+            admins = get_active_admins()
+            self._send_json({"ok": True, "admins": admins})
 
         else:
             self._send_json({"error": "Not found"}, 404)
@@ -118,6 +152,11 @@ class AvailabilityServer:
 
             self.running = False
             self._thread = None
+
+            # Clear admin connections
+            with _admin_connections_lock:
+                _admin_connections.clear()
+
             print("[AvailabilityServer] Stopped and port released")
         except Exception as e:
             print(f"[AvailabilityServer] Error stopping: {e}")
@@ -126,9 +165,8 @@ class AvailabilityServer:
     def is_running(self) -> bool:
         return self.running
 
-    def get_active_connections_count(self) -> int:
-        # HTTP is stateless — no persistent connections to count
-        return 0
+    def get_active_admins(self) -> list:
+        return get_active_admins()
 
 
 # Global singleton

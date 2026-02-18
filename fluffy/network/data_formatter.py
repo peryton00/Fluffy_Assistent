@@ -88,15 +88,15 @@ def format_monitoring_data() -> dict:
         # Disk (calculate from processes if available, otherwise 0)
         disk_usage = 0.0  # Placeholder - would need disk monitoring
         
-        # Processes - get top 20 by CPU
+        # Processes - get all, sorted by CPU
         processes_data = system_data.get("processes", {}).get("top_ram", [])
-        
-        # Sort by CPU and take top 20
+
+        # Sort by CPU descending — send all
         sorted_processes = sorted(
             processes_data,
             key=lambda p: p.get("cpu_percent", 0.0),
             reverse=True
-        )[:20]
+        )
         
         # Format processes
         formatted_processes = [

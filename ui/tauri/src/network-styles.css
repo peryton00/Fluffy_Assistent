@@ -509,3 +509,173 @@ body.light-mode .form-group input {
 body.light-mode .form-group input:focus {
     background: rgba(0, 0, 0, 0.05);
 }
+
+/* ── Admin Connection Banner ─────────────────────────────────────────────── */
+
+.admin-connection-banner {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 14px 18px;
+    margin-bottom: 16px;
+    background: linear-gradient(135deg, rgba(16, 185, 129, 0.15), rgba(5, 150, 105, 0.15));
+    border: 1px solid rgba(16, 185, 129, 0.4);
+    border-radius: 10px;
+    animation: fadeInDown 0.4s ease;
+}
+
+.admin-connection-banner i {
+    color: #10b981;
+    flex-shrink: 0;
+    width: 20px;
+    height: 20px;
+}
+
+.admin-connection-banner strong {
+    display: block;
+    color: #10b981;
+    font-size: 0.95rem;
+    font-weight: 600;
+}
+
+.admin-connection-banner span {
+    display: block;
+    color: #94a3b8;
+    font-size: 0.85rem;
+    margin-top: 2px;
+}
+
+@keyframes fadeInDown {
+    from {
+        opacity: 0;
+        transform: translateY(-8px);
+    }
+
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+
+/* ── Remote Process Table ────────────────────────────────────────────────── */
+
+.remote-processes-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 12px;
+}
+
+.remote-processes-header h6 {
+    color: #cbd5e1;
+    font-size: 0.95rem;
+    margin: 0;
+}
+
+.remote-process-search {
+    padding: 6px 12px;
+    background: rgba(255, 255, 255, 0.05);
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    border-radius: 6px;
+    color: #e2e8f0;
+    font-size: 0.85rem;
+    width: 200px;
+    transition: all 0.2s ease;
+}
+
+.remote-process-search:focus {
+    outline: none;
+    border-color: #6366f1;
+    background: rgba(255, 255, 255, 0.08);
+}
+
+.remote-processes-list {
+    max-height: 420px;
+    overflow-y: auto;
+    scrollbar-width: thin;
+    scrollbar-color: rgba(99, 102, 241, 0.3) transparent;
+}
+
+.remote-process-table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 0.88rem;
+}
+
+.remote-process-table thead th {
+    padding: 8px 12px;
+    text-align: left;
+    color: #64748b;
+    font-weight: 600;
+    font-size: 0.8rem;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+    position: sticky;
+    top: 0;
+    background: rgba(15, 23, 42, 0.95);
+    z-index: 1;
+}
+
+.remote-process-table tbody tr {
+    border-bottom: 1px solid rgba(255, 255, 255, 0.04);
+    transition: background 0.15s ease;
+}
+
+.remote-process-table tbody tr:hover {
+    background: rgba(255, 255, 255, 0.04);
+}
+
+.remote-process-table td {
+    padding: 7px 12px;
+    color: #cbd5e1;
+}
+
+.remote-process-table .proc-name {
+    font-weight: 500;
+    color: #e2e8f0;
+    max-width: 200px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.remote-process-table .proc-pid {
+    color: #64748b;
+    font-size: 0.82rem;
+    font-family: monospace;
+}
+
+.remote-process-table .proc-cpu {
+    color: #94a3b8;
+    font-family: monospace;
+}
+
+.remote-process-table .proc-cpu.high-cpu {
+    color: #f97316;
+    font-weight: 600;
+}
+
+.remote-process-table .proc-ram {
+    color: #94a3b8;
+    font-family: monospace;
+}
+
+body.light-mode .remote-process-table thead th {
+    background: rgba(255, 255, 255, 0.95);
+    color: #475569;
+}
+
+body.light-mode .remote-process-table tbody tr:hover {
+    background: rgba(0, 0, 0, 0.03);
+}
+
+body.light-mode .remote-process-table td {
+    color: #334155;
+}
+
+body.light-mode .remote-process-search {
+    background: rgba(0, 0, 0, 0.03);
+    border-color: rgba(0, 0, 0, 0.1);
+    color: #1e293b;
+}
