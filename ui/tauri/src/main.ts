@@ -127,7 +127,7 @@ function showToast(message: string, type: "success" | "error" | "info" | "warnin
    NAVIGATION & SEARCH
 ========================= */
 function setupNavigation() {
-  const navItems = ["dashboard", "processes", "guardian", "apps", "analytics", "startup", "cluster", "settings"];
+  const navItems = ["dashboard", "processes", "guardian", "apps", "analytics", "startup", "network", "cluster", "settings"];
   navItems.forEach(id => {
     const btn = document.getElementById(`nav-${id}`);
     if (btn) {
@@ -137,6 +137,7 @@ function setupNavigation() {
         if (id === "settings") renderLayoutSettings();
         if (id === "dashboard") applyDashboardOrder();
         if (id === "apps") fetchApps();
+        if (id === "network") initializeNetworkView();
       };
     }
   });
@@ -2896,6 +2897,418 @@ async function browseFtpFolder() {
   } catch (error) {
     console.error("Error selecting folder:", error);
     showToast("Failed to select folder", "error");
+  }
+}
+
+/* =========================
+   NETWORK / LAN MONITORING
+========================= */
+
+let currentNetworkRole = "standalone";
+let connectedMachines: any[] = [];
+let activeMachineId: string | null = null;
+let networkPollingInterval: any = null;
+
+async function initializeNetworkView() {
+  console.log("[Network] Initializing network view");
+
+  // Setup role buttons
+  const roleButtons = document.querySelectorAll(".role-btn");
+  roleButtons.forEach(btn => {
+    btn.addEventListener("click", async () => {
+      const role = (btn as HTMLElement).dataset.role;
+      if (role) await setNetworkRole(role);
+    });
+  });
+
+  // Setup availability mode buttons
+  const btnStartAvailability = document.getElementById("btn-start-availability");
+  if (btnStartAvailability) {
+    btnStartAvailability.onclick = () => startAvailabilityMode();
+  }
+
+  const btnStopAvailability = document.getElementById("btn-stop-availability");
+  if (btnStopAvailability) {
+    btnStopAvailability.onclick = () => stopAvailabilityMode();
+  }
+
+  // Setup admin mode buttons
+  const btnAdminConnect = document.getElementById("btn-admin-connect");
+  if (btnAdminConnect) {
+    btnAdminConnect.onclick = () => connectToMachine();
+  }
+
+  // Load current role
+  await fetchNetworkRole();
+
+  // Start polling for updates
+  startNetworkPolling();
+}
+
+async function fetchNetworkRole() {
+  const data = await apiRequest("/network/role", { method: "GET" });
+  if (data && data.ok) {
+    currentNetworkRole = data.role;
+    updateRoleUI(data.role);
+  }
+}
+
+function updateRoleUI(role: string) {
+  // Update role buttons
+  const roleButtons = document.querySelectorAll(".role-btn");
+  roleButtons.forEach(btn => {
+    const btnRole = (btn as HTMLElement).dataset.role;
+    if (btnRole === role) {
+      btn.classList.add("active");
+    } else {
+      btn.classList.remove("active");
+    }
+  });
+
+  // Update status text
+  const statusText = document.getElementById("role-status-text");
+  if (statusText) {
+    statusText.innerText = `Mode: ${role.charAt(0).toUpperCase() + role.slice(1)}`;
+  }
+
+  // Show/hide panels
+  const availabilityPanel = document.getElementById("availability-panel");
+  const adminPanel = document.getElementById("admin-panel");
+
+  if (availabilityPanel) {
+    availabilityPanel.style.display = role === "available" ? "block" : "none";
+  }
+
+  if (adminPanel) {
+    adminPanel.style.display = role === "admin" ? "block" : "none";
+  }
+
+  // If availability mode, check server status
+  if (role === "available") {
+    fetchAvailabilityStatus();
+  }
+
+  // If admin mode, fetch machines
+  if (role === "admin") {
+    fetchConnectedMachines();
+  }
+}
+
+async function setNetworkRole(role: string) {
+  if (role === currentNetworkRole) return;
+
+  // Auto-stop current mode before switching (mutual exclusivity)
+  if (currentNetworkRole === "available") {
+    // Stop availability server and release port
+    await apiRequest("/network/availability/stop", { method: "POST" });
+    showToast("Availability server stopped", "info");
+  } else if (currentNetworkRole === "admin") {
+    // Disconnect all machines
+    await apiRequest("/network/admin/remove_all", { method: "POST" });
+  }
+
+  const data = await apiRequest("/network/role", {
+    method: "POST",
+    body: JSON.stringify({ role })
+  });
+
+  if (data && data.ok) {
+    showToast(`Switched to ${role} mode`, "success");
+    currentNetworkRole = role;
+    updateRoleUI(role);
+  } else {
+    showToast(data?.error || "Failed to switch role", "error");
+  }
+}
+
+async function startAvailabilityMode() {
+  const port = parseInt((document.getElementById("availability-port") as HTMLInputElement)?.value || "8765");
+
+  if (isNaN(port) || port < 1024 || port > 65535) {
+    showToast("Port must be between 1024 and 65535", "warning");
+    return;
+  }
+
+  const data = await apiRequest("/network/availability/start", {
+    method: "POST",
+    body: JSON.stringify({ port })
+  });
+
+  if (data && data.ok) {
+    showToast("Availability server started", "success");
+    updateAvailabilityUI(true, port);
+  } else {
+    showToast(data?.error || "Failed to start server", "error");
+  }
+}
+
+async function stopAvailabilityMode() {
+  const data = await apiRequest("/network/availability/stop", {
+    method: "POST"
+  });
+
+  if (data && data.ok) {
+    showToast("Availability server stopped", "success");
+    updateAvailabilityUI(false, 0);
+  } else {
+    showToast(data?.error || "Failed to stop server", "error");
+  }
+}
+
+async function fetchAvailabilityStatus() {
+  const data = await apiRequest("/network/availability/status", { method: "GET" });
+
+  if (data && data.ok) {
+    const port = data.port || 8765;
+    updateAvailabilityUI(data.running, port);
+
+    // Update IP address if available
+    if (data.ip) {
+      const ipEl = document.getElementById("availability-running-ip");
+      if (ipEl) ipEl.innerText = data.ip;
+    }
+  }
+}
+
+function updateAvailabilityUI(running: boolean, port: number) {
+  const stoppedDiv = document.getElementById("availability-stopped");
+  const runningDiv = document.getElementById("availability-running");
+  const portEl = document.getElementById("availability-running-port");
+
+  if (stoppedDiv) stoppedDiv.style.display = running ? "none" : "block";
+  if (runningDiv) runningDiv.style.display = running ? "block" : "none";
+  if (portEl) portEl.innerText = port.toString();
+}
+
+async function connectToMachine() {
+  const ip = (document.getElementById("admin-ip") as HTMLInputElement)?.value?.trim();
+  const portStr = (document.getElementById("admin-port") as HTMLInputElement)?.value;
+
+  if (!ip) {
+    showToast("Please enter an IP address", "warning");
+    return;
+  }
+
+  const port = parseInt(portStr || "8765", 10);
+  if (isNaN(port) || port < 1024 || port > 65535) {
+    showToast("Port must be between 1024 and 65535", "warning");
+    return;
+  }
+
+  showToast(`Connecting to ${ip}:${port}...`, "info");
+
+  const data = await apiRequest("/network/admin/add", {
+    method: "POST",
+    body: JSON.stringify({ ip, port })
+  });
+
+  if (data && data.ok) {
+    showToast(`Added machine ${ip}:${port}`, "success");
+
+    // Clear IP input, keep port
+    (document.getElementById("admin-ip") as HTMLInputElement).value = "";
+
+    // Refresh machines list
+    await fetchConnectedMachines();
+  } else {
+    showToast(data?.error || "Failed to reach machine", "error");
+  }
+}
+
+async function disconnectFromMachine(machineId: string) {
+  const data = await apiRequest("/network/admin/remove", {
+    method: "POST",
+    body: JSON.stringify({ machine_id: machineId })
+  });
+
+  if (data && data.ok) {
+    showToast("Machine removed", "success");
+    await fetchConnectedMachines();
+  } else {
+    showToast(data?.error || "Failed to remove machine", "error");
+  }
+}
+
+async function fetchConnectedMachines() {
+  const data = await apiRequest("/network/admin/machines", { method: "GET" });
+  if (data && data.ok) {
+    connectedMachines = data.machines;
+    activeMachineId = data.active_machine;
+    renderMachinesList();
+
+    // If there's an active machine, fetch its data
+    if (activeMachineId) {
+      fetchMachineData(activeMachineId);
+    }
+  }
+}
+
+function renderMachinesList() {
+  const listEl = document.getElementById("machines-list");
+  const countEl = document.getElementById("machines-count");
+
+  if (!listEl || !countEl) return;
+
+  countEl.innerText = connectedMachines.length.toString();
+
+  if (connectedMachines.length === 0) {
+    listEl.innerHTML = `
+      <div class="empty-state">
+        <i data-lucide="server-off"></i>
+        <p>No machines connected</p>
+        <p class="hint">Add a Fluffy instance above to start monitoring</p>
+      </div>
+    `;
+    if ((window as any).lucide) (window as any).lucide.createIcons();
+    return;
+  }
+
+  listEl.innerHTML = "";
+
+  connectedMachines.forEach(machine => {
+    const card = document.createElement("div");
+    const isOnline = machine.online === true;
+    card.className = `machine-card ${machine.machine_id === activeMachineId ? "active" : ""}`;
+    card.innerHTML = `
+      <div class="machine-info">
+        <div class="machine-name">${machine.name || machine.ip}</div>
+        <div class="machine-ip">${machine.ip}:${machine.port}</div>
+      </div>
+      <div class="machine-status">
+        <span class="status-dot ${isOnline ? "online" : "offline"}"></span>
+        <span>${isOnline ? "Online" : "Offline"}</span>
+      </div>
+      <div class="machine-actions">
+        <button class="btn-outline btn-sm" data-action="switch" data-id="${machine.machine_id}">
+          <i data-lucide="eye"></i> View
+        </button>
+        <button class="btn-outline btn-sm btn-danger" data-action="disconnect" data-id="${machine.machine_id}">
+          <i data-lucide="x"></i>
+        </button>
+      </div>
+    `;
+
+    // Add event listeners
+    const switchBtn = card.querySelector('[data-action="switch"]');
+    const disconnectBtn = card.querySelector('[data-action="disconnect"]');
+
+    if (switchBtn) {
+      switchBtn.addEventListener("click", (e) => {
+        e.stopPropagation();
+        switchActiveMachine(machine.machine_id);
+      });
+    }
+
+    if (disconnectBtn) {
+      disconnectBtn.addEventListener("click", (e) => {
+        e.stopPropagation();
+        disconnectFromMachine(machine.machine_id);
+      });
+    }
+
+    // Click card to switch
+    card.addEventListener("click", () => {
+      switchActiveMachine(machine.machine_id);
+    });
+
+    listEl.appendChild(card);
+  });
+
+  if ((window as any).lucide) (window as any).lucide.createIcons();
+}
+
+async function switchActiveMachine(machineId: string) {
+  const data = await apiRequest("/network/admin/switch", {
+    method: "POST",
+    body: JSON.stringify({ machine_id: machineId })
+  });
+
+  if (data && data.ok) {
+    activeMachineId = machineId;
+    renderMachinesList();
+    fetchMachineData(machineId);
+  }
+}
+
+async function fetchMachineData(machineId: string) {
+  const data = await apiRequest(`/network/admin/data/${machineId}`, { method: "GET" });
+  if (data && data.ok && data.data) {
+    renderMachineData(data.data);
+  }
+}
+
+function renderMachineData(data: any) {
+  const dataDiv = document.getElementById("active-machine-data");
+  if (!dataDiv) return;
+
+  dataDiv.style.display = "block";
+
+  // data_formatter.py returns: { machine_name, ip_address, system: { cpu, ram_used, ram_total, disk, network }, processes: [{name, cpu, ram}] }
+  const sys = data.system || {};
+
+  // Update machine name
+  const nameEl = document.getElementById("active-machine-name");
+  if (nameEl) nameEl.innerText = data.machine_name || "Unknown";
+
+  // Update stats
+  const cpuEl = document.getElementById("remote-cpu");
+  if (cpuEl) cpuEl.innerText = `${(sys.cpu ?? 0).toFixed(1)}%`;
+
+  const ramEl = document.getElementById("remote-ram");
+  if (ramEl) {
+    const used = sys.ram_used ?? 0;
+    const total = sys.ram_total ?? 0;
+    ramEl.innerText = total > 0 ? `${used} / ${total} MB` : `${used} MB`;
+  }
+
+  const processesEl = document.getElementById("remote-processes");
+  if (processesEl && data.processes) {
+    processesEl.innerText = data.processes.length.toString();
+  }
+
+  const networkEl = document.getElementById("remote-network");
+  if (networkEl) networkEl.innerText = `${(sys.network ?? 0).toFixed(1)} KB/s`;
+
+  // Render top processes
+  const processList = document.getElementById("remote-processes-list");
+  if (processList && data.processes) {
+    processList.innerHTML = "";
+
+    data.processes.slice(0, 10).forEach((proc: any) => {
+      const item = document.createElement("div");
+      item.className = "remote-process-item";
+      item.innerHTML = `
+        <span class="remote-process-name">${proc.name}</span>
+        <div class="remote-process-stats">
+          <span>${(proc.cpu ?? 0).toFixed(1)}% CPU</span>
+          <span>${(proc.ram ?? 0).toFixed(0)} MB</span>
+        </div>
+      `;
+      processList.appendChild(item);
+    });
+  }
+}
+
+function startNetworkPolling() {
+  // Clear existing interval
+  if (networkPollingInterval) {
+    clearInterval(networkPollingInterval);
+  }
+
+  // Poll every 2 seconds
+  networkPollingInterval = setInterval(async () => {
+    if (currentNetworkRole === "available") {
+      await fetchAvailabilityStatus();
+    } else if (currentNetworkRole === "admin") {
+      await fetchConnectedMachines();
+    }
+  }, 2000);
+}
+
+function stopNetworkPolling() {
+  if (networkPollingInterval) {
+    clearInterval(networkPollingInterval);
+    networkPollingInterval = null;
   }
 }
 

@@ -10,6 +10,7 @@
   <link rel="stylesheet" href="/src/chat-styles.css" />
   <link rel="stylesheet" href="/src/cluster-styles.css" />
   <link rel="stylesheet" href="/src/ftp-styles.css" />
+  <link rel="stylesheet" href="/src/network-styles.css" />
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700&display=swap" rel="stylesheet">
@@ -58,6 +59,10 @@
         <a href="#" class="nav-item" id="nav-startup">
           <span class="nav-icon"><i data-lucide="rocket"></i></span>
           <span class="nav-text">Startup Apps</span>
+        </a>
+        <a href="#" class="nav-item" id="nav-network">
+          <span class="nav-icon"><i data-lucide="network"></i></span>
+          <span class="nav-text">Network</span>
         </a>
         <a href="#" class="nav-item" id="nav-settings">
           <span class="nav-icon"><i data-lucide="settings"></i></span>
@@ -602,6 +607,169 @@
           </div>
 
 
+        </div>
+      </section>
+
+      <!-- VIEW: NETWORK -->
+      <section id="section-network" class="view-section">
+        <div class="card full-width">
+          <div class="card-header">
+            <h3>LAN Distributed Monitoring</h3>
+            <p class="section-desc">Monitor multiple Fluffy instances across your local network</p>
+          </div>
+
+          <!-- Role Selection -->
+          <div class="network-role-section">
+            <h4>Current Mode</h4>
+            <div class="role-selector">
+              <button class="role-btn" id="role-standalone" data-role="standalone">
+                <i data-lucide="monitor"></i>
+                <span>Standalone</span>
+                <p>Local monitoring only</p>
+              </button>
+              <button class="role-btn" id="role-available" data-role="available">
+                <i data-lucide="radio-tower"></i>
+                <span>Availability</span>
+                <p>Allow remote monitoring</p>
+              </button>
+              <button class="role-btn" id="role-admin" data-role="admin">
+                <i data-lucide="server"></i>
+                <span>Admin</span>
+                <p>Monitor other instances</p>
+              </button>
+            </div>
+            <div id="role-status" class="role-status">
+              <span class="status-dot"></span>
+              <span id="role-status-text">Loading...</span>
+            </div>
+          </div>
+
+          <!-- Availability Mode Panel -->
+          <div id="availability-panel" class="network-panel" style="display: none;">
+            <div class="panel-header">
+              <h4><i data-lucide="radio-tower"></i> Availability Mode</h4>
+              <p>Allow other Fluffy instances to connect and monitor this machine</p>
+            </div>
+
+            <div id="availability-stopped" class="availability-stopped">
+              <div class="form-group">
+                <label>Port</label>
+                <input type="number" id="availability-port" value="8765" min="1024" max="65535">
+              </div>
+              <button class="btn-primary" id="btn-start-availability">
+                <i data-lucide="play"></i> Start Availability Server
+              </button>
+            </div>
+
+            <div id="availability-running" class="availability-running" style="display: none;">
+              <div class="server-info-card">
+                <div class="info-row">
+                  <span class="info-label">Status:</span>
+                  <span class="info-value"><span class="status-dot online"></span> Online</span>
+                </div>
+                <div class="info-row">
+                  <span class="info-label">IP Address:</span>
+                  <span class="info-value" id="availability-running-ip">Loading...</span>
+                </div>
+                <div class="info-row">
+                  <span class="info-label">Port:</span>
+                  <span class="info-value" id="availability-running-port">8765</span>
+                </div>
+                <div class="info-row">
+                  <span class="info-label">Connections:</span>
+                  <span class="info-value" id="availability-connections">HTTP (open)</span>
+                </div>
+              </div>
+              <div class="connection-hint">
+                <i data-lucide="info"></i>
+                <p>Other Fluffy instances can connect using the IP address and port shown above</p>
+              </div>
+              <button class="btn-outline btn-danger" id="btn-stop-availability">
+                <i data-lucide="stop-circle"></i> Stop Server
+              </button>
+            </div>
+          </div>
+
+          <!-- Admin Mode Panel -->
+          <div id="admin-panel" class="network-panel" style="display: none;">
+            <div class="panel-header">
+              <h4><i data-lucide="server"></i> Admin Mode</h4>
+              <p>Connect to and monitor other Fluffy instances on your network</p>
+            </div>
+
+            <!-- Add Connection Form -->
+            <div class="add-connection-form">
+              <h5>Add Fluffy Instance</h5>
+              <div class="form-row">
+                <div class="form-group">
+                  <label>IP Address</label>
+                  <input type="text" id="admin-ip" placeholder="192.168.1.100">
+                </div>
+                <div class="form-group">
+                  <label>Port</label>
+                  <input type="number" id="admin-port" placeholder="8765" value="8765" min="1024" max="65535">
+                </div>
+                <button class="btn-primary" id="btn-admin-connect">
+                  <i data-lucide="plus"></i> Add Machine
+                </button>
+              </div>
+            </div>
+
+            <!-- Connected Machines List -->
+            <div class="connected-machines-section">
+              <h5>Connected Machines (<span id="machines-count">0</span>)</h5>
+              <div id="machines-list" class="machines-list">
+                <div class="empty-state">
+                  <i data-lucide="server-off"></i>
+                  <p>No machines connected</p>
+                  <p class="hint">Add a Fluffy instance above to start monitoring</p>
+                </div>
+              </div>
+            </div>
+
+            <!-- Active Machine Data Display -->
+            <div id="active-machine-data" class="active-machine-data" style="display: none;">
+              <h5>Monitoring: <span id="active-machine-name">--</span></h5>
+              <div class="machine-stats-grid">
+                <div class="stat-card-mini">
+                  <div class="stat-icon"><i data-lucide="cpu"></i></div>
+                  <div class="stat-info">
+                    <span class="stat-label">CPU</span>
+                    <span class="stat-value" id="remote-cpu">--%</span>
+                  </div>
+                </div>
+                <div class="stat-card-mini">
+                  <div class="stat-icon"><i data-lucide="database"></i></div>
+                  <div class="stat-info">
+                    <span class="stat-label">RAM</span>
+                    <span class="stat-value" id="remote-ram">-- MB</span>
+                  </div>
+                </div>
+                <div class="stat-card-mini">
+                  <div class="stat-icon"><i data-lucide="layers"></i></div>
+                  <div class="stat-info">
+                    <span class="stat-label">Processes</span>
+                    <span class="stat-value" id="remote-processes">--</span>
+                  </div>
+                </div>
+                <div class="stat-card-mini">
+                  <div class="stat-icon"><i data-lucide="network"></i></div>
+                  <div class="stat-info">
+                    <span class="stat-label">Network</span>
+                    <span class="stat-value" id="remote-network">-- KB/s</span>
+                  </div>
+                </div>
+              </div>
+
+              <!-- Top Processes from Remote Machine -->
+              <div class="remote-processes-section">
+                <h6>Top Processes</h6>
+                <div id="remote-processes-list" class="remote-processes-list">
+                  <!-- Populated via JS -->
+                </div>
+              </div>
+            </div>
+          </div>
         </div>
       </section>
 

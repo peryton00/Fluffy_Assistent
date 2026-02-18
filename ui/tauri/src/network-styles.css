@@ -1,0 +1,511 @@
+/* Network Section Styles */
+
+.network-role-section {
+    padding: 24px;
+    background: rgba(255, 255, 255, 0.02);
+    border-radius: 12px;
+    margin-bottom: 24px;
+}
+
+.network-role-section h4 {
+    margin-bottom: 16px;
+    color: #e2e8f0;
+    font-size: 1.1rem;
+}
+
+.role-selector {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+    gap: 16px;
+    margin-bottom: 16px;
+}
+
+.role-btn {
+    background: rgba(255, 255, 255, 0.05);
+    border: 2px solid rgba(255, 255, 255, 0.1);
+    border-radius: 12px;
+    padding: 20px;
+    cursor: pointer;
+    transition: all 0.3s ease;
+    text-align: center;
+    color: #cbd5e1;
+}
+
+.role-btn i {
+    font-size: 2rem;
+    margin-bottom: 12px;
+    display: block;
+    color: #64748b;
+    transition: color 0.3s ease;
+}
+
+.role-btn span {
+    display: block;
+    font-size: 1.1rem;
+    font-weight: 600;
+    margin-bottom: 8px;
+    color: #e2e8f0;
+}
+
+.role-btn p {
+    font-size: 0.85rem;
+    color: #94a3b8;
+    margin: 0;
+}
+
+.role-btn:hover {
+    background: rgba(255, 255, 255, 0.08);
+    border-color: rgba(99, 102, 241, 0.5);
+    transform: translateY(-2px);
+}
+
+.role-btn.active {
+    background: linear-gradient(135deg, rgba(99, 102, 241, 0.2), rgba(139, 92, 246, 0.2));
+    border-color: #6366f1;
+}
+
+.role-btn.active i {
+    color: #818cf8;
+}
+
+.role-status {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 12px 16px;
+    background: rgba(255, 255, 255, 0.03);
+    border-radius: 8px;
+    font-size: 0.9rem;
+    color: #cbd5e1;
+}
+
+.role-status .status-dot {
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    background: #64748b;
+}
+
+.role-status .status-dot.online {
+    background: #10b981;
+    box-shadow: 0 0 8px rgba(16, 185, 129, 0.5);
+}
+
+/* Network Panels */
+
+.network-panel {
+    padding: 24px;
+    background: rgba(255, 255, 255, 0.02);
+    border-radius: 12px;
+    margin-top: 24px;
+}
+
+.panel-header {
+    margin-bottom: 24px;
+}
+
+.panel-header h4 {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    color: #e2e8f0;
+    font-size: 1.2rem;
+    margin-bottom: 8px;
+}
+
+.panel-header p {
+    color: #94a3b8;
+    font-size: 0.9rem;
+    margin: 0;
+}
+
+/* Availability Mode */
+
+.availability-stopped,
+.availability-running {
+    max-width: 500px;
+}
+
+.form-group {
+    margin-bottom: 16px;
+}
+
+.form-group label {
+    display: block;
+    margin-bottom: 6px;
+    color: #cbd5e1;
+    font-size: 0.9rem;
+    font-weight: 500;
+}
+
+.form-group input {
+    width: 100%;
+    padding: 10px 14px;
+    background: rgba(255, 255, 255, 0.05);
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    border-radius: 8px;
+    color: #e2e8f0;
+    font-size: 0.95rem;
+    transition: all 0.3s ease;
+}
+
+.form-group input:focus {
+    outline: none;
+    border-color: #6366f1;
+    background: rgba(255, 255, 255, 0.08);
+}
+
+.server-info-card {
+    background: rgba(255, 255, 255, 0.05);
+    border-radius: 8px;
+    padding: 16px;
+    margin-bottom: 16px;
+}
+
+.info-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 8px 0;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+}
+
+.info-row:last-child {
+    border-bottom: none;
+}
+
+.info-label {
+    color: #94a3b8;
+    font-size: 0.9rem;
+}
+
+.info-value {
+    color: #e2e8f0;
+    font-weight: 500;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.connection-hint {
+    background: rgba(99, 102, 241, 0.1);
+    border: 1px solid rgba(99, 102, 241, 0.3);
+    border-radius: 8px;
+    padding: 12px;
+    margin: 16px 0;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    color: #cbd5e1;
+    font-size: 0.9rem;
+}
+
+.connection-hint i {
+    color: #818cf8;
+    flex-shrink: 0;
+}
+
+.connection-hint p {
+    margin: 0;
+}
+
+/* Admin Mode */
+
+.add-connection-form {
+    margin-bottom: 32px;
+}
+
+.add-connection-form h5 {
+    color: #e2e8f0;
+    margin-bottom: 16px;
+    font-size: 1rem;
+}
+
+.form-row {
+    display: grid;
+    grid-template-columns: 1fr 1fr 1fr auto;
+    gap: 12px;
+    align-items: end;
+}
+
+.form-row .btn-primary {
+    white-space: nowrap;
+}
+
+.connected-machines-section {
+    margin-bottom: 32px;
+}
+
+.connected-machines-section h5 {
+    color: #e2e8f0;
+    margin-bottom: 16px;
+    font-size: 1rem;
+}
+
+.machines-list {
+    background: rgba(255, 255, 255, 0.03);
+    border-radius: 8px;
+    padding: 16px;
+    min-height: 150px;
+}
+
+.machine-card {
+    background: rgba(255, 255, 255, 0.05);
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    border-radius: 8px;
+    padding: 16px;
+    margin-bottom: 12px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    transition: all 0.3s ease;
+    cursor: pointer;
+}
+
+.machine-card:hover {
+    background: rgba(255, 255, 255, 0.08);
+    border-color: rgba(99, 102, 241, 0.5);
+}
+
+.machine-card.active {
+    background: linear-gradient(135deg, rgba(99, 102, 241, 0.15), rgba(139, 92, 246, 0.15));
+    border-color: #6366f1;
+}
+
+.machine-info {
+    flex: 1;
+}
+
+.machine-name {
+    font-size: 1rem;
+    font-weight: 600;
+    color: #e2e8f0;
+    margin-bottom: 4px;
+}
+
+.machine-ip {
+    font-size: 0.85rem;
+    color: #94a3b8;
+}
+
+.machine-status {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin-right: 16px;
+}
+
+.machine-status .status-dot {
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    background: #64748b;
+}
+
+.machine-status .status-dot.online {
+    background: #10b981;
+    box-shadow: 0 0 8px rgba(16, 185, 129, 0.5);
+    animation: pulse 2s infinite;
+}
+
+.machine-status .status-dot.offline {
+    background: #ef4444;
+}
+
+@keyframes pulse {
+
+    0%,
+    100% {
+        opacity: 1;
+    }
+
+    50% {
+        opacity: 0.5;
+    }
+}
+
+.machine-actions {
+    display: flex;
+    gap: 8px;
+}
+
+.machine-actions button {
+    padding: 6px 12px;
+    font-size: 0.85rem;
+}
+
+.empty-state {
+    text-align: center;
+    padding: 32px;
+    color: #64748b;
+}
+
+.empty-state i {
+    font-size: 3rem;
+    margin-bottom: 16px;
+    opacity: 0.5;
+}
+
+.empty-state p {
+    margin: 8px 0;
+    font-size: 0.95rem;
+}
+
+.empty-state .hint {
+    font-size: 0.85rem;
+    color: #475569;
+}
+
+/* Active Machine Data */
+
+.active-machine-data {
+    margin-top: 32px;
+    padding-top: 32px;
+    border-top: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.active-machine-data h5 {
+    color: #e2e8f0;
+    margin-bottom: 20px;
+    font-size: 1.1rem;
+}
+
+.machine-stats-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+    gap: 16px;
+    margin-bottom: 24px;
+}
+
+.stat-card-mini {
+    background: rgba(255, 255, 255, 0.05);
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    border-radius: 8px;
+    padding: 16px;
+    display: flex;
+    align-items: center;
+    gap: 12px;
+}
+
+.stat-card-mini .stat-icon {
+    width: 40px;
+    height: 40px;
+    border-radius: 8px;
+    background: linear-gradient(135deg, rgba(99, 102, 241, 0.2), rgba(139, 92, 246, 0.2));
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: #818cf8;
+}
+
+.stat-card-mini .stat-info {
+    flex: 1;
+}
+
+.stat-card-mini .stat-label {
+    display: block;
+    font-size: 0.8rem;
+    color: #94a3b8;
+    margin-bottom: 4px;
+}
+
+.stat-card-mini .stat-value {
+    display: block;
+    font-size: 1.2rem;
+    font-weight: 600;
+    color: #e2e8f0;
+}
+
+.remote-processes-section {
+    background: rgba(255, 255, 255, 0.03);
+    border-radius: 8px;
+    padding: 16px;
+}
+
+.remote-processes-section h6 {
+    color: #cbd5e1;
+    margin-bottom: 12px;
+    font-size: 0.95rem;
+}
+
+.remote-processes-list {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+}
+
+.remote-process-item {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 10px 12px;
+    background: rgba(255, 255, 255, 0.05);
+    border-radius: 6px;
+    font-size: 0.9rem;
+}
+
+.remote-process-name {
+    color: #cbd5e1;
+    flex: 1;
+}
+
+.remote-process-stats {
+    display: flex;
+    gap: 16px;
+    color: #94a3b8;
+    font-size: 0.85rem;
+}
+
+.remote-process-stats span {
+    min-width: 60px;
+    text-align: right;
+}
+
+/* Responsive */
+
+@media (max-width: 768px) {
+    .form-row {
+        grid-template-columns: 1fr;
+    }
+
+    .machine-stats-grid {
+        grid-template-columns: 1fr 1fr;
+    }
+
+    .role-selector {
+        grid-template-columns: 1fr;
+    }
+}
+
+/* Light Mode Adjustments */
+
+body.light-mode .network-role-section,
+body.light-mode .network-panel,
+body.light-mode .machines-list,
+body.light-mode .server-info-card,
+body.light-mode .remote-processes-section {
+    background: rgba(0, 0, 0, 0.02);
+}
+
+body.light-mode .role-btn,
+body.light-mode .machine-card,
+body.light-mode .stat-card-mini,
+body.light-mode .remote-process-item {
+    background: rgba(0, 0, 0, 0.03);
+    border-color: rgba(0, 0, 0, 0.1);
+}
+
+body.light-mode .role-btn:hover,
+body.light-mode .machine-card:hover {
+    background: rgba(0, 0, 0, 0.05);
+}
+
+body.light-mode .form-group input {
+    background: rgba(0, 0, 0, 0.03);
+    border-color: rgba(0, 0, 0, 0.1);
+    color: #1e293b;
+}
+
+body.light-mode .form-group input:focus {
+    background: rgba(0, 0, 0, 0.05);
+}

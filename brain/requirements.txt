@@ -7,3 +7,4 @@ pathlib
 uuid
 websockets
 psutil
+bcrypt>=4.1.0
