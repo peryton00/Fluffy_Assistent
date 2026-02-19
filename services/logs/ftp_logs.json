@@ -1,61 +1,430 @@
 [
   {
-    "timestamp": "2026-02-18T05:40:12.560042",
-    "event": "client_disconnected",
-    "client_ip": "10.180.173.137"
-  },
-  {
-    "timestamp": "2026-02-18T05:40:15.797840",
-    "event": "client_disconnected",
-    "client_ip": "10.180.173.137"
-  },
-  {
-    "timestamp": "2026-02-18T05:40:51.123464",
-    "event": "client_connected",
-    "client_ip": "10.180.173.137",
-    "details": {
-      "username": "fluffy",
-      "hostname": "AYUSH"
-    }
-  },
-  {
-    "timestamp": "2026-02-18T05:40:51.198490",
-    "event": "client_disconnected",
-    "client_ip": "10.180.173.137"
-  },
-  {
-    "timestamp": "2026-02-18T05:40:52.024396",
-    "event": "client_connected",
-    "client_ip": "10.180.173.137",
-    "details": {
-      "username": "fluffy",
-      "hostname": "AYUSH"
-    }
-  },
-  {
-    "timestamp": "2026-02-18T06:00:38.020089",
-    "event": "file_downloaded",
-    "client_ip": "10.180.173.137",
-    "filename": "FluffyAssistent.zip",
-    "details": {
-      "size_bytes": 2870326690
-    }
-  },
-  {
-    "timestamp": "2026-02-18T06:02:38.298992",
+    "timestamp": "2026-02-18T10:41:34.833783",
     "event": "server_stopped"
   },
   {
-    "timestamp": "2026-02-18T06:06:15.646040",
+    "timestamp": "2026-02-19T21:14:57.692863",
     "event": "server_started",
     "details": {
-      "ip": "172.24.71.171",
+      "ip": "192.168.1.44",
       "port": 2121,
-      "shared_dir": "C:\\Users\\sudip\\OneDrive\\Desktop\\webProjects"
+      "shared_dir": "C:\\Users\\sudip\\Downloads"
     }
   },
   {
-    "timestamp": "2026-02-18T06:06:23.098032",
+    "timestamp": "2026-02-19T21:17:14.223008",
+    "event": "client_disconnected",
+    "client_ip": "192.168.1.43"
+  },
+  {
+    "timestamp": "2026-02-19T21:17:18.019915",
+    "event": "client_disconnected",
+    "client_ip": "192.168.1.43"
+  },
+  {
+    "timestamp": "2026-02-19T21:17:44.802447",
+    "event": "client_connected",
+    "client_ip": "192.168.1.43",
+    "details": {
+      "username": "fluffy",
+      "hostname": "192.168.1.43"
+    }
+  },
+  {
+    "timestamp": "2026-02-19T21:17:45.142967",
+    "event": "client_disconnected",
+    "client_ip": "192.168.1.43"
+  },
+  {
+    "timestamp": "2026-02-19T21:17:50.712701",
+    "event": "client_connected",
+    "client_ip": "192.168.1.43",
+    "details": {
+      "username": "fluffy",
+      "hostname": "192.168.1.43"
+    }
+  },
+  {
+    "timestamp": "2026-02-19T21:17:52.389921",
+    "event": "file_downloaded",
+    "client_ip": "192.168.1.43",
+    "filename": "51d88f163ae7d00901a55a15aaff134c.jpg",
+    "details": {
+      "size_bytes": 89479
+    }
+  },
+  {
+    "timestamp": "2026-02-19T21:17:52.631839",
+    "event": "file_downloaded",
+    "client_ip": "192.168.1.43",
+    "filename": "7a474e92a1d6928557ee42d9fc368fe6.jpg",
+    "details": {
+      "size_bytes": 83785
+    }
+  },
+  {
+    "timestamp": "2026-02-19T21:17:52.790774",
+    "event": "file_downloaded",
+    "client_ip": "192.168.1.43",
+    "filename": "Aesthetic Instagram Frame Ideas_ Cute Backgrounds & Story Inspiration.jpg",
+    "details": {
+      "size_bytes": 54831
+    }
+  },
+  {
+    "timestamp": "2026-02-19T21:17:52.916526",
+    "event": "file_downloaded",
+    "client_ip": "192.168.1.43",
+    "filename": "Apexify_ Sales & Marketing Dashboard - 2025s Dark Mode UI Design Inspo.jpg",
+    "details": {
+      "size_bytes": 40863
+    }
+  },
+  {
+    "timestamp": "2026-02-19T21:17:53.104901",
+    "event": "file_downloaded",
+    "client_ip": "192.168.1.43",
+    "filename": "download (1).jpg",
+    "details": {
+      "size_bytes": 84410
+    }
+  },
+  {
+    "timestamp": "2026-02-19T21:17:53.271338",
+    "event": "file_downloaded",
+    "client_ip": "192.168.1.43",
+    "filename": "download (2).jpg",
+    "details": {
+      "size_bytes": 67052
+    }
+  },
+  {
+    "timestamp": "2026-02-19T21:17:54.108424",
+    "event": "file_downloaded",
+    "client_ip": "192.168.1.43",
+    "filename": "download (3).jpg",
+    "details": {
+      "size_bytes": 5286
+    }
+  },
+  {
+    "timestamp": "2026-02-19T21:17:54.296396",
+    "event": "file_downloaded",
+    "client_ip": "192.168.1.43",
+    "filename": "download (4).jpg",
+    "details": {
+      "size_bytes": 84483
+    }
+  },
+  {
+    "timestamp": "2026-02-19T21:17:54.455736",
+    "event": "file_downloaded",
+    "client_ip": "192.168.1.43",
+    "filename": "download.jpg",
+    "details": {
+      "size_bytes": 116134
+    }
+  },
+  {
+    "timestamp": "2026-02-19T21:17:54.961226",
+    "event": "file_downloaded",
+    "client_ip": "192.168.1.43",
+    "filename": "\ud83d\udc97\ud83e\udd8b.jpg",
+    "details": {
+      "size_bytes": 90968
+    }
+  },
+  {
+    "timestamp": "2026-02-19T21:17:55.236899",
+    "event": "file_downloaded",
+    "client_ip": "192.168.1.43",
+    "filename": "Glass.jpg",
+    "details": {
+      "size_bytes": 5262
+    }
+  },
+  {
+    "timestamp": "2026-02-19T21:18:21.346963",
+    "event": "file_downloaded",
+    "client_ip": "192.168.1.43",
+    "filename": "signature.jpg",
+    "details": {
+      "size_bytes": 41250
+    }
+  },
+  {
+    "timestamp": "2026-02-19T21:18:22.117779",
+    "event": "file_downloaded",
+    "client_ip": "192.168.1.43",
+    "filename": "signature00.jpeg",
+    "details": {
+      "size_bytes": 26286
+    }
+  },
+  {
+    "timestamp": "2026-02-19T21:18:23.428254",
+    "event": "file_downloaded",
+    "client_ip": "192.168.1.43",
+    "filename": "signature000.jpg",
+    "details": {
+      "size_bytes": 65240
+    }
+  },
+  {
+    "timestamp": "2026-02-19T21:18:23.851209",
+    "event": "file_downloaded",
+    "client_ip": "192.168.1.43",
+    "filename": "signature78.jpg",
+    "details": {
+      "size_bytes": 20840
+    }
+  },
+  {
+    "timestamp": "2026-02-19T21:18:24.995442",
+    "event": "file_downloaded",
+    "client_ip": "192.168.1.43",
+    "filename": "Solo Leveling Reawakening Smiley Face 4K.jpg",
+    "details": {
+      "size_bytes": 110363
+    }
+  },
+  {
+    "timestamp": "2026-02-19T21:18:36.293716",
+    "event": "file_downloaded",
+    "client_ip": "192.168.1.43",
+    "filename": "51d88f163ae7d00901a55a15aaff134c.jpg",
+    "details": {
+      "size_bytes": 89479
+    }
+  },
+  {
+    "timestamp": "2026-02-19T21:18:37.795797",
+    "event": "file_downloaded",
+    "client_ip": "192.168.1.43",
+    "filename": "7a474e92a1d6928557ee42d9fc368fe6.jpg",
+    "details": {
+      "size_bytes": 83785
+    }
+  },
+  {
+    "timestamp": "2026-02-19T21:18:38.420671",
+    "event": "file_downloaded",
+    "client_ip": "192.168.1.43",
+    "filename": "Aesthetic Instagram Frame Ideas_ Cute Backgrounds & Story Inspiration.jpg",
+    "details": {
+      "size_bytes": 54831
+    }
+  },
+  {
+    "timestamp": "2026-02-19T21:18:40.425426",
+    "event": "file_downloaded",
+    "client_ip": "192.168.1.43",
+    "filename": "Apexify_ Sales & Marketing Dashboard - 2025s Dark Mode UI Design Inspo.jpg",
+    "details": {
+      "size_bytes": 40863
+    }
+  },
+  {
+    "timestamp": "2026-02-19T21:18:41.804755",
+    "event": "file_downloaded",
+    "client_ip": "192.168.1.43",
+    "filename": "download (1).jpg",
+    "details": {
+      "size_bytes": 84410
+    }
+  },
+  {
+    "timestamp": "2026-02-19T21:18:42.774672",
+    "event": "file_downloaded",
+    "client_ip": "192.168.1.43",
+    "filename": "download (2).jpg",
+    "details": {
+      "size_bytes": 67052
+    }
+  },
+  {
+    "timestamp": "2026-02-19T21:18:44.347225",
+    "event": "file_downloaded",
+    "client_ip": "192.168.1.43",
+    "filename": "download (3).jpg",
+    "details": {
+      "size_bytes": 5286
+    }
+  },
+  {
+    "timestamp": "2026-02-19T21:18:44.685827",
+    "event": "file_downloaded",
+    "client_ip": "192.168.1.43",
+    "filename": "download (4).jpg",
+    "details": {
+      "size_bytes": 84483
+    }
+  },
+  {
+    "timestamp": "2026-02-19T21:18:46.253562",
+    "event": "file_downloaded",
+    "client_ip": "192.168.1.43",
+    "filename": "download.jpg",
+    "details": {
+      "size_bytes": 116134
+    }
+  },
+  {
+    "timestamp": "2026-02-19T21:18:48.946036",
+    "event": "file_downloaded",
+    "client_ip": "192.168.1.43",
+    "filename": "\ud83d\udc97\ud83e\udd8b.jpg",
+    "details": {
+      "size_bytes": 90968
+    }
+  },
+  {
+    "timestamp": "2026-02-19T21:18:50.779429",
+    "event": "file_downloaded",
+    "client_ip": "192.168.1.43",
+    "filename": "Glass.jpg",
+    "details": {
+      "size_bytes": 5262
+    }
+  },
+  {
+    "timestamp": "2026-02-19T21:19:01.005646",
+    "event": "file_uploaded",
+    "client_ip": "192.168.1.43",
+    "filename": "WIN_20230710_20_08_11_Pro.jpg",
+    "details": {
+      "size_bytes": 98820
+    }
+  },
+  {
+    "timestamp": "2026-02-19T21:19:09.344712",
+    "event": "file_downloaded",
+    "client_ip": "192.168.1.43",
+    "filename": "signature000.jpg",
+    "details": {
+      "size_bytes": 65240
+    }
+  },
+  {
+    "timestamp": "2026-02-19T21:19:10.874407",
+    "event": "file_downloaded",
+    "client_ip": "192.168.1.43",
+    "filename": "signature78.jpg",
+    "details": {
+      "size_bytes": 20840
+    }
+  },
+  {
+    "timestamp": "2026-02-19T21:19:11.429507",
+    "event": "file_downloaded",
+    "client_ip": "192.168.1.43",
+    "filename": "Solo Leveling Reawakening Smiley Face 4K.jpg",
+    "details": {
+      "size_bytes": 110363
+    }
+  },
+  {
+    "timestamp": "2026-02-19T21:19:13.917316",
+    "event": "file_downloaded",
+    "client_ip": "192.168.1.43",
+    "filename": "WhatsApp Image 2026-02-09 at 10.25.57 PM.jpeg",
+    "details": {
+      "size_bytes": 71137
+    }
+  },
+  {
+    "timestamp": "2026-02-19T21:19:15.217166",
+    "event": "file_downloaded",
+    "client_ip": "192.168.1.43",
+    "filename": "WhatsApp Image 2026-02-09 at 10.30.12 PM.jpeg",
+    "details": {
+      "size_bytes": 51352
+    }
+  },
+  {
+    "timestamp": "2026-02-19T21:19:17.610523",
+    "event": "file_downloaded",
+    "client_ip": "192.168.1.43",
+    "filename": "WhatsApp Image 2026-02-09 at 2.37.30 PM.jpeg",
+    "details": {
+      "size_bytes": 73564
+    }
+  },
+  {
+    "timestamp": "2026-02-19T21:19:22.483619",
+    "event": "file_downloaded",
+    "client_ip": "192.168.1.43",
+    "filename": "WhatsApp Image 2026-02-15 at 9.59.23 PM.jpeg",
+    "details": {
+      "size_bytes": 42911
+    }
+  },
+  {
+    "timestamp": "2026-02-19T21:19:23.679200",
+    "event": "file_downloaded",
+    "client_ip": "192.168.1.43",
+    "filename": "WIN_20230710_20_08_11_Pro.jpg",
+    "details": {
+      "size_bytes": 98820
+    }
+  },
+  {
+    "timestamp": "2026-02-19T21:19:25.279404",
+    "event": "file_downloaded",
+    "client_ip": "192.168.1.43",
+    "filename": "signature.jpg",
+    "details": {
+      "size_bytes": 41250
+    }
+  },
+  {
+    "timestamp": "2026-02-19T21:19:25.867288",
+    "event": "file_downloaded",
+    "client_ip": "192.168.1.43",
+    "filename": "signature00.jpeg",
+    "details": {
+      "size_bytes": 26286
+    }
+  },
+  {
+    "timestamp": "2026-02-19T21:19:44.673345",
+    "event": "file_uploaded",
+    "client_ip": "192.168.1.43",
+    "filename": "FB_IMG_1704360900771.jpg",
+    "details": {
+      "size_bytes": 27120
+    }
+  },
+  {
+    "timestamp": "2026-02-19T21:19:45.840228",
+    "event": "file_downloaded",
+    "client_ip": "192.168.1.43",
+    "filename": "FB_IMG_1704360900771.jpg",
+    "details": {
+      "size_bytes": 27120
+    }
+  },
+  {
+    "timestamp": "2026-02-19T21:24:18.854003",
+    "event": "client_disconnected",
+    "client_ip": "192.168.1.43"
+  },
+  {
+    "timestamp": "2026-02-19T21:47:00.253343",
+    "event": "server_stopped"
+  },
+  {
+    "timestamp": "2026-02-20T00:08:21.548946",
+    "event": "server_started",
+    "details": {
+      "ip": "192.168.1.45",
+      "port": 2121,
+      "shared_dir": "C:\\Users\\sudip\\Downloads"
+    }
+  },
+  {
+    "timestamp": "2026-02-20T00:08:51.592050",
     "event": "server_stopped"
   }
 ]
