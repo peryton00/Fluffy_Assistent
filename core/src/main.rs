@@ -22,6 +22,22 @@ use std::{
 use sysinfo::{Networks, ProcessesToUpdate, System};
 pub static IS_UI_ACTIVE: AtomicBool = AtomicBool::new(false);
 
+#[cfg(target_os = "windows")]
+use windows::Devices::Radios::{Radio, RadioKind, RadioState};
+#[cfg(target_os = "windows")]
+use windows_sys::Win32::System::Power::{GetSystemPowerStatus, SYSTEM_POWER_STATUS};
+
+#[derive(Serialize)]
+struct BatteryStats {
+    percent: f32,
+    plugged: bool,
+}
+
+#[derive(Serialize)]
+struct BluetoothStats {
+    enabled: bool,
+}
+
 type CpuHistory = HashMap<u32, f32>;
 
 #[derive(Serialize, Clone)]
@@ -70,6 +86,8 @@ struct SystemStats {
     cpu: CpuStats,
     network: NetworkStats,
     processes: ProcessStats,
+    battery: Option<BatteryStats>,
+    bluetooth: Option<BluetoothStats>,
 }
 
 #[derive(Serialize)]
@@ -81,7 +99,7 @@ struct FluffyMessage {
     active_sessions: u32,
 }
 
-#[derive(Serialize)]
+#[derive(Serialize, Clone)]
 struct StartupApp {
     name: String,
     command: String,
@@ -308,6 +326,58 @@ fn collect_processes(system: &System, cpu_history: &mut CpuHistory) -> Vec<Proce
         .collect()
 }
 
+#[cfg(target_os = "windows")]
+fn get_battery_info() -> Option<BatteryStats> {
+    unsafe {
+        let mut status: SYSTEM_POWER_STATUS = std::mem::zeroed();
+        if GetSystemPowerStatus(&mut status) != 0 {
+            let percent = if status.BatteryLifePercent == 255 {
+                0.0
+            } else {
+                status.BatteryLifePercent as f32
+            };
+            let plugged = status.ACLineStatus == 1;
+            return Some(BatteryStats { percent, plugged });
+        }
+    }
+    None
+}
+
+#[cfg(not(target_os = "windows"))]
+fn get_battery_info() -> Option<BatteryStats> {
+    None
+}
+
+#[cfg(target_os = "windows")]
+async fn get_bluetooth_enabled() -> bool {
+    // Windows Radios API logic
+    match Radio::GetRadiosAsync() {
+        Ok(op) => {
+            if let Ok(radios) = op.await {
+                let size = radios.Size().unwrap_or(0);
+                for i in 0..size {
+                    if let Ok(radio) = radios.GetAt(i) {
+                        if let Ok(kind) = radio.Kind() {
+                            if kind == RadioKind::Bluetooth {
+                                if let Ok(state) = radio.State() {
+                                    return state == RadioState::On;
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+        Err(_) => {}
+    }
+    false
+}
+
+#[cfg(not(target_os = "windows"))]
+async fn get_bluetooth_enabled() -> bool {
+    false
+}
+
 fn spawn_listener() {
     println!("[Fluffy Core] Spawning Brain...");
 
@@ -364,8 +434,10 @@ fn spawn_ui() {
 }
 
 fn main() {
-    let ipc = IpcServer::start(9001);
-    start_command_server(9002);
+    let runtime = tokio::runtime::Runtime::new().unwrap();
+    runtime.block_on(async {
+        let ipc = IpcServer::start(9001);
+        start_command_server(9002);
 
     // 🌐 Start ETW Network Monitor (Requires Admin)
     NetworkMonitor::start();
@@ -387,6 +459,10 @@ fn main() {
     let mut system = System::new_all();
     let mut networks = Networks::new_with_refreshed_list();
     let mut cpu_history = CpuHistory::new();
+
+    // Cache startup entries - registry reads are expensive, only refresh every 60s
+    let mut cached_startup: Vec<StartupApp> = get_startup_entries();
+    let mut last_startup_scan: u64 = unix_timestamp();
 
     while running.load(Ordering::SeqCst) {
         if IS_UI_ACTIVE.load(Ordering::SeqCst) {
@@ -440,13 +516,20 @@ fn main() {
                 }
             }
 
+            // Refresh startup entries cache every 60 seconds
+            let now = unix_timestamp();
+            if now - last_startup_scan >= 30 {
+                cached_startup = get_startup_entries();
+                last_startup_scan = now;
+            }
+
             println!(
                 "[Fluffy Core] Broadcasting telemetry ({} processes)...",
                 processes.len()
             );
             let message = FluffyMessage {
                 schema_version: "1.0",
-                timestamp: unix_timestamp(),
+                timestamp: now,
                 system: SystemStats {
                     ram: RamStats {
                         total_mb,
@@ -464,8 +547,10 @@ fn main() {
                         status: connection_type.to_string(),
                     },
                     processes: ProcessStats { top_ram: processes },
+                    battery: get_battery_info(),
+                    bluetooth: Some(BluetoothStats { enabled: get_bluetooth_enabled().await }),
                 },
-                persistence: get_startup_entries(),
+                persistence: cached_startup.clone(),
                 active_sessions: 1, // Hardcoded: UI is active if we are here
             };
 
@@ -502,4 +587,5 @@ fn main() {
 
     // 👇 clean exit point
     eprintln!("[Fluffy Core] Clean shutdown complete");
+    });
 }

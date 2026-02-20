@@ -30,6 +30,8 @@ class BluetoothControlHandler:
             elif action in ["off", "disable", "disabled"]:
                 enable = False
                 action_text = "disable"
+            elif action == "status":
+                return self.get_status()
             else:
                 return {
                     "success": False,
@@ -139,6 +141,47 @@ if ($bluetooth -eq $null) {{
                     "success": False,
                     "message": f"❌ Error controlling Bluetooth: {str(e)}"
                 }
+
+    def get_status(self) -> Dict[str, Any]:
+        """Check if Bluetooth is currently enabled"""
+        if platform.system() != 'Windows':
+            return {"success": False, "enabled": False}
+        
+        ps_command = """
+Add-Type -AssemblyName System.Runtime.WindowsRuntime
+$asTaskGeneric = ([System.WindowsRuntimeSystemExtensions].GetMethods() | Where-Object { $_.Name -eq 'AsTask' -and $_.GetParameters().Count -eq 1 -and $_.GetParameters()[0].ParameterType.Name -eq 'IAsyncOperation`1' })[0]
+
+Function Await($WinRtTask, $ResultType) {
+    $asTask = $asTaskGeneric.MakeGenericMethod($ResultType)
+    $netTask = $asTask.Invoke($null, @($WinRtTask))
+    $netTask.Wait(-1) | Out-Null
+    $netTask.Result
+}
+
+[Windows.Devices.Radios.Radio,Windows.System.Devices,ContentType=WindowsRuntime] | Out-Null
+$radios = Await ([Windows.Devices.Radios.Radio]::GetRadiosAsync()) ([System.Collections.Generic.IReadOnlyList[Windows.Devices.Radios.Radio]])
+$bluetooth = $radios | Where-Object { $_.Kind -eq 'Bluetooth' } | Select-Object -First 1
+
+if ($bluetooth -eq $null) {
+    Write-Output "OFF"
+} else {
+    Write-Output $bluetooth.State
+}
+"""
+        try:
+            result = subprocess.run(
+                ["powershell", "-ExecutionPolicy", "Bypass", "-Command", ps_command],
+                capture_output=True,
+                text=True,
+                timeout=5
+            )
+            output = result.stdout.strip()
+            return {
+                "success": True,
+                "enabled": "On" in output
+            }
+        except:
+            return {"success": False, "enabled": False}
 
 def get_handler():
     return BluetoothControlHandler()

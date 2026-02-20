@@ -100,6 +100,15 @@
             <span class="net-icon" id="header-net-icon"><i data-lucide="satellite"></i></span>
             <span id="header-net-speed" style="margin-left: 4px;">-- Kbps</span>
           </div>
+          <div class="battery-container" id="battery-status" title="Battery Status">
+            <span class="battery-icon" id="battery-icon"><i data-lucide="battery"></i></span>
+            <span id="battery-value">--%</span>
+          </div>
+          <div class="bluetooth-container" id="bluetooth-status" title="Bluetooth Status">
+            <button class="bluetooth-btn" id="btn-bluetooth-toggle">
+              <i data-lucide="bluetooth"></i>
+            </button>
+          </div>
           <div class="user-profile">
             <div id="system-status-dot" class="status-dot"></div>
           </div>
@@ -118,6 +127,13 @@
             </div>
             <p class="card-label">CPU Usage</p>
             <h2 id="cpu-value">--%</h2>
+            <!-- Circular Progress SVG -->
+            <div class="circular-progress-container">
+              <svg viewBox="0 0 36 36" class="circular-progress">
+                <circle class="bg" cx="18" cy="18" r="16"></circle>
+                <circle id="cpu-progress-circle" class="progress" cx="18" cy="18" r="16"></circle>
+              </svg>
+            </div>
             <p class="card-comparison">System Load</p>
           </div>
 
@@ -127,6 +143,13 @@
             </div>
             <p class="card-label">RAM Usage</p>
             <h2 id="ram-value">-- MB</h2>
+            <!-- Circular Progress SVG -->
+            <div class="circular-progress-container">
+              <svg viewBox="0 0 36 36" class="circular-progress">
+                <circle class="bg" cx="18" cy="18" r="16"></circle>
+                <circle id="ram-progress-circle" class="progress" cx="18" cy="18" r="16"></circle>
+              </svg>
+            </div>
             <p class="card-comparison" id="ram-total">Total: -- GB</p>
           </div>
 
@@ -198,6 +221,13 @@
             </div>
             <p class="card-label">Fluffy Usage</p>
             <h2 id="fluffy-usage">--%</h2>
+            <!-- Circular Progress SVG -->
+            <div class="circular-progress-container">
+              <svg viewBox="0 0 36 36" class="circular-progress">
+                <circle class="bg" cx="18" cy="18" r="16"></circle>
+                <circle id="fluffy-progress-circle" class="progress" cx="18" cy="18" r="16"></circle>
+              </svg>
+            </div>
             <p class="card-comparison" id="fluffy-ram">-- MB RAM</p>
           </div>
 
@@ -224,11 +254,26 @@
                 <span>0%</span>
               </div>
               <svg id="resource-chart" viewBox="0 0 400 150" preserveAspectRatio="none">
+                <defs>
+                  <linearGradient id="cpu-gradient" x1="0" y1="0" x2="0" y2="1">
+                    <stop offset="0%" stop-color="var(--accent)" stop-opacity="0.3" />
+                    <stop offset="100%" stop-color="var(--accent)" stop-opacity="0" />
+                  </linearGradient>
+                  <linearGradient id="ram-gradient" x1="0" y1="0" x2="0" y2="1">
+                    <stop offset="0%" stop-color="var(--success)" stop-opacity="0.3" />
+                    <stop offset="100%" stop-color="var(--success)" stop-opacity="0" />
+                  </linearGradient>
+                  <filter id="soft-blur" x="-20%" y="-20%" width="140%" height="140%">
+                    <feGaussianBlur in="SourceGraphic" stdDeviation="3" />
+                  </filter>
+                </defs>
                 <!-- Grid Lines -->
                 <line x1="0" y1="0" x2="400" y2="0" class="chart-grid-line" />
                 <line x1="0" y1="75" x2="400" y2="75" class="chart-grid-line" />
                 <line x1="0" y1="150" x2="400" y2="150" class="chart-grid-line" />
 
+                <path id="cpu-area" class="chart-area cpu" d=""></path>
+                <path id="ram-area" class="chart-area ram" d=""></path>
                 <path id="cpu-path" class="chart-line cpu" d=""></path>
                 <path id="ram-path" class="chart-line ram" d=""></path>
               </svg>

@@ -101,7 +101,9 @@ def format_monitoring_data() -> dict:
         # Format processes
         formatted_processes = [
             {
+                "pid": p.get("pid"),
                 "name": p.get("name", "unknown"),
+                "exe": p.get("exe_path", ""),
                 "cpu": round(p.get("cpu_percent", 0.0), 2),
                 "ram": round(p.get("ram_mb", 0.0), 2)
             }

@@ -14,26 +14,45 @@ from guardian_manager import (
 )
 import state
 
-# Voice system import (safe - fails silently if Piper not available)
-try:
-    import sys
-    import os
-    # Add parent directory to path for voice module
-    sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..'))
-    from voice import speak_welcome, speak_guardian_alert
-    VOICE_AVAILABLE = True
-except Exception as e:
-    print(f"[Voice] Voice system unavailable: {e}", file=sys.stderr)
-    VOICE_AVAILABLE = False
-    speak_welcome = lambda: None
-    speak_guardian_alert = lambda x: None
+# Voice system - lazy loaded on first use to speed up startup
+VOICE_AVAILABLE = None  # None = not yet checked
+_voice_module_loaded = False
+
+def _ensure_voice():
+    global VOICE_AVAILABLE, _voice_module_loaded
+    if _voice_module_loaded:
+        return VOICE_AVAILABLE
+    _voice_module_loaded = True
+    try:
+        import sys as _sys
+        import os as _os
+        _sys.path.insert(0, _os.path.join(_os.path.dirname(__file__), '..'))
+        from voice import speak_welcome as _sw, speak_guardian_alert as _sga
+        import builtins
+        builtins._fluffy_speak_welcome = _sw
+        builtins._fluffy_speak_guardian_alert = _sga
+        VOICE_AVAILABLE = True
+    except Exception as e:
+        import sys as _sys
+        print(f"[Voice] Voice system unavailable: {e}", file=_sys.stderr)
+        VOICE_AVAILABLE = False
+    return VOICE_AVAILABLE
+
+def speak_welcome():
+    if _ensure_voice():
+        import builtins
+        builtins._fluffy_speak_welcome()
+
+def speak_guardian_alert(*args, **kwargs):
+    if _ensure_voice():
+        import builtins
+        builtins._fluffy_speak_guardian_alert(*args, **kwargs)
 
 import socket
 import json
 import sys
 import signal
 import time
-import copy
 
 print("[Fluffy Brain] Listener script started", file=sys.stderr)
 
@@ -46,6 +65,8 @@ ipc_socket = None
 
 PROCESS_MSG_COUNTER = 0 # For periodic saving
 PROACTIVE_PROMPTS = set() # Track processes already prompted for confirmation
+GUARDIAN_TICK_COUNTER = 0  # For throttling Guardian analysis
+GUARDIAN_FULL_INTERVAL = 2  # Full analysis every 2nd tick (4 seconds)
 
 
 
@@ -198,8 +219,8 @@ def handle_message(raw_msg, monitor):
         state.update_security_alerts(security_alerts)
         return
 
-    # Work on a clean copy to avoid race conditions
-    msg = copy.deepcopy(raw_msg)
+    # Use the message directly - we own this data from the IPC read
+    msg = raw_msg
 
     signals = compute_signals(msg)
     msg["signals"] = signals
@@ -212,6 +233,10 @@ def handle_message(raw_msg, monitor):
     recommendations = recommend(msg)
 
     # --- GUARDIAN ENGINE (Level 2) ---
+    global GUARDIAN_TICK_COUNTER
+    GUARDIAN_TICK_COUNTER += 1
+    run_full_guardian = (GUARDIAN_TICK_COUNTER % GUARDIAN_FULL_INTERVAL == 0)
+
     all_guardian_verdicts = []
     processes = msg.get("system", {}).get("processes", {}).get("top_ram", [])
     active_pids = [p["pid"] for p in processes]
@@ -222,7 +247,10 @@ def handle_message(raw_msg, monitor):
     learning_progress = GUARDIAN_BASELINE.get_learning_progress()
     is_learning = learning_progress < 100
 
-    for p in processes:
+    # Throttle: full analysis every 3rd tick, lightweight (top 20) on other ticks
+    analysis_processes = processes if run_full_guardian else processes[:20]
+
+    for p in analysis_processes:
         pid = p["pid"]
         name = p["name"]
         cpu = p["cpu_percent"]
@@ -260,8 +288,8 @@ def handle_message(raw_msg, monitor):
             verdicts = generate_verdicts(name, pid, risk_score, anomalies, level, 0.8)
             all_guardian_verdicts.extend(verdicts)
             
-            # Voice alert for serious verdicts with metrics
-            if VOICE_AVAILABLE and verdicts:
+            # Voice alert for serious verdicts with metrics (lazy loaded)
+            if _ensure_voice() and verdicts:
                 for verdict in verdicts:
                     # Pass current process metrics for conversational alerts
                     speak_guardian_alert(
@@ -349,8 +377,8 @@ def main():
     ipc_socket = connect_ipc()
     print("[Fluffy Brain] Connected to IPC", file=sys.stderr)
     
-    # Speak welcome message (non-blocking, guarded)
-    if VOICE_AVAILABLE and not state.WELCOME_SPOKEN:
+    # Speak welcome message (non-blocking, lazy-loaded)
+    if not state.WELCOME_SPOKEN:
         speak_welcome()
         state.WELCOME_SPOKEN = True
 

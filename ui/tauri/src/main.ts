@@ -249,6 +249,30 @@ function setupNavigation() {
       switchView("chat");
     };
   }
+
+  // Bluetooth Toggle
+  const btToggle = document.getElementById("btn-bluetooth-toggle");
+  if (btToggle) {
+    btToggle.onclick = async () => {
+      const icon = btToggle.querySelector('i');
+      if (icon) icon.style.opacity = '0.5';
+
+      // Determine next state (flip current)
+      const container = document.getElementById("bluetooth-status");
+      const currentState = container?.classList.contains("active");
+      const action = currentState ? "off" : "on";
+
+      const res = await apiRequest("/command", {
+        method: "POST",
+        body: JSON.stringify({ "Extension": { "name": "bluetooth_control", "parameters": { "action": action } } })
+      });
+
+      if (res && res.ok) {
+        showToast(`Bluetooth ${action === 'on' ? 'enabled' : 'disabled'}`, "success");
+      }
+      if (icon) icon.style.opacity = '1';
+    };
+  }
 }
 
 async function normalizeSystem() {
@@ -265,9 +289,11 @@ async function normalizeSystem() {
   if (data && data.ok) {
     let detailsHtml = `
       <ul>
-        <li>Volume reset to 50%</li>
-        <li>Brightness optimized to 70%</li>
-        <li>Temp directories purged</li>
+        <li>A/V: Volume (50%) & Brightness (70%) reset</li>
+        <li>Temp: User, System, Prefetch & WinUpdate cleared</li>
+        <li>Cache: DNS flush & Browser patterns purged</li>
+        <li>Memory: Process working sets trimmed</li>
+        <li>System: Recycle Bin emptied & SSD Re-trimmed</li>
       </ul>
     `;
 
@@ -419,9 +445,6 @@ async function killProcess(pid: number, mode: string = "tree", skipConfirm = fal
   }
 }
 
-/* =========================
-   CHARTING
-========================= */
 function updateChart(cpu: number, ramUsagePercent: number) {
   statHistory.cpu.push(cpu);
   statHistory.ram.push(ramUsagePercent);
@@ -431,22 +454,52 @@ function updateChart(cpu: number, ramUsagePercent: number) {
   }
 
   const cpuPath = document.getElementById("cpu-path") as any;
+  const cpuArea = document.getElementById("cpu-area") as any;
   const ramPath = document.getElementById("ram-path") as any;
+  const ramArea = document.getElementById("ram-area") as any;
 
-  const generatePath = (data: number[]) => {
+  const generateSmoothPath = (data: number[], isArea = false) => {
     if (data.length < 2) return "";
     const width = 400;
     const height = 150;
-    const points = data.map((val, i) => {
+
+    const getPoint = (i: number) => {
       const x = (i / (MAX_HISTORY - 1)) * width;
-      const y = height - (Math.min(val, 100) / 100) * height;
-      return `${x},${y}`;
-    });
-    return `M ${points.join(" L ")}`;
+      const y = height - (Math.min(data[i], 100) / 100) * height;
+      return { x, y };
+    };
+
+    let path = `M ${getPoint(0).x},${getPoint(0).y}`;
+
+    // Bézier curve smoothing
+    for (let i = 0; i < data.length - 1; i++) {
+      const p0 = getPoint(Math.max(i - 1, 0));
+      const p1 = getPoint(i);
+      const p2 = getPoint(i + 1);
+      const p3 = getPoint(Math.min(i + 2, data.length - 1));
+
+      // Control points for cubic Bézier
+      const cp1x = p1.x + (p2.x - p0.x) / 6;
+      const cp1y = p1.y + (p2.y - p0.y) / 6;
+      const cp2x = p2.x - (p3.x - p1.x) / 6;
+      const cp2y = p2.y - (p3.y - p1.y) / 6;
+
+      path += ` C ${cp1x},${cp1y} ${cp2x},${cp2y} ${p2.x},${p2.y}`;
+    }
+
+    if (isArea) {
+      const lastPoint = getPoint(data.length - 1);
+      const firstPoint = getPoint(0);
+      path += ` L ${lastPoint.x},${height} L ${firstPoint.x},${height} Z`;
+    }
+
+    return path;
   };
 
-  if (cpuPath) cpuPath.setAttribute("d", generatePath(statHistory.cpu));
-  if (ramPath) ramPath.setAttribute("d", generatePath(statHistory.ram));
+  if (cpuPath) cpuPath.setAttribute("d", generateSmoothPath(statHistory.cpu));
+  if (cpuArea) cpuArea.setAttribute("d", generateSmoothPath(statHistory.cpu, true));
+  if (ramPath) ramPath.setAttribute("d", generateSmoothPath(statHistory.ram));
+  if (ramArea) ramArea.setAttribute("d", generateSmoothPath(statHistory.ram, true));
 }
 
 /* =========================
@@ -466,23 +519,50 @@ function buildTree(processes: any[]): any[] {
     }
   });
 
-  // Sort children by RAM by default to keep tree organized
-  Object.values(map).forEach((node: any) => {
-    if (node.children.length > 0) {
-      node.children.sort((a: any, b: any) => b.ram_mb - a.ram_mb);
-    }
-  });
-
   return roots;
 }
 
-function calculateTotalRam(node: any): number {
-  let total = node.ram_mb;
+function calculateTotals(node: any): { ram: number, cpu: number } {
+  let totalRam = node.ram_mb || 0;
+  let totalCpu = node.cpu_percent || 0;
+
   if (node.children && node.children.length > 0) {
-    total += node.children.reduce((sum: number, child: any) => sum + calculateTotalRam(child), 0);
+    node.children.forEach((child: any) => {
+      const childTotals = calculateTotals(child);
+      totalRam += childTotals.ram;
+      totalCpu += childTotals.cpu;
+    });
   }
-  node.total_ram_mb = total;
-  return total;
+
+  node.total_ram_mb = totalRam;
+  node.total_cpu_percent = totalCpu;
+  return { ram: totalRam, cpu: totalCpu };
+}
+
+function getSortedProcesses(processes: any[], useTotals: boolean = false): any[] {
+  return [...processes].sort((a: any, b: any) => {
+    // 1. Pinned Always Top (Check both by name and by PID if applicable)
+    const aPinned = pinnedProcesses.has(a.name);
+    const bPinned = pinnedProcesses.has(b.name);
+    if (aPinned && !bPinned) return -1;
+    if (!aPinned && bPinned) return 1;
+
+    // 2. User selected sort mode
+    if (sortMode === "ram") {
+      const valA = useTotals ? (a.total_ram_mb || 0) : (a.ram_mb || 0);
+      const valB = useTotals ? (b.total_ram_mb || 0) : (b.ram_mb || 0);
+      return valB - valA;
+    }
+    if (sortMode === "cpu") {
+      const valA = useTotals ? (a.total_cpu_percent || 0) : (a.cpu_percent || 0);
+      const valB = useTotals ? (b.total_cpu_percent || 0) : (b.cpu_percent || 0);
+      return valB - valA;
+    }
+    if (sortMode === "name") {
+      return a.name.localeCompare(b.name);
+    }
+    return 0;
+  });
 }
 
 function processMatchesSearch(node: any): boolean {
@@ -594,13 +674,8 @@ function renderNode(node: any, container: HTMLElement) {
     const childrenContainer = document.createElement("div");
     childrenContainer.className = `tree-children ${shouldExpand ? "active" : ""}`;
 
-    // Recursive sort for children
-    const sortedChildren = [...node.children].sort((a: any, b: any) => {
-      if (sortMode === "ram") return b.ram_mb - a.ram_mb;
-      if (sortMode === "cpu") return b.cpu_percent - a.cpu_percent;
-      if (sortMode === "name") return a.name.localeCompare(b.name);
-      return 0;
-    });
+    // Recursive sort for children using unified logic
+    const sortedChildren = getSortedProcesses(node.children, false);
 
     sortedChildren.forEach((child: any) => {
       renderNode(child, childrenContainer);
@@ -615,6 +690,26 @@ function renderNode(node: any, container: HTMLElement) {
    VIEW UPDATES
 ========================= */
 
+function updateProgressCircle(circleId: string, value: number) {
+  const circle = document.getElementById(circleId) as unknown as SVGCircleElement | null;
+  if (!circle) return;
+
+  const circumference = 100.5;
+  const offset = circumference - (Math.min(100, Math.max(0, value || 0)) / 100) * circumference;
+  circle.style.strokeDashoffset = offset.toString();
+
+  // Dynamic Color Classes
+  circle.classList.remove("low", "med", "high");
+  const val = value || 0;
+  if (val < 50) {
+    circle.classList.add("low");
+  } else if (val < 80) {
+    circle.classList.add("med");
+  } else {
+    circle.classList.add("high");
+  }
+}
+
 function renderDashboard(data: any) {
   if (!data || !data.system || !data.system.cpu || !data.system.ram) {
     console.warn("Incomplete dashboard data", data);
@@ -627,9 +722,11 @@ function renderDashboard(data: any) {
 
   const cpuEl = document.getElementById("cpu-value");
   if (cpuEl) cpuEl.innerText = `${cpu.toFixed(1)}%`;
+  updateProgressCircle("cpu-progress-circle", cpu);
 
   const ramEl = document.getElementById("ram-value");
   if (ramEl) ramEl.innerText = `${ram.used_mb} MB`;
+  updateProgressCircle("ram-progress-circle", ramPercent);
 
   const ramTotalEl = document.getElementById("ram-total");
   if (ramTotalEl) ramTotalEl.innerText = `Total: ${(ram.total_mb / 1024).toFixed(1)} GB`;
@@ -659,6 +756,7 @@ function renderDashboard(data: any) {
 
   const fluffyCpuEl = document.getElementById("fluffy-usage");
   if (fluffyCpuEl) fluffyCpuEl.innerText = `${totalCpu.toFixed(1)}%`;
+  updateProgressCircle("fluffy-progress-circle", totalCpu);
 
   const fluffyRamEl = document.getElementById("fluffy-ram");
   if (fluffyRamEl) fluffyRamEl.innerText = `${totalRam} MB`;
@@ -737,6 +835,32 @@ function renderDashboard(data: any) {
     healthEl.className = sys.health.toLowerCase();
   }
 
+  // Battery Update
+  if (sys.battery) {
+    const batVal = document.getElementById("battery-value");
+    const batIcon = document.getElementById("battery-icon");
+    const batCont = document.getElementById("battery-status");
+    if (batVal) batVal.innerText = `${Math.round(sys.battery.percent)}%`;
+    if (batCont) {
+      batCont.classList.toggle("low", sys.battery.percent < 20);
+      batCont.classList.toggle("charging", sys.battery.plugged);
+      if (batIcon) {
+        const iconName = sys.battery.plugged ? "battery-charging" : (sys.battery.percent < 20 ? "battery-low" : "battery");
+        batIcon.innerHTML = `<i data-lucide="${iconName}"></i>`;
+      }
+    }
+  }
+
+  // Bluetooth Update
+  if (sys.bluetooth) {
+    const btCont = document.getElementById("bluetooth-status");
+    if (btCont) {
+      btCont.classList.toggle("active", sys.bluetooth.enabled);
+    }
+  }
+
+  if ((window as any).lucide) (window as any).lucide.createIcons();
+
   updateChart(cpu, ramPercent);
 
   // Link Speed Test button if dashboard is active
@@ -812,26 +936,15 @@ function renderProcesses(data: any) {
   const allProcs = data.system.processes.top_ram || [];
   const filtered = allProcs.filter((p: any) => !pendingKills.has(p.pid));
 
-  // Sort and Build Tree
-  filtered.sort((a: any, b: any) => {
-    // 1. Pinned Always Top
-    const aPinned = pinnedProcesses.has(a.name);
-    const bPinned = pinnedProcesses.has(b.name);
-    if (aPinned && !bPinned) return -1;
-    if (!aPinned && bPinned) return 1;
-
-    // 2. User selected sort mode
-    if (sortMode === "ram") return b.ram_mb - a.ram_mb;
-    if (sortMode === "cpu") return b.cpu_percent - a.cpu_percent;
-    if (sortMode === "name") return a.name.localeCompare(b.name);
-    return 0;
-  });
-
   const tree = buildTree(filtered);
-  // Calculate total tree RAM for each root
-  tree.forEach(node => calculateTotalRam(node));
 
-  tree.forEach(node => renderNode(node, container));
+  // Calculate total tree metrics for each root
+  tree.forEach(node => calculateTotals(node));
+
+  // Sort Root Nodes using Aggregate Metrics
+  const sortedRoots = getSortedProcesses(tree, true);
+
+  sortedRoots.forEach(node => renderNode(node, container));
 
   // Handle Top Consumer Highlight
   if (highlightContainer) {
@@ -1265,7 +1378,13 @@ async function fetchData() {
     return;
   }
 
-  if (data) renderUI(data);
+  if (data) {
+    // Track key metrics for adaptive polling change detection
+    (window as any).__lastCpu = data?.system?.cpu?.usage_percent?.toFixed(0);
+    (window as any).__lastRam = data?.system?.ram?.used_mb;
+    (window as any).__lastAlerts = data?._guardian_verdicts?.length || 0;
+    renderUI(data);
+  }
 }
 
 async function fetchLogs() {
@@ -1288,12 +1407,43 @@ async function fetchLogs() {
 setupNavigation();
 let dataInterval: any = null;
 let logsInterval: any = null;
+let lastDataHash: string = "";
+let currentPollRate: number = 2000;
+const MIN_POLL_RATE = 2000;
+const MAX_POLL_RATE = 4000;
 
 function startPolling() {
   if (dataInterval) clearInterval(dataInterval);
   if (logsInterval) clearInterval(logsInterval);
 
-  dataInterval = setInterval(fetchData, 2000);
+  currentPollRate = MIN_POLL_RATE;
+
+  // Adaptive polling: speed up when data changes, slow down when idle
+  const adaptiveFetch = async () => {
+    await fetchData();
+
+    // Simple change detection based on key metrics
+    const newHash = JSON.stringify({
+      cpu: (window as any).__lastCpu,
+      ram: (window as any).__lastRam,
+      alerts: (window as any).__lastAlerts
+    });
+
+    if (newHash === lastDataHash) {
+      // No change - gradually slow down (up to MAX_POLL_RATE)
+      currentPollRate = Math.min(currentPollRate + 250, MAX_POLL_RATE);
+    } else {
+      // Data changed - snap back to fast polling
+      currentPollRate = MIN_POLL_RATE;
+      lastDataHash = newHash;
+    }
+
+    // Reschedule with adapted rate
+    if (dataInterval) clearInterval(dataInterval);
+    dataInterval = setInterval(adaptiveFetch, currentPollRate);
+  };
+
+  dataInterval = setInterval(adaptiveFetch, currentPollRate);
   logsInterval = setInterval(fetchLogs, 5000);
 
   fetchData();
@@ -1571,13 +1721,23 @@ function renderApps(apps: any[] | null = null, filter: string = "") {
     // Only show launch button if we have a valid exe_path
     const showLaunch = !!app.exe_path;
 
+    // Check if app is running
+    const runningProcesses = lastData?.system?.processes?.top_ram || [];
+    const isRunning = app.exe_path && runningProcesses.some((p: any) => {
+      const exeName = app.exe_path.split(/[\\/]/).pop()?.toLowerCase();
+      return p.name.toLowerCase() === exeName || p.name.toLowerCase() === exeName?.replace(".exe", "");
+    });
+
     card.innerHTML = `
       <div class="app-card-header">
         <div class="app-icon-wrapper">
           ${iconHtml}
+          ${isRunning ? '<span class="running-dot" title="Application is currently running"></span>' : ''}
         </div>
         <div class="app-info">
-          <div class="app-name" title="${app.name}">${app.name}</div>
+          <div class="app-name" title="${app.name}">
+            ${app.name}
+          </div>
           <div class="app-publisher">${app.publisher}</div>
         </div>
       </div>

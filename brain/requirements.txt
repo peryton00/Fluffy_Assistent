@@ -1,10 +1,21 @@
+# =============================================
+# Fluffy Assistant - Python Dependencies
+# Install: pip install -r requirements.txt
+# =============================================
+
+# --- Core (required) ---
 flask
 requests
+python-dotenv
+
+# --- Security / Auth ---
+bcrypt>=4.1.0
+
+# --- FTP Server (optional - file sharing) ---
+pyftpdlib
+qrcode[pil]
+
+# --- Voice STT (optional - speech-to-text) ---
 vosk
 sounddevice
 numpy
-pathlib
-uuid
-websockets
-psutil
-bcrypt>=4.1.0

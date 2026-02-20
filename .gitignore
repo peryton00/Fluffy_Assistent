@@ -2,6 +2,8 @@
 
 # Data & Security
 fluffy_data/
+data/
+brain/data/
 brain/guardian/*.json
 brain/**/*.log
 *.fluffy

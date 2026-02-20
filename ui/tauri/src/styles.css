@@ -452,10 +452,65 @@ body.light-mode .upgrade-btn {
   min-width: 45px;
 }
 
+/* Battery & Bluetooth Containers */
+.battery-container,
+.bluetooth-container {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  background: var(--bg-secondary);
+  padding: 6px 12px;
+  border-radius: 20px;
+  font-size: 13px;
+  color: var(--text-secondary);
+  border: 1px solid var(--border);
+  transition: var(--transition);
+}
+
+.battery-container:hover,
+.bluetooth-container:hover {
+  border-color: var(--accent-light);
+  background: var(--bg-card);
+}
+
+.battery-icon i {
+  width: 18px;
+  height: 18px;
+}
+
+.battery-container.low {
+  color: var(--error);
+}
+
+.battery-container.charging {
+  color: var(--success);
+}
+
+.bluetooth-btn {
+  background: transparent;
+  border: none;
+  color: inherit;
+  padding: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.bluetooth-btn i {
+  width: 18px;
+  height: 18px;
+}
+
+.bluetooth-container.active {
+  color: var(--accent);
+  background: var(--accent-10);
+  border-color: var(--accent-light);
+}
+
 .top-nav {
   display: flex;
   align-items: center;
-  gap: 16px;
+  gap: 12px;
 }
 
 .header-right {
@@ -657,6 +712,32 @@ body.light-mode .upgrade-btn {
   font-size: 12px;
   color: var(--text-secondary);
   margin: 0;
+}
+
+.card-progress {
+  height: 6px;
+  background: rgba(255, 255, 255, 0.05);
+  border-radius: 3px;
+  margin: 12px 0;
+  overflow: hidden;
+  position: relative;
+}
+
+.progress-fill {
+  height: 100%;
+  background: linear-gradient(90deg, var(--accent) 0%, #a855f7 100%);
+  border-radius: 3px;
+  transition: width 0.5s cubic-bezier(0.4, 0, 0.2, 1);
+  box-shadow: 0 0 10px rgba(139, 92, 246, 0.3);
+}
+
+.stat-card.primary .card-progress {
+  background: rgba(255, 255, 255, 0.1);
+}
+
+.stat-card.primary .progress-fill {
+  background: white;
+  box-shadow: 0 0 10px rgba(255, 255, 255, 0.3);
 }
 
 .stat-card.primary .card-comparison {
@@ -1096,7 +1177,9 @@ button:active {
   fill: none;
   stroke-width: 2.5;
   stroke-linecap: round;
-  transition: d 0.3s;
+  transition: d 1s cubic-bezier(0.4, 0, 0.2, 1);
+  shape-rendering: geometricPrecision;
+  vector-effect: non-scaling-stroke;
 }
 
 .chart-line.cpu {
@@ -1105,6 +1188,22 @@ button:active {
 
 .chart-line.ram {
   stroke: var(--success);
+}
+
+.chart-area {
+  stroke: none;
+  opacity: 0.8;
+  pointer-events: none;
+  transition: d 1s cubic-bezier(0.4, 0, 0.2, 1);
+  filter: url(#soft-blur);
+}
+
+.chart-area.cpu {
+  fill: url(#cpu-gradient);
+}
+
+.chart-area.ram {
+  fill: url(#ram-gradient);
 }
 
 .chart-legend {
@@ -2845,7 +2944,7 @@ input:checked+.slider:before {
   font-size: 24px;
   color: var(--accent);
   border: 1px solid var(--border);
-  overflow: hidden;
+  position: relative;
 }
 
 .app-icon-img {
@@ -2867,6 +2966,41 @@ input:checked+.slider:before {
   overflow: hidden;
   text-overflow: ellipsis;
   margin-bottom: 2px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.running-dot {
+  position: absolute;
+  top: -4px;
+  right: -4px;
+  width: 12px;
+  height: 12px;
+  background-color: var(--success);
+  border-radius: 50%;
+  border: 2px solid var(--bg-card);
+  box-shadow: 0 0 10px var(--success);
+  flex-shrink: 0;
+  animation: pulse-green 2s infinite;
+  z-index: 2;
+}
+
+@keyframes pulse-green {
+  0% {
+    transform: scale(1);
+    opacity: 1;
+  }
+
+  50% {
+    transform: scale(1.2);
+    opacity: 0.7;
+  }
+
+  100% {
+    transform: scale(1);
+    opacity: 1;
+  }
 }
 
 .app-publisher {
@@ -3101,6 +3235,110 @@ input:checked+.slider:before {
     width: 100%;
     justify-content: space-between;
   }
+}
+
+/* Circular Progress Bar Styling */
+.circular-progress-container {
+  position: absolute;
+  top: 15px;
+  right: 15px;
+  width: 50px;
+  height: 50px;
+}
+
+.circular-progress {
+  width: 100%;
+  height: 100%;
+  transform: rotate(-90deg);
+}
+
+.circular-progress circle {
+  fill: none;
+  stroke-width: 3;
+  stroke-linecap: round;
+}
+
+.circular-progress circle.bg {
+  stroke: var(--border-light);
+}
+
+.circular-progress circle.progress {
+  stroke: var(--accent);
+  stroke-dasharray: 100.5;
+  /* 2 * PI * R (16) = ~100.5 */
+  transition: stroke-dashoffset 0.5s ease, stroke 0.3s ease;
+}
+
+.circular-progress circle.progress.low {
+  stroke: var(--success);
+}
+
+.circular-progress circle.progress.med {
+  stroke: var(--warning);
+}
+
+.circular-progress circle.progress.high {
+  stroke: var(--error);
+}
+
+
+
+.stat-card {
+  position: relative;
+  /* Ensure container is absolute to card */
+}
+
+/* Remove old linear progress styles if necessary, but keep for now if reused elsewhere */
+.card-progress {
+  display: none;
+}
+
+/* Professional Offender Bar Redesign */
+.offender-bar-bg {
+  height: 8px;
+  background: var(--bg-primary);
+  border-radius: 4px;
+  overflow: hidden;
+  margin-top: 6px;
+  border: 1px solid var(--border-light);
+}
+
+.offender-bar-fill {
+  height: 100%;
+  background: linear-gradient(90deg, var(--accent) 0%, #6366f1 100%);
+  border-radius: 4px;
+  transition: width 0.8s cubic-bezier(0.34, 1.56, 0.64, 1);
+  box-shadow: 0 0 8px rgba(139, 92, 246, 0.2);
+}
+
+.battery-container,
+.bluetooth-container {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 14px;
+  color: var(--text-secondary);
+}
+
+.battery-container i,
+.bluetooth-container i {
+  font-size: 18px;
+  color: var(--accent);
+}
+
+.card-progress {
+  height: 6px;
+  background: var(--overlay-subtle);
+  border-radius: 3px;
+  overflow: hidden;
+  margin-top: 10px;
+}
+
+.card-progress-fill {
+  height: 100%;
+  background: var(--accent);
+  border-radius: 3px;
+  transition: width 0.5s ease-out;
 }
 
 /* Large Displays */

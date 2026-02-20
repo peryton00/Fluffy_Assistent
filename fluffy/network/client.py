@@ -11,7 +11,7 @@ import threading
 import time
 import uuid
 from typing import Optional, Dict, List
-from urllib.request import urlopen
+from urllib.request import urlopen, Request
 from urllib.error import URLError
 
 
@@ -114,6 +114,40 @@ class AdminClient:
         with self._lock:
             entry = self._machines.get(machine_id)
             return entry.last_data if entry else None
+
+    def send_action(self, machine_id: str, action_data: dict) -> tuple:
+        """
+        Send an action request to a client machine.
+        
+        Returns:
+            (success: bool, result_dict_or_error_str)
+        """
+        with self._lock:
+            entry = self._machines.get(machine_id)
+            if not entry:
+                return False, "Machine not found"
+            
+            ip, port = entry.ip, entry.port
+
+        url = f"http://{ip}:{port}/action"
+        
+        # Add token
+        from brain.routes.cluster_routes import FLUFFY_TOKEN
+        headers = {
+            "Content-Type": "application/json",
+            "X-Fluffy-Token": FLUFFY_TOKEN
+        }
+        
+        try:
+            data = json.dumps(action_data).encode("utf-8")
+            req = Request(url, data=data, headers=headers, method="POST")
+            with urlopen(req, timeout=self.TIMEOUT) as resp:
+                body = json.loads(resp.read().decode())
+                if body.get("ok"):
+                    return True, body
+                return False, body.get("error", "Unknown error")
+        except Exception as e:
+            return False, str(e)
 
     def disconnect_all(self):
         """Remove all machines and stop polling."""

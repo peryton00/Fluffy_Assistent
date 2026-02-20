@@ -96,11 +96,60 @@ class _DataHandler(BaseHTTPRequestHandler):
         else:
             self._send_json({"error": "Not found"}, 404)
 
+    def do_POST(self):
+        client_ip = self.client_address[0]
+        
+        # Simple token-based auth
+        auth_token = self.headers.get("X-Fluffy-Token")
+        from brain.routes.cluster_routes import FLUFFY_TOKEN
+        
+        if auth_token != FLUFFY_TOKEN:
+            self._send_json({"error": "Unauthorized"}, 401)
+            return
+
+        content_length = int(self.headers.get('Content-Length', 0))
+        if content_length == 0:
+            self._send_json({"error": "Missing payload"}, 400)
+            return
+
+        try:
+            post_data = self.rfile.read(content_length)
+            data = json.loads(post_data.decode('utf-8'))
+            action = data.get("action")
+            
+            if action == "kill_process":
+                pid = data.get("pid")
+                if not pid:
+                    self._send_json({"error": "Missing pid"}, 400)
+                    return
+                
+                # Execute kill
+                import subprocess
+                try:
+                    result = subprocess.run(
+                        ["taskkill", "/PID", str(pid), "/F"],
+                        capture_output=True,
+                        text=True
+                    )
+                    if result.returncode == 0:
+                        self._send_json({"ok": True, "message": f"Terminated PID {pid}"})
+                    else:
+                        self._send_json({"error": result.stderr or "Failed to kill process"}, 500)
+                except Exception as e:
+                    self._send_json({"error": str(e)}, 500)
+            
+            else:
+                self._send_json({"error": f"Unknown action: {action}"}, 400)
+                
+        except Exception as e:
+            self._send_json({"error": str(e)}, 500)
+
     def do_OPTIONS(self):
         # Handle CORS preflight
         self.send_response(200)
         self.send_header("Access-Control-Allow-Origin", "*")
-        self.send_header("Access-Control-Allow-Methods", "GET, OPTIONS")
+        self.send_header("Access-Control-Allow-Methods", "GET, POST, OPTIONS")
+        self.send_header("Access-Control-Allow-Headers", "X-Fluffy-Token, Content-Type")
         self.end_headers()
 
 

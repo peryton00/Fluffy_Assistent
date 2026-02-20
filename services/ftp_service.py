@@ -31,6 +31,7 @@ _connected_clients: List[Dict[str, Any]] = []
 _transfer_sessions: Dict[str, Dict[str, Any]] = {}  # Track active transfers per client IP
 _speed_calc_thread: Optional[threading.Thread] = None
 _speed_calc_running = False
+_current_shared_dir: str = ""  # Track the active shared directory
 
 # Configuration
 FTP_PORT = 2121
@@ -199,8 +200,6 @@ def calculate_speeds():
     global _connected_clients, _transfer_sessions, _speed_calc_running
     
     while _speed_calc_running:
-        current_time = time.time()
-        
         for client in _connected_clients:
             client_ip = client["ip"]
             if client_ip not in _transfer_sessions:
@@ -208,21 +207,17 @@ def calculate_speeds():
             
             session = _transfer_sessions[client_ip]
             
-            # Calculate upload speed
-            if session["upload_start"] and session["upload_bytes"] > 0:
-                elapsed = current_time - session["upload_start"]
-                if elapsed > 0:
-                    client["current_upload_speed"] = session["upload_bytes"] / elapsed
-            else:
-                client["current_upload_speed"] = 0
+            # Calculate instantaneous upload speed
+            current_up = session["upload_bytes"]
+            prev_up = session.get("prev_upload_bytes", 0)
+            client["current_upload_speed"] = max(0, current_up - prev_up)
+            session["prev_upload_bytes"] = current_up
             
-            # Calculate download speed
-            if session["download_start"] and session["download_bytes"] > 0:
-                elapsed = current_time - session["download_start"]
-                if elapsed > 0:
-                    client["current_download_speed"] = session["download_bytes"] / elapsed
-            else:
-                client["current_download_speed"] = 0
+            # Calculate instantaneous download speed
+            current_down = session["download_bytes"]
+            prev_down = session.get("prev_download_bytes", 0)
+            client["current_download_speed"] = max(0, current_down - prev_down)
+            session["prev_download_bytes"] = current_down
         
         time.sleep(1)  # Update every second
 
@@ -305,6 +300,8 @@ class FluffyFTPHandler(FTPHandler):
         _transfer_sessions[client_ip] = {
             "upload_bytes": 0,
             "download_bytes": 0,
+            "prev_upload_bytes": 0,
+            "prev_download_bytes": 0,
             "upload_start": None,
             "download_start": None,
             "current_file": None
@@ -441,7 +438,8 @@ def start_ftp_server(shared_dir: Optional[str] = None) -> Dict[str, Any]:
     Returns:
         Dictionary with status, credentials, and server info
     """
-    global _server, _server_thread, _current_password, _current_ip, _is_running, _connected_clients, _speed_calc_thread, _speed_calc_running
+    global _server, _server_thread, _current_password, _current_ip, _is_running
+    global _connected_clients, _speed_calc_thread, _speed_calc_running, _current_shared_dir
     
     with _server_lock:
         # Check if already running
@@ -507,6 +505,7 @@ def start_ftp_server(shared_dir: Optional[str] = None) -> Dict[str, Any]:
             _server_thread.start()
             
             _is_running = True
+            _current_shared_dir = target_dir
             _connected_clients = []
             
             # Log activity
@@ -569,7 +568,8 @@ def stop_ftp_server() -> Dict[str, Any]:
     Returns:
         Dictionary with status
     """
-    global _server, _server_thread, _current_password, _current_ip, _is_running, _connected_clients, _speed_calc_thread, _speed_calc_running, _transfer_sessions
+    global _server, _server_thread, _current_password, _current_ip, _is_running
+    global _connected_clients, _speed_calc_thread, _speed_calc_running, _transfer_sessions, _current_shared_dir
     
     with _server_lock:
         if not _is_running:
@@ -693,7 +693,7 @@ def get_ftp_status() -> Dict[str, Any]:
     Returns:
         Dictionary with server status and info
     """
-    global _is_running, _current_ip, _current_password, _connected_clients
+    global _is_running, _current_ip, _current_password, _connected_clients, _current_shared_dir
     
     with _server_lock:
         if _is_running:
@@ -703,7 +703,7 @@ def get_ftp_status() -> Dict[str, Any]:
                 "port": FTP_PORT,
                 "username": FTP_USERNAME,
                 "password": _current_password,
-                "shared_dir": SHARED_DIR,
+                "shared_dir": _current_shared_dir or SHARED_DIR,
                 "url": f"ftp://{_current_ip}:{FTP_PORT}",
                 "connected_clients": len(_connected_clients),
                 "clients": _connected_clients
@@ -711,6 +711,7 @@ def get_ftp_status() -> Dict[str, Any]:
         else:
             return {
                 "status": "stopped",
+                "shared_dir": _current_shared_dir or SHARED_DIR,
                 "connected_clients": 0
             }
 
