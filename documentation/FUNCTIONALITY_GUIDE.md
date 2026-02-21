@@ -2,7 +2,7 @@
 
 ## Executive Summary
 
-**Fluffy Integrated Assistant System** is an advanced, privacy-focused system monitoring and security platform for Windows. It combines high-performance native system monitoring (Rust), intelligent behavioral analysis (Python), and a modern desktop interface (Tauri/TypeScript) to provide users with real-time insights into system health, detect suspicious behavior, and offer intelligent assistance through voice commands and LLM-powered chat.
+**Fluffy Integrated Assistant System** is an advanced, privacy-focused system monitoring and security platform for **Windows and Linux (Kali Linux)**. It combines high-performance native system monitoring (Rust), intelligent behavioral analysis (Python), and a modern desktop interface (Tauri/TypeScript) to provide users with real-time insights into system health, detect suspicious behavior, and offer intelligent assistance through voice commands and LLM-powered chat.
 
 **Key Highlights:**
 - **100% Local Processing** - No cloud dependencies, complete privacy
@@ -22,16 +22,16 @@ Fluffy Assistant follows a clean separation of concerns with three distinct serv
 
 ```
 ┌─────────────────────────────────────────────────────────────┐
-│                        USER INTERFACE                        │
-│                    (Tauri + TypeScript)                      │
-│                     Port: Native Window                      │
+│                        USER INTERFACE                       │
+│                    (Tauri + TypeScript)                     │
+│                     Port: Native Window                     │
 └──────────────────────┬──────────────────────────────────────┘
                        │ HTTP/WebSocket
                        ▼
 ┌─────────────────────────────────────────────────────────────┐
-│                    INTELLIGENCE LAYER                        │
-│                      (Python Brain)                          │
-│                       Port: 5123                             │
+│                    INTELLIGENCE LAYER                       │
+│                      (Python Brain)                         │
+│                       Port: 5123                            │
 │  ┌──────────────────────────────────────────────────────┐   │
 │  │ • Security Monitor  • Guardian Engine                │   │
 │  │ • LLM Service       • Voice System                   │   │
@@ -41,9 +41,9 @@ Fluffy Assistant follows a clean separation of concerns with three distinct serv
                        │ IPC (TCP Socket)
                        ▼
 ┌─────────────────────────────────────────────────────────────┐
-│                     MONITORING ENGINE                        │
-│                       (Rust Core)                            │
-│                   Ports: 9001, 9002                          │
+│                     MONITORING ENGINE                       │
+│                       (Rust Core)                           │
+│                   Ports: 9001, 9002                         │
 │  ┌──────────────────────────────────────────────────────┐   │
 │  │ • System Telemetry  • Process Management             │   │
 │  │ • ETW Network       • Volume/Brightness Control      │   │
@@ -100,7 +100,9 @@ The Guardian is a **Level 2 behavioral security system** that learns normal syst
 #### Four Pillars of Detection
 
 **1. Path Integrity**
-- Monitors execution from suspicious locations (`%TEMP%`, `AppData\Local\Temp`)
+- Monitors execution from suspicious locations:
+  - **Windows**: `%TEMP%`, `AppData\Local\Temp`
+  - **Linux**: `/tmp/`, `/dev/shm/`, `/var/tmp/`
 - Flags processes running from non-standard directories
 - Risk Score: +30 for temp execution
 
@@ -241,25 +243,31 @@ The Guardian is a **Level 2 behavioral security system** that learns normal syst
 - **Location**: `fluffy_data/apps_cache.json`
 - **Metadata**: Last scan timestamp, app count
 - **Manual Refresh**: Force re-scan via UI
+- **Cross-Platform**: Registry scan (Windows) / `.desktop` file scan (Linux)
 
 ---
 
-### 6. System Normalization
+### 6. System Normalization (Enhanced)
 
 One-click system optimization that:
 
 **Volume Control**
 - Sets system volume to 50%
-- Uses WScript for compatibility
+- Uses WScript (Windows) for compatibility
 
 **Brightness Control**
 - Sets screen brightness to 70%
-- Uses WMI for hardware access
+- Uses WMI (Windows) for hardware access
 
-**Disk Cleanup**
-- Purges `%TEMP%` directory
-- Removes temporary files
+**Cache & Disk Cleanup**
+- Purges system temp directories (`%TEMP%` / `/tmp/`)
+- Cleans browser caches (Chrome, Firefox, Edge)
+- Removes package manager caches
 - Frees disk space
+
+**RAM Optimization**
+- Identifies unused services consuming memory
+- Suggests services that can be stopped
 
 **Security Scan**
 - Lists unusual processes (Threat Score > 0)
@@ -478,9 +486,9 @@ The Guardian engine runs on every telemetry update:
 ### Planned Enhancements
 
 #### 1. Cross-Platform Support
-- **Linux**: Port Core to use `/proc` filesystem
-- **macOS**: Adapt to Activity Monitor APIs
-- **Mobile**: React Native companion app
+- **Linux**: ✅ Implemented — Platform abstraction layer, Linux process management, `.desktop` app discovery
+- **macOS**: Adapt to Activity Monitor APIs (planned)
+- **Mobile**: React Native companion app (planned)
 
 #### 2. Advanced Analytics
 - **Trend Analysis**: Long-term resource usage patterns
@@ -529,7 +537,7 @@ The Guardian engine runs on every telemetry update:
 ## Technical Specifications
 
 ### System Requirements
-- **OS**: Windows 10/11 (64-bit)
+- **OS**: Windows 10/11 (64-bit) or Linux (Kali, Debian, Ubuntu)
 - **RAM**: 4GB minimum, 8GB recommended
 - **Disk**: 500MB for application + models
 - **Network**: Optional (for LLM providers)

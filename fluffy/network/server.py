@@ -125,12 +125,18 @@ class _DataHandler(BaseHTTPRequestHandler):
                 
                 # Execute kill
                 import subprocess
+                import platform as _platform
                 try:
-                    result = subprocess.run(
-                        ["taskkill", "/PID", str(pid), "/F"],
-                        capture_output=True,
-                        text=True
-                    )
+                    if _platform.system() == "Windows":
+                        result = subprocess.run(
+                            ["taskkill", "/PID", str(pid), "/F"],
+                            capture_output=True, text=True
+                        )
+                    else:
+                        result = subprocess.run(
+                            ["kill", "-9", str(pid)],
+                            capture_output=True, text=True
+                        )
                     if result.returncode == 0:
                         self._send_json({"ok": True, "message": f"Terminated PID {pid}"})
                     else:

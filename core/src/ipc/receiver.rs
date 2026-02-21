@@ -34,7 +34,11 @@ pub fn start_command_server(port: u16) {
 }
 
 static KILL_HISTORY: Lazy<Mutex<Vec<std::time::Instant>>> = Lazy::new(|| Mutex::new(Vec::new()));
+
+#[cfg(target_os = "windows")]
 const PROTECTED_PROCESSES: &[&str] = &["csrss.exe", "wininit.exe", "lsass.exe", "services.exe", "smss.exe", "winlogon.exe"];
+#[cfg(not(target_os = "windows"))]
+const PROTECTED_PROCESSES: &[&str] = &["init", "systemd", "kthreadd", "ksoftirqd", "rcu_sched", "sshd"];
 
 fn handle_command(cmd: IpcCommand) {
     match cmd {
@@ -84,78 +88,76 @@ fn handle_command(cmd: IpcCommand) {
 fn execute(cmd: IpcCommand) {
     match cmd {
         IpcCommand::KillProcess { pid } => {
-            #[cfg(target_os = "windows")]
-            {
-                use sysinfo::{Pid, System, ProcessesToUpdate};
-                use std::time::{Duration, Instant};
+            use sysinfo::{Pid, System, ProcessesToUpdate};
+            use std::time::{Duration, Instant};
 
-                let mut status = "success";
-                let mut error_msg = String::new();
+            let mut status = "success";
+            let mut error_msg = String::new();
 
-                // 1. Rate Limiting Check
-                let now = Instant::now();
-                let mut history = KILL_HISTORY.lock().unwrap();
-                // Remove entries older than 10 seconds
-                history.retain(|&t| now.duration_since(t) < Duration::from_secs(10));
-                
-                if history.len() >= 3 {
-                    status = "error";
-                    error_msg = "Rate limit exceeded: >3 kills in 10s".to_string();
-                } else {
-                    // 2. Protected Process Check
-                    let mut sys = System::new();
-                    let target_pid = Pid::from_u32(pid);
-                    // Refresh only the specific process
-                    sys.refresh_processes(ProcessesToUpdate::Some(&[target_pid]), true);
+            // 1. Rate Limiting Check
+            let now = Instant::now();
+            let mut history = KILL_HISTORY.lock().unwrap();
+            history.retain(|&t| now.duration_since(t) < Duration::from_secs(10));
+            
+            if history.len() >= 3 {
+                status = "error";
+                error_msg = "Rate limit exceeded: >3 kills in 10s".to_string();
+            } else {
+                // 2. Protected Process Check
+                let mut sys = System::new();
+                let target_pid = Pid::from_u32(pid);
+                sys.refresh_processes(ProcessesToUpdate::Some(&[target_pid]), true);
 
-                    if let Some(process) = sys.process(target_pid) {
-                        let name = process.name().to_string_lossy().to_lowercase(); // sysinfo might return OsStr
-                            if PROTECTED_PROCESSES.contains(&name.as_str()) {
-                            status = "error";
-                            error_msg = format!("Protected system process: {}", name);
-                        }
+                if let Some(process) = sys.process(target_pid) {
+                    let name = process.name().to_string_lossy().to_lowercase();
+                    if PROTECTED_PROCESSES.contains(&name.as_str()) {
+                        status = "error";
+                        error_msg = format!("Protected system process: {}", name);
                     }
-                    // If process not found, we let taskkill handle it (it might error "process not found")
                 }
-
-                if status == "success" {
-                     // Record this attempt for rate limiting (only if we are actually proceeding)
-                     history.push(now);
-                     
-                    let result = std::process::Command::new("taskkill")
-                        .args(["/PID", &pid.to_string(), "/T", "/F"])
-                        .output();
-
-                    status = match result {
-                        Ok(out) if out.status.success() => "success",
-                        Ok(out) => {
-                            let stderr = String::from_utf8_lossy(&out.stderr).to_string();
-                            error_msg = stderr.trim().to_string();
-                            "error"
-                        }
-                        Err(e) => {
-                            error_msg = e.to_string();
-                            "error"
-                        }
-                    };
-                }
-
-                crate::ipc::server::IpcServer::broadcast_global(&crate::ipc::protocol::IpcMessage {
-                    schema_version: "1.0".to_string(),
-                    payload: serde_json::json!({
-                        "type": "execution_result",
-                        "command": "KillProcess",
-                        "pid": pid,
-                        "status": status,
-                        "error": if error_msg.is_empty() { None } else { Some(error_msg) }
-                    }),
-                });
             }
+
+            if status == "success" {
+                 history.push(now);
+                 
+                #[cfg(target_os = "windows")]
+                let result = std::process::Command::new("taskkill")
+                    .args(["/PID", &pid.to_string(), "/T", "/F"])
+                    .output();
+
+                #[cfg(not(target_os = "windows"))]
+                let result = std::process::Command::new("kill")
+                    .args(["-9", &pid.to_string()])
+                    .output();
+
+                status = match result {
+                    Ok(out) if out.status.success() => "success",
+                    Ok(out) => {
+                        let stderr = String::from_utf8_lossy(&out.stderr).to_string();
+                        error_msg = stderr.trim().to_string();
+                        "error"
+                    }
+                    Err(e) => {
+                        error_msg = e.to_string();
+                        "error"
+                    }
+                };
+            }
+
+            crate::ipc::server::IpcServer::broadcast_global(&crate::ipc::protocol::IpcMessage {
+                schema_version: "1.0".to_string(),
+                payload: serde_json::json!({
+                    "type": "execution_result",
+                    "command": "KillProcess",
+                    "pid": pid,
+                    "status": status,
+                    "error": if error_msg.is_empty() { None } else { Some(error_msg) }
+                }),
+            });
         }
         IpcCommand::StartupAdd { name, path } => {
             #[cfg(target_os = "windows")]
             {
-                // PowerShell is robust for registry operations
                 let script = format!(
                     "New-ItemProperty -Path 'HKCU:\\Software\\Microsoft\\Windows\\CurrentVersion\\Run' -Name '{}' -Value '{}' -PropertyType String -Force",
                     name.replace("'", "''"), 
@@ -182,6 +184,19 @@ fn execute(cmd: IpcCommand) {
                     }),
                 });
             }
+
+            #[cfg(not(target_os = "windows"))]
+            {
+                crate::ipc::server::IpcServer::broadcast_global(&crate::ipc::protocol::IpcMessage {
+                    schema_version: "1.0".to_string(),
+                    payload: serde_json::json!({
+                        "type": "execution_result",
+                        "command": "StartupAdd",
+                        "status": "error",
+                        "error": "Startup management is not supported on Linux. Use your distro's autostart configuration."
+                    }),
+                });
+            }
         }
 
         IpcCommand::StartupRemove { name } => {
@@ -190,7 +205,6 @@ fn execute(cmd: IpcCommand) {
                 let mut status = "success";
                 let mut error = None;
 
-                // Parse source from name e.g. "My App (HKCU)" or "script.bat (Folder)"
                 if name.ends_with("(HKCU)") {
                     let real_name = name.strip_suffix(" (HKCU)").unwrap();
                     let script = format!(
@@ -225,8 +239,6 @@ fn execute(cmd: IpcCommand) {
                     }
                 } else if name.ends_with("(Folder)") {
                     let real_name = name.strip_suffix(" (Folder)").unwrap();
-                    // We need the full path to delete from folder. 
-                    // Since we only have the name here, we'd have to scan both folders to find it.
                     let folders = vec![
                         std::env::var("APPDATA").map(|s| format!("{}\\Microsoft\\Windows\\Start Menu\\Programs\\Startup", s)),
                         std::env::var("ProgramData").map(|s| format!("{}\\Microsoft\\Windows\\Start Menu\\Programs\\Startup", s)),
@@ -248,7 +260,6 @@ fn execute(cmd: IpcCommand) {
                         error = Some("Startup file not found.".to_string());
                     }
                 } else {
-                    // Fallback for legacy items or items without suffix (defaults to HKCU)
                     let script = format!(
                         "Remove-ItemProperty -Path 'HKCU:\\Software\\Microsoft\\Windows\\CurrentVersion\\Run' -Name '{}' -Force",
                         name.replace("'", "''")
@@ -266,6 +277,19 @@ fn execute(cmd: IpcCommand) {
                     }),
                 });
             }
+
+            #[cfg(not(target_os = "windows"))]
+            {
+                crate::ipc::server::IpcServer::broadcast_global(&crate::ipc::protocol::IpcMessage {
+                    schema_version: "1.0".to_string(),
+                    payload: serde_json::json!({
+                        "type": "execution_result",
+                        "command": "StartupRemove",
+                        "status": "error",
+                        "error": "Startup management is not supported on Linux. Use your distro's autostart configuration."
+                    }),
+                });
+            }
         }
 
         IpcCommand::StartupToggle { name, enabled } => {
@@ -274,7 +298,6 @@ fn execute(cmd: IpcCommand) {
                 let mut status = "success";
                 let mut error = None;
 
-                // Handle registry entries only for now. Folder entries are complex to toggle.
                 if name.ends_with("(HKCU)") || name.ends_with("(HKLM)") {
                     let (_hive_path, approved_path) = if name.ends_with("(HKCU)") {
                         ("HKCU:\\Software\\Microsoft\\Windows\\CurrentVersion\\Run", 
@@ -290,7 +313,6 @@ fn execute(cmd: IpcCommand) {
                         name.strip_suffix(" (HKLM)").unwrap()
                     };
 
-                    // Value 0x02 enabled, 0x03 disabled (binary byte array)
                     let hex_val = if enabled { "02,00,00,00,00,00,00,00,00,00,00,00" } else { "03,00,00,00,00,00,00,00,00,00,00,00" };
                     
                     let script = format!(
@@ -322,6 +344,20 @@ fn execute(cmd: IpcCommand) {
                         "command": "StartupToggle",
                         "status": status,
                         "error": error
+                    }),
+                });
+            }
+
+            #[cfg(not(target_os = "windows"))]
+            {
+                let _ = (name, enabled); // suppress unused warnings
+                crate::ipc::server::IpcServer::broadcast_global(&crate::ipc::protocol::IpcMessage {
+                    schema_version: "1.0".to_string(),
+                    payload: serde_json::json!({
+                        "type": "execution_result",
+                        "command": "StartupToggle",
+                        "status": "error",
+                        "error": "Startup management is not supported on Linux. Use your distro's autostart configuration."
                     }),
                 });
             }

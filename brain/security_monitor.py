@@ -1,5 +1,6 @@
 import os
 import time
+import platform_utils
 
 class SecurityMonitor:
     def __init__(self):
@@ -94,7 +95,8 @@ class SecurityMonitor:
         exe_path = p.get("exe_path", "").lower()
 
         # Signal 1: Suspicious Directory
-        if exe_path and any(s in exe_path for s in ["\\temp\\", "\\appdata\\local\\temp\\"]):
+        suspicious_patterns = platform_utils.get_suspicious_path_patterns()
+        if exe_path and any(s in exe_path for s in suspicious_patterns):
             if "Suspicious Path" not in hist["detected_signals"]:
                 hist["detected_signals"].add("Suspicious Path")
                 score_gain += 15

@@ -96,5 +96,18 @@
       "port": 2121,
       "shared_dir": "C:\\Users\\sudip\\Downloads"
     }
+  },
+  {
+    "timestamp": "2026-02-21T15:06:35.968656",
+    "event": "server_started",
+    "details": {
+      "ip": "192.168.1.49",
+      "port": 2121,
+      "shared_dir": "C:\\Users\\sudip\\Downloads"
+    }
+  },
+  {
+    "timestamp": "2026-02-21T15:06:48.016880",
+    "event": "server_stopped"
   }
 ]

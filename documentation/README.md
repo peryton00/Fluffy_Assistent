@@ -4,7 +4,15 @@ This folder contains comprehensive documentation for the FluffyAssistent project
 
 ## 📚 Documentation Files
 
-### 1. FUNCTIONALITY_GUIDE.md (19 KB)
+### 1. agent.md (Project Architecture & Agent Briefing)
+**Comprehensive architecture and AI agent reference:**
+- Cross-platform architecture overview (Windows + Linux)
+- Three-tier hexagonal architecture deep-dive
+- All key features with implementation details
+- Platform abstraction layer reference
+- Actionable guidance for future AI agents
+
+**Read this first** for technical architecture and agent onboarding.
 **Comprehensive feature documentation covering:**
 - Executive summary and architecture overview
 - All core features (monitoring, security, voice, LLM, apps)
@@ -130,5 +138,5 @@ For questions about the documentation or the project:
 
 ---
 
-**Last Updated:** February 14, 2026  
-**Documentation Version:** 1.0
+**Last Updated:** February 21, 2026  
+**Documentation Version:** 2.0

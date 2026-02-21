@@ -3176,6 +3176,13 @@ async function setNetworkRole(role: string) {
     showToast(`Switched to ${role} mode`, "success");
     currentNetworkRole = role;
     updateRoleUI(role);
+
+    // Start or stop network polling based on role
+    if (role === "standalone") {
+      stopNetworkPolling();
+    } else {
+      startNetworkPolling();
+    }
   } else {
     showToast(data?.error || "Failed to switch role", "error");
   }

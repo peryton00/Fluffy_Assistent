@@ -14,9 +14,7 @@ env_logger = "0.11"
 ctrlc = "3.4"
 once_cell = "1"
 uuid = { version = "1", features = ["v4"] }
-windows-sys = { version = "0.52", features = ["Win32_Security", "Win32_System_Registry", "Win32_Foundation"] }
 dashmap = "6.1"
-ferrisetw = "1.2"
 dirs = "5.0"
 
 [target.'cfg(windows)'.dependencies]
@@ -27,4 +25,5 @@ windows = { version = "0.52", features = [
     "Foundation",
     "Foundation_Collections",
 ] }
+ferrisetw = "1.2"
 

@@ -7,6 +7,7 @@ import requests
 from typing import Dict, Any, Optional
 from brain.command_parser import Command, Intent
 from brain.action_validator import ValidationResult, SafetyLevel
+from brain import platform_utils
 
 
 class CommandExecutor:
@@ -152,22 +153,10 @@ class CommandExecutor:
         
         app_name = command.parameters.get("app_name", "")
         
-        # Common app mappings
-        app_paths = {
-            "chrome": "C:\\Program Files\\Google\\Chrome\\Application\\chrome.exe",
-            "brave": "C:\\Program Files\\BraveSoftware\\Brave-Browser\\Application\\brave.exe",
-            "firefox": "C:\\Program Files\\Mozilla Firefox\\firefox.exe",
-            "edge": "C:\\Program Files (x86)\\Microsoft\\Edge\\Application\\msedge.exe",
-            "vscode": "C:\\Program Files\\Microsoft VS Code\\Code.exe",
-            "code": "C:\\Program Files\\Microsoft VS Code\\Code.exe",
-            "notepad": "C:\\Windows\\System32\\notepad.exe",
-            "calculator": "C:\\Windows\\System32\\calc.exe",
-            "calc": "C:\\Windows\\System32\\calc.exe",
-        }
+        # Use platform-aware app discovery
+        app_path = platform_utils.find_app_executable(app_name)
         
-        app_path = app_paths.get(app_name.lower())
-        
-        if app_path and os.path.exists(app_path):
+        if app_path:
             try:
                 subprocess.Popen([app_path])
                 return {
@@ -232,7 +221,7 @@ class CommandExecutor:
             
             # Auto-open the folder and select the file
             try:
-                subprocess.run(['explorer', '/select,', str(full_path)])
+                platform_utils.open_file_in_explorer(str(full_path))
             except Exception as e:
                 print(f"[Executor] Failed to auto-open file location: {e}")
             
@@ -261,7 +250,7 @@ class CommandExecutor:
             
             # Auto-open the folder
             try:
-                subprocess.run(['explorer', str(full_path)])
+                platform_utils.open_folder(str(full_path))
             except Exception as e:
                 print(f"[Executor] Failed to auto-open folder: {e}")
             
@@ -368,7 +357,7 @@ class CommandExecutor:
             
             # 4. Auto-open the file
             try:
-                os.startfile(str(full_path))
+                platform_utils.open_file(str(full_path))
             except Exception as e:
                 print(f"[Executor] Failed to auto-open research file: {e}")
             
@@ -387,19 +376,12 @@ class CommandExecutor:
     
     def _execute_close_app(self, command: Command) -> Dict[str, Any]:
         """Execute app close command"""
-        import subprocess
-        
         app_name = command.parameters.get("app_name", "")
         
         try:
-            # Use taskkill to close the app
-            result = subprocess.run(
-                ["taskkill", "/IM", f"{app_name}.exe", "/F"],
-                capture_output=True,
-                text=True
-            )
+            success, msg = platform_utils.kill_process_by_name(app_name)
             
-            if result.returncode == 0:
+            if success:
                 return {
                     "success": True,
                     "message": f"Closed {app_name}",
@@ -424,15 +406,12 @@ class CommandExecutor:
         
         sys_command = command.parameters.get("command", "")
         
-        # Map commands to Windows commands
-        command_map = {
-            "shutdown": ["shutdown", "/s", "/t", "10"],
-            "restart": ["shutdown", "/r", "/t", "10"],
-            "reboot": ["shutdown", "/r", "/t", "10"],
-            "sleep": ["rundll32.exe", "powrprof.dll,SetSuspendState", "0,1,0"],
-            "lock": ["rundll32.exe", "user32.dll,LockWorkStation"],
-            "hibernate": ["shutdown", "/h"],
-        }
+        # Use platform-aware system commands
+        command_map = platform_utils.get_system_commands()
+        
+        # Also handle 'reboot' alias
+        if sys_command == "reboot":
+            sys_command = "restart"
         
         cmd_args = command_map.get(sys_command)
         
@@ -459,21 +438,12 @@ class CommandExecutor:
     
     def _execute_kill_process(self, command: Command) -> Dict[str, Any]:
         """Execute kill process command"""
-        import subprocess
-        
         process_name = command.parameters.get("process_name", "")
-        if not process_name.lower().endswith(".exe"):
-            process_name += ".exe"
         
         try:
-            # Use taskkill to terminate the process
-            result = subprocess.run(
-                ["taskkill", "/IM", process_name, "/F"],
-                capture_output=True,
-                text=True
-            )
+            success, msg = platform_utils.kill_process_by_name(process_name)
             
-            if result.returncode == 0:
+            if success:
                 return {
                     "success": True,
                     "message": f"Terminated process: {process_name}",
@@ -569,7 +539,7 @@ class CommandExecutor:
             
             # Auto-open project folder
             try:
-                subprocess.run(['explorer', str(project_path)])
+                platform_utils.open_folder(str(project_path))
             except Exception as e:
                 print(f"[Executor] Failed to open folder: {e}")
             
