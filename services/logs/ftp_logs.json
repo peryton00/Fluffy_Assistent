@@ -1,113 +1,818 @@
 [
   {
-    "timestamp": "2026-02-20T19:17:10.060710",
-    "event": "server_stopped"
-  },
-  {
-    "timestamp": "2026-02-20T19:17:35.938236",
-    "event": "server_started",
+    "timestamp": "2026-02-25T04:26:14.059714",
+    "event": "client_connected",
+    "client_ip": "192.168.1.42",
     "details": {
-      "ip": "192.168.1.41",
-      "port": 2121,
-      "shared_dir": "C:\\Users\\sudip\\Downloads"
+      "username": "fluffy",
+      "hostname": "PRIYANSHU"
     }
   },
   {
-    "timestamp": "2026-02-20T19:17:47.833366",
+    "timestamp": "2026-02-25T04:26:14.895236",
     "event": "client_disconnected",
-    "client_ip": "192.168.1.44"
+    "client_ip": "192.168.1.42"
   },
   {
-    "timestamp": "2026-02-20T19:17:49.550981",
+    "timestamp": "2026-02-25T04:26:19.420065",
+    "event": "client_connected",
+    "client_ip": "192.168.1.42",
+    "details": {
+      "username": "fluffy",
+      "hostname": "PRIYANSHU"
+    }
+  },
+  {
+    "timestamp": "2026-02-25T04:26:37.717169",
+    "event": "client_connected",
+    "client_ip": "192.168.1.42",
+    "details": {
+      "username": "fluffy",
+      "hostname": "Priyanshu"
+    }
+  },
+  {
+    "timestamp": "2026-02-25T04:26:38.905166",
+    "event": "file_uploaded",
+    "client_ip": "192.168.1.42",
+    "filename": "10th cert_compressed.pdf",
+    "details": {
+      "size_bytes": 153377
+    }
+  },
+  {
+    "timestamp": "2026-02-25T04:26:40.563469",
+    "event": "file_uploaded",
+    "client_ip": "192.168.1.42",
+    "filename": "10th rersle_compressed.pdf",
+    "details": {
+      "size_bytes": 184290
+    }
+  },
+  {
+    "timestamp": "2026-02-25T04:26:42.087818",
+    "event": "file_uploaded",
+    "client_ip": "192.168.1.42",
+    "filename": "16992898-440A-48AE-80EB-0EEAF3F37214.jpg",
+    "details": {
+      "size_bytes": 158661
+    }
+  },
+  {
+    "timestamp": "2026-02-25T04:26:44.206021",
+    "event": "file_uploaded",
+    "client_ip": "192.168.1.42",
+    "filename": "2.jpg",
+    "details": {
+      "size_bytes": 6779
+    }
+  },
+  {
+    "timestamp": "2026-02-25T04:26:45.922651",
+    "event": "file_uploaded",
+    "client_ip": "192.168.1.42",
+    "filename": "2_imresizer.jpg",
+    "details": {
+      "size_bytes": 121207
+    }
+  },
+  {
+    "timestamp": "2026-02-25T04:26:46.245011",
+    "event": "file_uploaded",
+    "client_ip": "192.168.1.42",
+    "filename": "7E85F720-71B2-4CEA-ABD7-C591FDA5BAE4.jpg",
+    "details": {
+      "size_bytes": 169044
+    }
+  },
+  {
+    "timestamp": "2026-02-25T04:26:47.897480",
+    "event": "file_uploaded",
+    "client_ip": "192.168.1.42",
+    "filename": "85E99238-D5DD-4E1F-871D-650CF7F713DE.jpg",
+    "details": {
+      "size_bytes": 182992
+    }
+  },
+  {
+    "timestamp": "2026-02-25T04:26:48.473579",
+    "event": "file_uploaded",
+    "client_ip": "192.168.1.42",
+    "filename": "AADHAAR.jpeg",
+    "details": {
+      "size_bytes": 65423
+    }
+  },
+  {
+    "timestamp": "2026-02-25T04:26:50.554969",
+    "event": "file_uploaded",
+    "client_ip": "192.168.1.42",
+    "filename": "aadhar_compressed (1).pdf",
+    "details": {
+      "size_bytes": 275385
+    }
+  },
+  {
+    "timestamp": "2026-02-25T04:26:52.486675",
+    "event": "file_uploaded",
+    "client_ip": "192.168.1.42",
+    "filename": "aadhar_compressed.pdf",
+    "details": {
+      "size_bytes": 275385
+    }
+  },
+  {
+    "timestamp": "2026-02-25T04:26:54.478396",
+    "event": "file_uploaded",
+    "client_ip": "192.168.1.42",
+    "filename": "Admission Letter 2025 - Priyanshu Soni.pdf",
+    "details": {
+      "size_bytes": 231977
+    }
+  },
+  {
+    "timestamp": "2026-02-25T04:26:56.397419",
+    "event": "file_uploaded",
+    "client_ip": "192.168.1.42",
+    "filename": "Admit Card.pdf",
+    "details": {
+      "size_bytes": 127454
+    }
+  },
+  {
+    "timestamp": "2026-02-25T04:26:57.542309",
+    "event": "file_uploaded",
+    "client_ip": "192.168.1.42",
+    "filename": "AdmitCard_25071775943904_1_2025.pdf",
+    "details": {
+      "size_bytes": 169395
+    }
+  },
+  {
+    "timestamp": "2026-02-25T04:26:59.481751",
+    "event": "file_uploaded",
+    "client_ip": "192.168.1.42",
+    "filename": "BD7D4AF8-C9AA-4E79-A469-C8B4DAFCF493.jpg",
+    "details": {
+      "size_bytes": 143509
+    }
+  },
+  {
+    "timestamp": "2026-02-25T04:27:01.404271",
+    "event": "file_uploaded",
+    "client_ip": "192.168.1.42",
+    "filename": "bhaiya raj.docx",
+    "details": {
+      "size_bytes": 19727
+    }
+  },
+  {
+    "timestamp": "2026-02-25T04:27:03.460856",
+    "event": "file_uploaded",
+    "client_ip": "192.168.1.42",
+    "filename": "C LANGUAGE.doc",
+    "details": {
+      "size_bytes": 228352
+    }
+  },
+  {
+    "timestamp": "2026-02-25T04:27:05.489721",
+    "event": "file_uploaded",
+    "client_ip": "192.168.1.42",
+    "filename": "cast_compressed.pdf",
+    "details": {
+      "size_bytes": 63616
+    }
+  },
+  {
+    "timestamp": "2026-02-25T04:27:07.251468",
+    "event": "file_uploaded",
+    "client_ip": "192.168.1.42",
+    "filename": "CBD5F9AE-8AF0-4AD4-9CEE-ADE2CADE3991.jpg",
+    "details": {
+      "size_bytes": 143779
+    }
+  },
+  {
+    "timestamp": "2026-02-25T04:27:09.182819",
+    "event": "file_uploaded",
+    "client_ip": "192.168.1.42",
+    "filename": "CLOUD COMPUTING.doc",
+    "details": {
+      "size_bytes": 209408
+    }
+  },
+  {
+    "timestamp": "2026-02-25T04:27:11.251051",
+    "event": "file_uploaded",
+    "client_ip": "192.168.1.42",
+    "filename": "COA QB.docx",
+    "details": {
+      "size_bytes": 1483314
+    }
+  },
+  {
+    "timestamp": "2026-02-25T04:27:12.749343",
+    "event": "file_uploaded",
+    "client_ip": "192.168.1.42",
+    "filename": "domicile_compressed.pdf",
+    "details": {
+      "size_bytes": 153991
+    }
+  },
+  {
+    "timestamp": "2026-02-25T04:27:15.404917",
+    "event": "file_uploaded",
+    "client_ip": "192.168.1.42",
+    "filename": "download.png",
+    "details": {
+      "size_bytes": 304
+    }
+  },
+  {
+    "timestamp": "2026-02-25T04:27:16.957944",
+    "event": "file_uploaded",
+    "client_ip": "192.168.1.42",
+    "filename": "DSC_3159 (1).jpg",
+    "details": {
+      "size_bytes": 436191
+    }
+  },
+  {
+    "timestamp": "2026-02-25T04:27:18.980988",
+    "event": "file_uploaded",
+    "client_ip": "192.168.1.42",
+    "filename": "DSC_3159.jpg",
+    "details": {
+      "size_bytes": 436191
+    }
+  },
+  {
+    "timestamp": "2026-02-25T04:27:20.223743",
+    "event": "file_uploaded",
+    "client_ip": "192.168.1.42",
+    "filename": "F733A92A-447C-4413-BF09-3CE8F74AF06E.jpg",
+    "details": {
+      "size_bytes": 213766
+    }
+  },
+  {
+    "timestamp": "2026-02-25T04:27:22.052127",
+    "event": "file_uploaded",
+    "client_ip": "192.168.1.42",
+    "filename": "first.c",
+    "details": {
+      "size_bytes": 95
+    }
+  },
+  {
+    "timestamp": "2026-02-25T04:27:23.970255",
+    "event": "file_uploaded",
+    "client_ip": "192.168.1.42",
+    "filename": "fundamental and emarging.docx",
+    "details": {
+      "size_bytes": 41045
+    }
+  },
+  {
+    "timestamp": "2026-02-25T04:27:25.773113",
+    "event": "file_uploaded",
+    "client_ip": "192.168.1.42",
+    "filename": "garduation cert_compressed.pdf",
+    "details": {
+      "size_bytes": 147784
+    }
+  },
+  {
+    "timestamp": "2026-02-25T04:27:27.096589",
+    "event": "file_uploaded",
+    "client_ip": "192.168.1.42",
+    "filename": "garduation reslt_compressed.pdf",
+    "details": {
+      "size_bytes": 142954
+    }
+  },
+  {
+    "timestamp": "2026-02-25T04:27:29.375225",
+    "event": "file_uploaded",
+    "client_ip": "192.168.1.42",
+    "filename": "Gemini_Generated_Image_lwg84slwg84slwg8.png",
+    "details": {
+      "size_bytes": 1284021
+    }
+  },
+  {
+    "timestamp": "2026-02-25T04:27:32.111571",
+    "event": "file_uploaded",
+    "client_ip": "192.168.1.42",
+    "filename": "IMG_6303.PNG",
+    "details": {
+      "size_bytes": 2767878
+    }
+  },
+  {
+    "timestamp": "2026-02-25T04:27:33.148483",
+    "event": "file_uploaded",
+    "client_ip": "192.168.1.42",
+    "filename": "inter cerft_compressed.pdf",
+    "details": {
+      "size_bytes": 186926
+    }
+  },
+  {
+    "timestamp": "2026-02-25T04:27:35.139817",
+    "event": "file_uploaded",
+    "client_ip": "192.168.1.42",
+    "filename": "inter result_compressed.pdf",
+    "details": {
+      "size_bytes": 182178
+    }
+  },
+  {
+    "timestamp": "2026-02-25T04:27:37.408447",
+    "event": "file_uploaded",
+    "client_ip": "192.168.1.42",
+    "filename": "JULY-DEC_2025_MCA_1_SEM_V12_MCA101_MCA101_Fundamentals_of_Computers__Assignment_U1.docx",
+    "details": {
+      "size_bytes": 62533
+    }
+  },
+  {
+    "timestamp": "2026-02-25T04:27:39.113819",
+    "event": "file_uploaded",
+    "client_ip": "192.168.1.42",
+    "filename": "JULY-DEC_2025_MCA_1_SEM_V12_MCA101_MCA101_Fundamentals_of_Computers__Assignment_U4.docx",
+    "details": {
+      "size_bytes": 64697
+    }
+  },
+  {
+    "timestamp": "2026-02-25T04:27:41.592546",
+    "event": "file_uploaded",
+    "client_ip": "192.168.1.42",
+    "filename": "JULY-DEC_2025_MCA_1_SEM_V12_MCA101_MCA101_Unit1_Notes (1).docx",
+    "details": {
+      "size_bytes": 1074135
+    }
+  },
+  {
+    "timestamp": "2026-02-25T04:27:44.519762",
+    "event": "file_uploaded",
+    "client_ip": "192.168.1.42",
+    "filename": "JULY-DEC_2025_MCA_1_SEM_V12_MCA101_MCA101_Unit1_Notes.docx",
+    "details": {
+      "size_bytes": 1074135
+    }
+  },
+  {
+    "timestamp": "2026-02-25T04:27:46.739487",
+    "event": "file_uploaded",
+    "client_ip": "192.168.1.42",
+    "filename": "JULY-DEC_2025_MCA_1_SEM_V12_MCA101_MCA101_Unit_2_Assignment.docx",
+    "details": {
+      "size_bytes": 39025
+    }
+  },
+  {
+    "timestamp": "2026-02-25T04:27:48.796622",
+    "event": "file_uploaded",
+    "client_ip": "192.168.1.42",
+    "filename": "JULY-DEC_2025_MCA_1_SEM_V12_MCA101_MCA101_Unit_3_Assignments.docx",
+    "details": {
+      "size_bytes": 52892
+    }
+  },
+  {
+    "timestamp": "2026-02-25T04:27:50.162173",
+    "event": "file_uploaded",
+    "client_ip": "192.168.1.42",
+    "filename": "JULY-DEC_2025_MCA_1_SEM_V12_MCA101_MCA101_Unit_5_Assignment.docx",
+    "details": {
+      "size_bytes": 45873
+    }
+  },
+  {
+    "timestamp": "2026-02-25T04:27:52.192958",
+    "event": "file_uploaded",
+    "client_ip": "192.168.1.42",
+    "filename": "JULY-DEC_2025_MCA_1_SEM_V12_MCA101_MCA_101_Fundamental_of_Computer__Unit_1_ (1).pptx",
+    "details": {
+      "size_bytes": 425971
+    }
+  },
+  {
+    "timestamp": "2026-02-25T04:27:53.937936",
+    "event": "file_uploaded",
+    "client_ip": "192.168.1.42",
+    "filename": "JULY-DEC_2025_MCA_1_SEM_V12_MCA101_MCA_101_Fundamental_of_Computer__Unit_1_.pptx",
+    "details": {
+      "size_bytes": 425971
+    }
+  },
+  {
+    "timestamp": "2026-02-25T04:27:56.667808",
+    "event": "file_uploaded",
+    "client_ip": "192.168.1.42",
+    "filename": "JULY-DEC_2025_MCA_1_SEM_V12_MCA102_JULY_DEC_2024_MCA_1_SEM_V11_MCA102_MCA102_Unit_1_Assignment.docx",
+    "details": {
+      "size_bytes": 34762
+    }
+  },
+  {
+    "timestamp": "2026-02-25T04:27:59.324368",
+    "event": "file_uploaded",
+    "client_ip": "192.168.1.42",
+    "filename": "JULY-DEC_2025_MCA_1_SEM_V12_MCA102_JULY_DEC_2024_MCA_1_SEM_V11_MCA102_MCA102_Unit_1_Notes.docx",
+    "details": {
+      "size_bytes": 111236
+    }
+  },
+  {
+    "timestamp": "2026-02-25T04:28:03.492806",
+    "event": "file_uploaded",
+    "client_ip": "192.168.1.42",
+    "filename": "JULY-DEC_2025_MCA_1_SEM_V12_MCA102_JULY_DEC_2024_MCA_1_SEM_V11_MCA102_MCA102_Unit_1_PPTs.pptx",
+    "details": {
+      "size_bytes": 1956854
+    }
+  },
+  {
+    "timestamp": "2026-02-25T04:28:05.988122",
+    "event": "file_uploaded",
+    "client_ip": "192.168.1.42",
+    "filename": "JULY-DEC_2025_MCA_1_SEM_V12_MCA103_JULY_DEC_2024_MCA_1_SEM_V11_MCA103_MCA103_UNIT_1_NOTES.docx",
+    "details": {
+      "size_bytes": 91704
+    }
+  },
+  {
+    "timestamp": "2026-02-25T04:28:08.966027",
+    "event": "file_uploaded",
+    "client_ip": "192.168.1.42",
+    "filename": "JULY-DEC_2025_MCA_1_SEM_V12_MCA103_JULY_DEC_2024_MCA_1_SEM_V11_MCA103_MCA_UNIT__1_Assignment.docx",
+    "details": {
+      "size_bytes": 72072
+    }
+  },
+  {
+    "timestamp": "2026-02-25T04:28:12.119298",
+    "event": "file_uploaded",
+    "client_ip": "192.168.1.42",
+    "filename": "JULY-DEC_2025_MCA_1_SEM_V12_MCA103_JULY_DEC_2024_MCA_1_SEM_V11_MCA103_UNIT_1_PPT_MCA103.pptx",
+    "details": {
+      "size_bytes": 2890123
+    }
+  },
+  {
+    "timestamp": "2026-02-25T04:28:15.104372",
+    "event": "file_uploaded",
+    "client_ip": "192.168.1.42",
+    "filename": "JULY-DEC_2025_MCA_1_SEM_V12_MCA104_MCA104_Disccrete_Mathematics.docx",
+    "details": {
+      "size_bytes": 154730
+    }
+  },
+  {
+    "timestamp": "2026-02-25T04:28:18.862539",
+    "event": "file_uploaded",
+    "client_ip": "192.168.1.42",
+    "filename": "JULY-DEC_2025_MCA_1_SEM_V12_MCA104_PPT_of_Unit_I_MCA104___Discrete_Mathematics_MCA_1st_Sem_2021_22.pptx",
+    "details": {
+      "size_bytes": 3082176
+    }
+  },
+  {
+    "timestamp": "2026-02-25T04:28:22.708273",
+    "event": "file_uploaded",
+    "client_ip": "192.168.1.42",
+    "filename": "JULY-DEC_2025_MCA_1_SEM_V12_MCA104_Unit_I_Note_MCA104.docx",
+    "details": {
+      "size_bytes": 424532
+    }
+  },
+  {
+    "timestamp": "2026-02-25T04:28:27.073582",
+    "event": "file_uploaded",
+    "client_ip": "192.168.1.42",
+    "filename": "JULY-DEC_2025_MCA_1_SEM_V12_MCA105_MCA105_qb.docx",
+    "details": {
+      "size_bytes": 1483314
+    }
+  },
+  {
+    "timestamp": "2026-02-25T04:28:31.042803",
+    "event": "file_uploaded",
+    "client_ip": "192.168.1.42",
+    "filename": "JULY-DEC_2025_MCA_1_SEM_V12_MCA105_MCA105_Unit2_Assignment.docx",
+    "details": {
+      "size_bytes": 63261
+    }
+  },
+  {
+    "timestamp": "2026-02-25T04:28:34.449451",
+    "event": "file_uploaded",
+    "client_ip": "192.168.1.42",
+    "filename": "JULY-DEC_2025_MCA_1_SEM_V12_MCA105_MCA105_Unit3_Assignment.docx",
+    "details": {
+      "size_bytes": 63163
+    }
+  },
+  {
+    "timestamp": "2026-02-25T04:28:38.706009",
+    "event": "file_uploaded",
+    "client_ip": "192.168.1.42",
+    "filename": "JULY-DEC_2025_MCA_1_SEM_V12_MCA105_MCA105_Unit4_Assignment.docx",
+    "details": {
+      "size_bytes": 63363
+    }
+  },
+  {
+    "timestamp": "2026-02-25T04:28:41.099074",
+    "event": "file_uploaded",
+    "client_ip": "192.168.1.42",
+    "filename": "JULY-DEC_2025_MCA_1_SEM_V12_MCA105_MCA105_Unit5_Assignment.docx",
+    "details": {
+      "size_bytes": 65093
+    }
+  },
+  {
+    "timestamp": "2026-02-25T04:28:46.159989",
+    "event": "file_uploaded",
+    "client_ip": "192.168.1.42",
+    "filename": "JULY-DEC_2025_MCA_1_SEM_V12_MCA105_UNIT_01_Computer_Organizational_Architecture.pptx",
+    "details": {
+      "size_bytes": 664132
+    }
+  },
+  {
+    "timestamp": "2026-02-25T04:28:49.856148",
+    "event": "file_uploaded",
+    "client_ip": "192.168.1.42",
+    "filename": "JULY-DEC_2025_MCA_1_SEM_V12_MCA105_unit_01_notes.docx",
+    "details": {
+      "size_bytes": 385182
+    }
+  },
+  {
+    "timestamp": "2026-02-25T04:28:54.046988",
+    "event": "file_uploaded",
+    "client_ip": "192.168.1.42",
+    "filename": "JULY-DEC_2025_MCA_1_SEM_V12_MCA106D_econtent_cc (1).doc",
+    "details": {
+      "size_bytes": 2013696
+    }
+  },
+  {
+    "timestamp": "2026-02-25T04:28:58.116520",
+    "event": "file_uploaded",
+    "client_ip": "192.168.1.42",
+    "filename": "JULY-DEC_2025_MCA_1_SEM_V12_MCA106D_econtent_cc.doc",
+    "details": {
+      "size_bytes": 899584
+    }
+  },
+  {
+    "timestamp": "2026-02-25T04:29:02.614758",
+    "event": "file_uploaded",
+    "client_ip": "192.168.1.42",
+    "filename": "JULY-DEC_2025_MCA_1_SEM_V12_MCA106D_MCA106D_Question_bank_cloud_computing.doc",
+    "details": {
+      "size_bytes": 209408
+    }
+  },
+  {
+    "timestamp": "2026-02-25T04:29:07.243168",
+    "event": "file_uploaded",
+    "client_ip": "192.168.1.42",
+    "filename": "JULY-DEC_2025_MCA_1_SEM_V12_MCA107P_MCA107P_LAB_MANUAL.docx",
+    "details": {
+      "size_bytes": 325635
+    }
+  },
+  {
+    "timestamp": "2026-02-25T04:29:10.596770",
+    "event": "file_uploaded",
+    "client_ip": "192.168.1.42",
+    "filename": "MANAGEMENT QB.docx",
+    "details": {
+      "size_bytes": 287358
+    }
+  },
+  {
+    "timestamp": "2026-02-25T04:29:16.620714",
+    "event": "file_uploaded",
+    "client_ip": "192.168.1.42",
+    "filename": "MATHES.docx",
+    "details": {
+      "size_bytes": 154730
+    }
+  },
+  {
+    "timestamp": "2026-02-25T04:29:19.761735",
+    "event": "file_uploaded",
+    "client_ip": "192.168.1.42",
+    "filename": "pg cert_compressed.pdf",
+    "details": {
+      "size_bytes": 147124
+    }
+  },
+  {
+    "timestamp": "2026-02-25T04:29:22.874504",
+    "event": "file_uploaded",
+    "client_ip": "192.168.1.42",
+    "filename": "pg result_compressed.pdf",
+    "details": {
+      "size_bytes": 158414
+    }
+  },
+  {
+    "timestamp": "2026-02-25T04:29:27.066786",
+    "event": "file_uploaded",
+    "client_ip": "192.168.1.42",
+    "filename": "photo_6264778682975499972_y.jpg",
+    "details": {
+      "size_bytes": 71475
+    }
+  },
+  {
+    "timestamp": "2026-02-25T04:29:32.169770",
+    "event": "file_uploaded",
+    "client_ip": "192.168.1.42",
+    "filename": "PRIY6ANSHU SONI.pdf",
+    "details": {
+      "size_bytes": 357015
+    }
+  },
+  {
+    "timestamp": "2026-02-25T04:29:36.877544",
+    "event": "file_uploaded",
+    "client_ip": "192.168.1.42",
+    "filename": "PRIYANSHU CV Resume.pdf",
+    "details": {
+      "size_bytes": 99609
+    }
+  },
+  {
+    "timestamp": "2026-02-25T04:29:41.604675",
+    "event": "file_uploaded",
+    "client_ip": "192.168.1.42",
+    "filename": "PRIYANSHU_SONI_Resume.txt",
+    "details": {
+      "size_bytes": 522
+    }
+  },
+  {
+    "timestamp": "2026-02-25T04:29:48.580831",
+    "event": "file_uploaded",
+    "client_ip": "192.168.1.42",
+    "filename": "Profile (1).pdf",
+    "details": {
+      "size_bytes": 617822
+    }
+  },
+  {
+    "timestamp": "2026-02-25T04:29:54.503570",
+    "event": "file_uploaded",
+    "client_ip": "192.168.1.42",
+    "filename": "Profile.pdf",
+    "details": {
+      "size_bytes": 466290
+    }
+  },
+  {
+    "timestamp": "2026-02-25T04:29:59.746368",
+    "event": "file_uploaded",
+    "client_ip": "192.168.1.42",
+    "filename": "qutation foe security services.docx",
+    "details": {
+      "size_bytes": 19727
+    }
+  },
+  {
+    "timestamp": "2026-02-25T04:30:05.355752",
+    "event": "file_uploaded",
+    "client_ip": "192.168.1.42",
+    "filename": "Security-Company-Business-Plan-Contents-Table.pdf",
+    "details": {
+      "size_bytes": 660034
+    }
+  },
+  {
+    "timestamp": "2026-02-25T04:30:10.046097",
+    "event": "file_uploaded",
+    "client_ip": "192.168.1.42",
+    "filename": "ssslogo_page-0001.jpg",
+    "details": {
+      "size_bytes": 420538
+    }
+  },
+  {
+    "timestamp": "2026-02-25T04:30:15.546244",
+    "event": "file_uploaded",
+    "client_ip": "192.168.1.42",
+    "filename": "Untitled design.pdf",
+    "details": {
+      "size_bytes": 552922
+    }
+  },
+  {
+    "timestamp": "2026-02-25T04:30:21.473941",
+    "event": "file_uploaded",
+    "client_ip": "192.168.1.42",
+    "filename": "wepik-gradient-professional-tech-company-sales-manager-business-card-20230928181716aiiK.pdf",
+    "details": {
+      "size_bytes": 649519
+    }
+  },
+  {
+    "timestamp": "2026-02-25T04:30:27.385140",
+    "event": "file_uploaded",
+    "client_ip": "192.168.1.42",
+    "filename": "wepik-gradient-professional-tech-company-sales-manager-business-card-20230930093013CZMC.pdf",
+    "details": {
+      "size_bytes": 1136076
+    }
+  },
+  {
+    "timestamp": "2026-02-25T04:30:31.654198",
+    "event": "file_uploaded",
+    "client_ip": "192.168.1.42",
+    "filename": "yash pic (1).jpg",
+    "details": {
+      "size_bytes": 1912
+    }
+  },
+  {
+    "timestamp": "2026-02-25T04:30:37.643352",
+    "event": "file_uploaded",
+    "client_ip": "192.168.1.42",
+    "filename": "yash pic (2).jpg",
+    "details": {
+      "size_bytes": 1912
+    }
+  },
+  {
+    "timestamp": "2026-02-25T04:30:41.445755",
+    "event": "file_uploaded",
+    "client_ip": "192.168.1.42",
+    "filename": "yash pic (3).jpg",
+    "details": {
+      "size_bytes": 1912
+    }
+  },
+  {
+    "timestamp": "2026-02-25T04:30:46.685983",
+    "event": "file_uploaded",
+    "client_ip": "192.168.1.42",
+    "filename": "yash pic (4).jpg",
+    "details": {
+      "size_bytes": 16279
+    }
+  },
+  {
+    "timestamp": "2026-02-25T04:30:52.942624",
+    "event": "file_uploaded",
+    "client_ip": "192.168.1.42",
+    "filename": "yash pic.jpg",
+    "details": {
+      "size_bytes": 5684
+    }
+  },
+  {
+    "timestamp": "2026-02-25T04:31:00.040246",
+    "event": "file_uploaded",
+    "client_ip": "192.168.1.42",
+    "filename": "yash pic_imresizer.jpg",
+    "details": {
+      "size_bytes": 117234
+    }
+  },
+  {
+    "timestamp": "2026-02-25T04:31:00.740251",
     "event": "client_disconnected",
-    "client_ip": "192.168.1.44"
+    "client_ip": "192.168.1.42"
   },
   {
-    "timestamp": "2026-02-20T19:17:54.483856",
+    "timestamp": "2026-02-25T07:04:18.362116",
+    "event": "file_uploaded",
+    "client_ip": "192.168.1.42",
+    "filename": "25aniversary.zip",
+    "details": {
+      "size_bytes": 16406475736
+    }
+  },
+  {
+    "timestamp": "2026-02-25T07:09:18.644146",
     "event": "client_disconnected",
-    "client_ip": "192.168.1.44"
+    "client_ip": "192.168.1.42"
   },
   {
-    "timestamp": "2026-02-20T19:18:24.949639",
-    "event": "client_disconnected",
-    "client_ip": "192.168.1.44"
-  },
-  {
-    "timestamp": "2026-02-20T19:22:32.945175",
-    "event": "server_stopped"
-  },
-  {
-    "timestamp": "2026-02-20T19:28:26.927615",
+    "timestamp": "2026-02-25T18:31:26.030102",
     "event": "server_started",
     "details": {
-      "ip": "192.168.1.41",
+      "ip": "192.168.1.70",
       "port": 2121,
-      "shared_dir": "C:\\Users\\sudip\\OneDrive\\Desktop\\webProjects\\FluffyAssistent\\FluffyShared"
+      "shared_dir": "C:\\Users\\sudip\\OneDrive\\Desktop\\priyansh"
     }
-  },
-  {
-    "timestamp": "2026-02-20T19:34:35.316866",
-    "event": "server_stopped"
-  },
-  {
-    "timestamp": "2026-02-20T19:34:45.484356",
-    "event": "server_started",
-    "details": {
-      "ip": "192.168.1.41",
-      "port": 2121,
-      "shared_dir": "C:\\Users\\sudip\\Downloads"
-    }
-  },
-  {
-    "timestamp": "2026-02-20T19:34:51.519900",
-    "event": "server_stopped"
-  },
-  {
-    "timestamp": "2026-02-20T19:39:53.836915",
-    "event": "server_started",
-    "details": {
-      "ip": "192.168.1.41",
-      "port": 2121,
-      "shared_dir": "C:\\Users\\sudip\\OneDrive\\Desktop\\webProjects\\FluffyAssistent\\brain\\test_shared"
-    }
-  },
-  {
-    "timestamp": "2026-02-20T19:39:54.861482",
-    "event": "server_stopped"
-  },
-  {
-    "timestamp": "2026-02-20T20:15:31.956166",
-    "event": "server_started",
-    "details": {
-      "ip": "192.168.1.41",
-      "port": 2121,
-      "shared_dir": "C:\\Users\\sudip\\Downloads"
-    }
-  },
-  {
-    "timestamp": "2026-02-20T20:15:39.963474",
-    "event": "server_stopped"
-  },
-  {
-    "timestamp": "2026-02-20T20:15:51.769776",
-    "event": "server_started",
-    "details": {
-      "ip": "192.168.1.41",
-      "port": 2121,
-      "shared_dir": "C:\\Users\\sudip\\Downloads"
-    }
-  },
-  {
-    "timestamp": "2026-02-21T15:06:35.968656",
-    "event": "server_started",
-    "details": {
-      "ip": "192.168.1.49",
-      "port": 2121,
-      "shared_dir": "C:\\Users\\sudip\\Downloads"
-    }
-  },
-  {
-    "timestamp": "2026-02-21T15:06:48.016880",
-    "event": "server_stopped"
   }
 ]

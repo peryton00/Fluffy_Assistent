@@ -378,27 +378,57 @@ async fn get_bluetooth_enabled() -> bool {
     false
 }
 
+/// Read a single key from a `key=value` style .env file.
+/// Lines starting with `#` and blank lines are ignored.
+fn read_env_key(env_path: &str, key: &str) -> Option<String> {
+    let content = std::fs::read_to_string(env_path).ok()?;
+    for line in content.lines() {
+        let line = line.trim();
+        if line.starts_with('#') || line.is_empty() {
+            continue;
+        }
+        if let Some((k, v)) = line.split_once('=') {
+            if k.trim() == key {
+                return Some(v.trim().to_string());
+            }
+        }
+    }
+    None
+}
+
 fn spawn_listener() {
     println!("[Fluffy Core] Spawning Brain...");
 
-    let ui_dir = "../brain";
+    let brain_dir = "../brain";
+
+    // Resolve PYTHON_PATH from ../.env (one level up from core/)
+    let env_file = "../.env";
 
     #[cfg(target_os = "windows")]
-    let res = std::process::Command::new("cmd")
-        .args(["/C", "python listener.py"])
-        .current_dir(ui_dir)
-        .spawn();
-
+    let default_python = "../.venv/Scripts/python.exe".to_string();
     #[cfg(not(target_os = "windows"))]
-    let res = std::process::Command::new("python")
+    let default_python = "../.venv/bin/python".to_string();
+
+    let python_path = read_env_key(env_file, "PYTHON_PATH").unwrap_or_else(|| {
+        println!(
+            "[Fluffy Core] PYTHON_PATH not set in .env — using default: {}",
+            default_python
+        );
+        default_python
+    });
+
+    println!("[Fluffy Core] Using Python: {}", python_path);
+
+    let res = std::process::Command::new(&python_path)
         .args(["listener.py"])
-        .current_dir(ui_dir)
+        .current_dir(brain_dir)
         .spawn();
 
     if let Err(e) = res {
         eprintln!(
-            "[Fluffy Core] Failed to spawn brain: {}. Make sure you are running core from its directory and python is installed.",
-            e
+            "[Fluffy Core] Failed to spawn brain: {}. \
+             Check PYTHON_PATH in .env (currently: {}) and that brain/listener.py exists.",
+            e, python_path
         );
     }
 }
