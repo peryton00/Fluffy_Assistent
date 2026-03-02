@@ -1,4 +1,5 @@
 import os
+import secrets
 os.environ["FLASK_SKIP_DOTENV"] = "1"
 from state import update_state, add_execution_log
 from web_api import start_api
@@ -212,11 +213,32 @@ def compute_health(signals, security_alerts):
 # MESSAGE HANDLER
 # -----------------------------
 def handle_message(raw_msg, monitor):
+    global PROCESS_MSG_COUNTER
     # If UI is not active, skip heavy processing and state updates
     if not state.UI_ACTIVE:
-        # Still run security monitor in background!
+        # Security monitor keeps running in background
         security_alerts = monitor.analyze(raw_msg, state.UI_ACTIVE)
         state.update_security_alerts(security_alerts)
+
+        # Guardian keeps learning baselines even when the dashboard is closed.
+        # This ensures the learning phase completes regardless of UI state.
+        # We only update baselines (lightweight) — no scoring, no verdicts, no alerts.
+        processes = raw_msg.get("system", {}).get("processes", {}).get("top_ram", [])
+        for p in processes:
+            GUARDIAN_BASELINE.update(
+                p["name"],
+                p.get("cpu_percent", 0),
+                p.get("ram_mb", 0),
+                len(p.get("children", [])),
+                p.get("net_sent", 0.0),
+                p.get("net_received", 0.0),
+            )
+
+        # Periodic baseline save (same counter as the UI-active path)
+        PROCESS_MSG_COUNTER += 1
+        if PROCESS_MSG_COUNTER >= 50:
+            GUARDIAN_BASELINE.save()
+            PROCESS_MSG_COUNTER = 0
         return
 
     # Use the message directly - we own this data from the IPC read
@@ -327,7 +349,6 @@ def handle_message(raw_msg, monitor):
     GUARDIAN_SCORER.cleanup(active_pids)
 
     # Periodic baseline save (every 50 telemetry messages)
-    global PROCESS_MSG_COUNTER
     PROCESS_MSG_COUNTER += 1
     if PROCESS_MSG_COUNTER >= 50:
         GUARDIAN_BASELINE.save()
@@ -363,8 +384,46 @@ def handle_message(raw_msg, monitor):
 # -----------------------------
 # MAIN LOOP
 # -----------------------------
+def _ensure_fluffy_token():
+    """Generate and persist a secure FLUFFY_TOKEN if one doesn't exist in .env."""
+    env_path = os.path.join(os.path.dirname(__file__), "..", ".env")
+    env_path = os.path.normpath(env_path)
+
+    # Check if already set in environment (e.g. from a previous run)
+    if os.environ.get("FLUFFY_TOKEN") and os.environ["FLUFFY_TOKEN"] != "fluffy_dev_token":
+        return
+
+    # Read current .env to see if FLUFFY_TOKEN already exists
+    existing_lines = []
+    token_found = False
+    if os.path.exists(env_path):
+        with open(env_path, "r", encoding="utf-8") as f:
+            for line in f:
+                existing_lines.append(line)
+                stripped = line.strip()
+                if stripped.startswith("FLUFFY_TOKEN=") and not stripped.startswith("#"):
+                    token_value = stripped.split("=", 1)[1].strip()
+                    if token_value and token_value != "fluffy_dev_token":
+                        os.environ["FLUFFY_TOKEN"] = token_value
+                        token_found = True
+
+    if not token_found:
+        # Generate a new secure token
+        new_token = secrets.token_hex(32)
+        os.environ["FLUFFY_TOKEN"] = new_token
+
+        # Append to .env file
+        with open(env_path, "a", encoding="utf-8") as f:
+            f.write(f"\n# Auto-generated secure API token (do not share)\nFLUFFY_TOKEN={new_token}\n")
+
+        print(f"[Fluffy Brain] 🔐 New secure auth token generated and saved to .env", file=__import__('sys').stderr)
+
+
 def main():
     global ipc_socket
+
+    # Ensure a secure auth token exists before starting the API
+    _ensure_fluffy_token()
 
     Thread(target=start_api, daemon=True).start()
 

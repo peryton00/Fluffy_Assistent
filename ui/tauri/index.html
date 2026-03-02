@@ -1,1021 +1,1361 @@
 <!doctype html>
 <html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Fluffy Desktop Dashboard</title>
+    <link rel="stylesheet" href="/src/styles.css" />
+    <link rel="stylesheet" href="/src/styles-enhanced.css" />
+    <link rel="stylesheet" href="/src/chat-styles.css" />
+    <link rel="stylesheet" href="/src/cluster-styles.css" />
+    <link rel="stylesheet" href="/src/ftp-styles.css" />
+    <link rel="stylesheet" href="/src/network-styles.css" />
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700&display=swap"
+      rel="stylesheet"
+    />
+    <script src="https://unpkg.com/lucide@latest"></script>
+  </head>
 
-<head>
-  <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Fluffy Desktop Dashboard</title>
-  <link rel="stylesheet" href="/src/styles.css" />
-  <link rel="stylesheet" href="/src/styles-enhanced.css" />
-  <link rel="stylesheet" href="/src/chat-styles.css" />
-  <link rel="stylesheet" href="/src/cluster-styles.css" />
-  <link rel="stylesheet" href="/src/ftp-styles.css" />
-  <link rel="stylesheet" href="/src/network-styles.css" />
-  <link rel="preconnect" href="https://fonts.googleapis.com">
-  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700&display=swap" rel="stylesheet">
-  <script src="https://unpkg.com/lucide@latest"></script>
-</head>
-
-<body>
-  <div class="app-container">
-    <!-- Sidebar -->
-    <aside class="sidebar">
-      <div class="sidebar-header">
-        <div class="logo-group">
-          <div class="logo-circle">
-            <img src="/logo.png" alt="Fluffy Logo" class="logo-img">
-          </div>
-          <span class="logo-text">Fluffy</span>
-        </div>
-        <div class="notification-area">
-          <div id="guardian-notification-icon" class="notification-icon" title="Guardian Notifications">
-            <i data-lucide="bell"></i>
-            <span id="notification-badge" class="notification-badge">0</span>
-          </div>
-        </div>
-      </div>
-      <nav class="sidebar-nav">
-        <a href="#" class="nav-item active" id="nav-dashboard">
-          <span class="nav-icon"><i data-lucide="layout-dashboard"></i></span>
-          <span class="nav-text">Dashboard</span>
-        </a>
-        <a href="#" class="nav-item" id="nav-processes">
-          <span class="nav-icon"><i data-lucide="list"></i></span>
-          <span class="nav-text">Processes</span>
-        </a>
-        <a href="#" class="nav-item" id="nav-guardian">
-          <span class="nav-icon"><i data-lucide="shield-check"></i></span>
-          <span class="nav-text">Guardian</span>
-        </a>
-        <a href="#" class="nav-item" id="nav-apps">
-          <span class="nav-icon"><i data-lucide="package"></i></span>
-          <span class="nav-text">Apps</span>
-        </a>
-        <a href="#" class="nav-item" id="nav-analytics">
-          <span class="nav-icon"><i data-lucide="line-chart"></i></span>
-          <span class="nav-text">Analytics</span>
-        </a>
-        <a href="#" class="nav-item" id="nav-startup">
-          <span class="nav-icon"><i data-lucide="rocket"></i></span>
-          <span class="nav-text">Startup Apps</span>
-        </a>
-        <a href="#" class="nav-item" id="nav-network">
-          <span class="nav-icon"><i data-lucide="network"></i></span>
-          <span class="nav-text">Network</span>
-        </a>
-        <a href="#" class="nav-item" id="nav-settings">
-          <span class="nav-icon"><i data-lucide="settings"></i></span>
-          <span class="nav-text">Settings</span>
-        </a>
-      </nav>
-      <div class="sidebar-footer">
-        <div class="upgrade-card">
-          <p>System is <strong>Protected</strong></p>
-          <button class="upgrade-btn">Details</button>
-        </div>
-        <div class="theme-toggle">
-          <span>Dark Mode</span>
-          <label class="switch">
-            <input type="checkbox" id="theme-toggle-input" checked>
-            <span class="slider round"></span>
-          </label>
-        </div>
-      </div>
-    </aside>
-
-    <!-- Main Content -->
-    <main class="main-content">
-      <header class="top-header">
-        <div class="header-left">
-          <h1 id="view-title">Dashboard</h1>
-        </div>
-        <div class="top-nav">
-          <div class="ping-container" title="Latency to Python Brain">
-            <span class="ping-dot" id="ping-dot"></span>
-            <span class="ping-label">Latency:</span>
-            <span id="ping-value">-- ms</span>
-          </div>
-          <div class="network-header-status" id="header-net-status" title="Network Connection Info">
-            <span class="net-icon" id="header-net-icon"><i data-lucide="satellite"></i></span>
-            <span id="header-net-speed" style="margin-left: 4px;">-- Kbps</span>
-          </div>
-          <div class="battery-container" id="battery-status" title="Battery Status">
-            <span class="battery-icon" id="battery-icon"><i data-lucide="battery"></i></span>
-            <span id="battery-value">--%</span>
-          </div>
-          <div class="bluetooth-container" id="bluetooth-status" title="Bluetooth Status">
-            <button class="bluetooth-btn" id="btn-bluetooth-toggle">
-              <i data-lucide="bluetooth"></i>
-            </button>
-          </div>
-          <div class="user-profile">
-            <div id="system-status-dot" class="status-dot"></div>
-          </div>
-        </div>
-      </header>
-
-      <div id="admin-warning" class="admin-warning-banner"></div>
-
-      <!-- VIEW: DASHBOARD -->
-      <section id="section-dashboard" class="view-section active">
-        <div class="dashboard-grid">
-          <!-- Stat Cards -->
-          <div class="card stat-card primary" data-component-id="cpu">
-            <div class="card-header">
-              <div class="card-icon cpu"><i data-lucide="zap"></i></div>
+  <body>
+    <div class="app-container">
+      <!-- Sidebar -->
+      <aside class="sidebar">
+        <div class="sidebar-header">
+          <div class="logo-group">
+            <div class="logo-circle">
+              <img src="/logo.png" alt="Fluffy Logo" class="logo-img" />
             </div>
-            <p class="card-label">CPU Usage</p>
-            <h2 id="cpu-value">--%</h2>
-            <!-- Circular Progress SVG -->
-            <div class="circular-progress-container">
-              <svg viewBox="0 0 36 36" class="circular-progress">
-                <circle class="bg" cx="18" cy="18" r="16"></circle>
-                <circle id="cpu-progress-circle" class="progress" cx="18" cy="18" r="16"></circle>
-              </svg>
-            </div>
-            <p class="card-comparison">System Load</p>
+            <span class="logo-text">Fluffy</span>
           </div>
-
-          <div class="card stat-card" data-component-id="ram">
-            <div class="card-header">
-              <div class="card-icon ram"><i data-lucide="database"></i></div>
-            </div>
-            <p class="card-label">RAM Usage</p>
-            <h2 id="ram-value">-- MB</h2>
-            <!-- Circular Progress SVG -->
-            <div class="circular-progress-container">
-              <svg viewBox="0 0 36 36" class="circular-progress">
-                <circle class="bg" cx="18" cy="18" r="16"></circle>
-                <circle id="ram-progress-circle" class="progress" cx="18" cy="18" r="16"></circle>
-              </svg>
-            </div>
-            <p class="card-comparison" id="ram-total">Total: -- GB</p>
-          </div>
-
-          <div class="card stat-card" data-component-id="proc">
-            <div class="card-header">
-              <div class="card-icon proc"><i data-lucide="layers"></i></div>
-            </div>
-            <p class="card-label">Total Processes</p>
-            <h2 id="proc-count">--</h2>
-            <p class="card-comparison">Monitoring active</p>
-          </div>
-
-          <div class="card stat-card" data-component-id="health">
-            <div class="card-header">
-              <div class="card-icon health"><i data-lucide="shield"></i></div>
-            </div>
-            <p class="card-label">Health Score</p>
-            <h2 id="health-status">Healthy</h2>
-            <div class="card-actions">
-              <button class="btn-primary btn-sm" id="btn-normalize">Normalize</button>
-              <button class="btn-outline btn-sm" id="btn-health-details">Details</button>
-            </div>
-            <p class="card-comparison">Optimized</p>
-          </div>
-
-          <div class="card stat-card network-card" data-component-id="network">
-            <div class="card-header">
-              <div class="card-icon" id="net-card-icon"><i data-lucide="globe"></i></div>
-            </div>
-            <p class="card-label">Network Usage</p>
-            <div class="speed-row">
-              <div class="speed-item">
-                <span class="speed-dir">RX:</span>
-                <span id="net-rx-value">--</span>
-              </div>
-              <div class="speed-item">
-                <span class="speed-dir">TX:</span>
-                <span id="net-tx-value">--</span>
-              </div>
-            </div>
-            <p class="card-comparison" id="net-status-label">Offline</p>
-          </div>
-
-          <!-- Speed Test Container -->
-          <div class="card speed-test-card" id="speed-test-container" data-component-id="speedtest">
-            <div class="speed-test-header">
-              <div class="speed-test-title">
-                <span class="speed-test-icon"><i data-lucide="gauge"></i></span>
-                <h3>Internet Speed Test</h3>
-              </div>
-            </div>
-            <div class="speed-test-body">
-              <div class="speed-display">
-                <div class="speed-circle">
-                  <span id="speed-result-value">0.0</span>
-                  <span class="speed-unit">Mbps</span>
-                </div>
-              </div>
-              <div class="speed-info-group">
-                <p id="speed-test-status">Ready to check connection speed</p>
-                <button class="btn-primary" id="btn-run-speedtest">Check Now</button>
-              </div>
-            </div>
-          </div>
-
-          <div class="card stat-card fluffy-card" data-component-id="fluffy">
-            <div class="card-header">
-              <div class="card-icon self"><i data-lucide="sparkles"></i></div>
-            </div>
-            <p class="card-label">Fluffy Usage</p>
-            <h2 id="fluffy-usage">--%</h2>
-            <!-- Circular Progress SVG -->
-            <div class="circular-progress-container">
-              <svg viewBox="0 0 36 36" class="circular-progress">
-                <circle class="bg" cx="18" cy="18" r="16"></circle>
-                <circle id="fluffy-progress-circle" class="progress" cx="18" cy="18" r="16"></circle>
-              </svg>
-            </div>
-            <p class="card-comparison" id="fluffy-ram">-- MB RAM</p>
-          </div>
-
-          <div class="card stat-card" data-component-id="sessions">
-            <div class="card-header">
-              <div class="card-icon session"><i data-lucide="users"></i></div>
-            </div>
-            <p class="card-label">Active Sessions</p>
-            <h2 id="session-count">--</h2>
-            <p class="card-comparison">Live interactions</p>
-          </div>
-
-
-
-          <!-- Chart & Top Offenders -->
-          <div class="card chart-card">
-            <div class="card-header">
-              <h3>Resource History</h3>
-            </div>
-            <div class="chart-container">
-              <div class="chart-y-labels">
-                <span>100%</span>
-                <span>50%</span>
-                <span>0%</span>
-              </div>
-              <svg id="resource-chart" viewBox="0 0 400 150" preserveAspectRatio="none">
-                <defs>
-                  <linearGradient id="cpu-gradient" x1="0" y1="0" x2="0" y2="1">
-                    <stop offset="0%" stop-color="var(--accent)" stop-opacity="0.3" />
-                    <stop offset="100%" stop-color="var(--accent)" stop-opacity="0" />
-                  </linearGradient>
-                  <linearGradient id="ram-gradient" x1="0" y1="0" x2="0" y2="1">
-                    <stop offset="0%" stop-color="var(--success)" stop-opacity="0.3" />
-                    <stop offset="100%" stop-color="var(--success)" stop-opacity="0" />
-                  </linearGradient>
-                  <filter id="soft-blur" x="-20%" y="-20%" width="140%" height="140%">
-                    <feGaussianBlur in="SourceGraphic" stdDeviation="3" />
-                  </filter>
-                </defs>
-                <!-- Grid Lines -->
-                <line x1="0" y1="0" x2="400" y2="0" class="chart-grid-line" />
-                <line x1="0" y1="75" x2="400" y2="75" class="chart-grid-line" />
-                <line x1="0" y1="150" x2="400" y2="150" class="chart-grid-line" />
-
-                <path id="cpu-area" class="chart-area cpu" d=""></path>
-                <path id="ram-area" class="chart-area ram" d=""></path>
-                <path id="cpu-path" class="chart-line cpu" d=""></path>
-                <path id="ram-path" class="chart-line ram" d=""></path>
-              </svg>
-              <div class="chart-legend">
-                <span class="legend-item cpu">CPU</span>
-                <span class="legend-item ram">RAM</span>
-              </div>
-            </div>
-          </div>
-
-          <div class="card offenders-card">
-            <div class="card-header">
-              <h3>RAM Offenders</h3>
-            </div>
-            <div id="offenders-list" class="offenders-list"></div>
-          </div>
-        </div>
-      </section>
-
-      <!-- VIEW: PROCESSES (Restored Tree) -->
-      <section id="section-processes" class="view-section">
-        <div class="card full-width">
-          <div class="card-header">
-            <h3>Process Hierarchy</h3>
-            <div class="header-actions">
-              <div class="sort-selector">
-                <label>Sort:</label>
-                <select id="process-sort-mode">
-                  <option value="ram">Most RAM</option>
-                  <option value="cpu">Highest CPU</option>
-                  <option value="name">Name (A-Z)</option>
-                </select>
-              </div>
-              <div class="inline-search">
-                <i data-lucide="search"></i>
-                <input type="text" id="process-search-input" placeholder="Search by name or PID...">
-                <button id="clear-search" class="clear-search-btn" title="Clear Search"><i data-lucide="x"></i></button>
-              </div>
-              <button class="btn-outline" id="refresh-tree">Refresh Tree</button>
-            </div>
-          </div>
-          <div id="processes-tree" class="process-tree-container">
-            <!-- Hierarchical tree populated via JS -->
-          </div>
-          <div id="top-consumer-highlight" class="top-consumer-card">
-            <!-- Populated via JS -->
-          </div>
-        </div>
-      </section>
-
-      <!-- VIEW: GUARDIAN -->
-      <section id="section-guardian" class="view-section">
-        <div class="card full-width guardian-view-card">
-          <div class="card-header">
-            <div class="header-with-badge">
-              <h3>Behavioral Guardian</h3>
-              <span class="view-badge">Level 2 Protection</span>
-            </div>
-            <p class="section-desc">Real-time intent analysis and behavioral chain tracking.</p>
-            <div id="learning-mode-indicator" class="learning-banner" style="display: none;">
-              <span class="learning-icon"><i data-lucide="brain"></i></span>
-              <div class="learning-info">
-                <strong>Initial Learning Phase</strong>
-                <p>Establishing behavioral baselines. Alerts suppressed: <span id="learning-progress">0</span>%</p>
-              </div>
-            </div>
-          </div>
-          <div id="guardian-alerts" class="guardian-alerts-container large-view">
-            <!-- Populated via JS -->
-            <div class="guardian-empty-state">
-              <div class="empty-icon"><i data-lucide="shield-check"></i></div>
-              <h3>System Secure</h3>
-              <p>No suspicious behavioral chains detected in the last window.</p>
+          <div class="notification-area">
+            <div
+              id="guardian-notification-icon"
+              class="notification-icon"
+              title="Guardian Notifications"
+            >
+              <i data-lucide="bell"></i>
+              <span id="notification-badge" class="notification-badge">0</span>
             </div>
           </div>
         </div>
-      </section>
-
-      <!-- VIEW: ANALYTICS -->
-      <section id="section-analytics" class="view-section">
-        <div class="card analytics-card full-width">
-          <div class="card-header">
-            <h3>System Insights</h3>
-            <h4 style="margin-left: auto; font-size: 0.8rem; font-weight: normal; opacity: 0.7;">That's where fluffy
-              learn about your system</h4>
+        <nav class="sidebar-nav">
+          <a href="#" class="nav-item active" id="nav-dashboard">
+            <span class="nav-icon"><i data-lucide="layout-dashboard"></i></span>
+            <span class="nav-text">Dashboard</span>
+          </a>
+          <a href="#" class="nav-item" id="nav-processes">
+            <span class="nav-icon"><i data-lucide="list"></i></span>
+            <span class="nav-text">Processes</span>
+          </a>
+          <a href="#" class="nav-item" id="nav-guardian">
+            <span class="nav-icon"><i data-lucide="shield-check"></i></span>
+            <span class="nav-text">Guardian</span>
+          </a>
+          <a href="#" class="nav-item" id="nav-apps">
+            <span class="nav-icon"><i data-lucide="package"></i></span>
+            <span class="nav-text">Apps</span>
+          </a>
+          <a href="#" class="nav-item" id="nav-analytics">
+            <span class="nav-icon"><i data-lucide="line-chart"></i></span>
+            <span class="nav-text">Analytics</span>
+          </a>
+          <a href="#" class="nav-item" id="nav-startup">
+            <span class="nav-icon"><i data-lucide="rocket"></i></span>
+            <span class="nav-text">Startup Apps</span>
+          </a>
+          <a href="#" class="nav-item" id="nav-network">
+            <span class="nav-icon"><i data-lucide="network"></i></span>
+            <span class="nav-text">Network</span>
+          </a>
+          <a href="#" class="nav-item" id="nav-settings">
+            <span class="nav-icon"><i data-lucide="settings"></i></span>
+            <span class="nav-text">Settings</span>
+          </a>
+        </nav>
+        <div class="sidebar-footer">
+          <div class="upgrade-card">
+            <p>System is <strong>Protected</strong></p>
+            <button class="upgrade-btn">Details</button>
           </div>
-          <ul id="insights" class="insights-list"></ul>
-        </div>
-        <div class="card logs-card full-width shadow-top">
-          <div class="card-header">
-            <h3>Execution logs</h3>
+          <div class="theme-toggle">
+            <span>Dark Mode</span>
+            <label class="switch">
+              <input type="checkbox" id="theme-toggle-input" checked />
+              <span class="slider round"></span>
+            </label>
           </div>
-          <ul id="logs" class="log-container"></ul>
         </div>
-      </section>
+      </aside>
 
-
-      <!-- VIEW: APPS -->
-      <section id="section-apps" class="view-section">
-        <div class="card full-width">
-          <div class="card-header">
-            <h3>Installed Applications</h3>
-            <div class="header-actions">
-              <div class="search-box">
-                <i data-lucide="search"></i>
-                <input type="text" id="apps-search-input" placeholder="Search installed software...">
-              </div>
-              <button class="btn-outline refresh-btn" id="btn-refresh-apps" title="Refresh App List">
-                <i data-lucide="refresh-cw"></i>
+      <!-- Main Content -->
+      <main class="main-content">
+        <header class="top-header">
+          <div class="header-left">
+            <h1 id="view-title">Dashboard</h1>
+          </div>
+          <div class="top-nav">
+            <div class="ping-container" title="Latency to Python Brain">
+              <span class="ping-dot" id="ping-dot"></span>
+              <span class="ping-label">Latency:</span>
+              <span id="ping-value">-- ms</span>
+            </div>
+            <div
+              class="network-header-status"
+              id="header-net-status"
+              title="Network Connection Info"
+            >
+              <span class="net-icon" id="header-net-icon"
+                ><i data-lucide="satellite"></i
+              ></span>
+              <span id="header-net-speed" style="margin-left: 4px"
+                >-- Kbps</span
+              >
+            </div>
+            <div
+              class="battery-container"
+              id="battery-status"
+              title="Battery Status"
+            >
+              <span class="battery-icon" id="battery-icon"
+                ><i data-lucide="battery"></i
+              ></span>
+              <span id="battery-value">--%</span>
+            </div>
+            <div
+              class="bluetooth-container"
+              id="bluetooth-status"
+              title="Bluetooth Status"
+            >
+              <button class="bluetooth-btn" id="btn-bluetooth-toggle">
+                <i data-lucide="bluetooth"></i>
               </button>
             </div>
-          </div>
-          <div class="apps-grid-container">
-            <div id="apps-loading-indicator" class="loading-overlay hidden">
-              <div class="spinner"></div>
-              <p>Scanning System Registry...</p>
-            </div>
-            <div id="apps-grid" class="apps-grid">
-              <!-- Populated via JS -->
+            <div class="user-profile">
+              <div id="system-status-dot" class="status-dot"></div>
             </div>
           </div>
-        </div>
-      </section>
+        </header>
 
-      <!-- VIEW: STARTUP APPS -->
-      <section id="section-startup" class="view-section">
-        <div class="card full-width">
-          <div class="card-header">
-            <h3>Startup Applications</h3>
-            <button class="btn-primary btn-sm" id="btn-add-startup">+ Add New</button>
-          </div>
-          <div class="startup-list-container">
-            <table class="startup-table">
-              <thead>
-                <tr>
-                  <th>Name</th>
-                  <th>Command / Path</th>
-                  <th>Status</th>
-                  <th>Action</th>
-                </tr>
-              </thead>
-              <tbody id="startup-list-body">
-                <!-- Populated via JS -->
-              </tbody>
-            </table>
-          </div>
-        </div>
-      </section>
+        <div id="admin-warning" class="admin-warning-banner"></div>
 
-      <!-- VIEW: SETTINGS -->
-      <section id="section-settings" class="view-section">
-        <div class="settings-container">
+        <!-- VIEW: DASHBOARD -->
+        <section id="section-dashboard" class="view-section active">
+          <div class="dashboard-grid">
+            <!-- Stat Cards -->
+            <div class="card stat-card primary" data-component-id="cpu">
+              <div class="card-header">
+                <div class="card-icon cpu"><i data-lucide="zap"></i></div>
+              </div>
+              <p class="card-label">CPU Usage</p>
+              <h2 id="cpu-value">--%</h2>
+              <!-- Circular Progress SVG -->
+              <div class="circular-progress-container">
+                <svg viewBox="0 0 36 36" class="circular-progress">
+                  <circle class="bg" cx="18" cy="18" r="16"></circle>
+                  <circle
+                    id="cpu-progress-circle"
+                    class="progress"
+                    cx="18"
+                    cy="18"
+                    r="16"
+                  ></circle>
+                </svg>
+              </div>
+              <p class="card-comparison">System Load</p>
+            </div>
 
-          <!-- Category: Connection -->
-          <div class="card settings-group">
-            <div class="settings-group-header">
-              <div class="group-icon"><i data-lucide="network"></i></div>
-              <div>
-                <h3>Connectivity</h3>
-                <p>Backend communication and API configuration.</p>
+            <div class="card stat-card" data-component-id="ram">
+              <div class="card-header">
+                <div class="card-icon ram"><i data-lucide="database"></i></div>
               </div>
+              <p class="card-label">RAM Usage</p>
+              <h2 id="ram-value">-- MB</h2>
+              <!-- Circular Progress SVG -->
+              <div class="circular-progress-container">
+                <svg viewBox="0 0 36 36" class="circular-progress">
+                  <circle class="bg" cx="18" cy="18" r="16"></circle>
+                  <circle
+                    id="ram-progress-circle"
+                    class="progress"
+                    cx="18"
+                    cy="18"
+                    r="16"
+                  ></circle>
+                </svg>
+              </div>
+              <p class="card-comparison" id="ram-total">Total: -- GB</p>
             </div>
-            <div class="settings-form">
-              <div class="form-row">
-                <div class="form-group">
-                  <label>API Endpoint</label>
-                  <div class="readonly-value">http://127.0.0.1:5123</div>
-                </div>
-                <div class="form-group">
-                  <label>Security Token</label>
-                  <div class="readonly-value">••••••••••••••••</div>
-                </div>
-              </div>
-              <div class="form-group">
-                <label>Refresh Interval</label>
-                <div class="readonly-value">2000 ms</div>
-              </div>
-            </div>
-          </div>
 
-          <!-- Category: Dashboard -->
-          <div class="card settings-group">
-            <div class="settings-group-header">
-              <div class="group-icon"><i data-lucide="layout"></i></div>
-              <div>
-                <h3>Dashboard Layout</h3>
-                <p>Customize the order and visibility of your stat cards.</p>
+            <div class="card stat-card" data-component-id="proc">
+              <div class="card-header">
+                <div class="card-icon proc"><i data-lucide="layers"></i></div>
               </div>
+              <p class="card-label">Total Processes</p>
+              <h2 id="proc-count">--</h2>
+              <p class="card-comparison">Monitoring active</p>
             </div>
-            <div class="layout-settings">
-              <div id="layout-order-list" class="layout-order-list">
-                <!-- Populated via JS -->
-              </div>
-            </div>
-          </div>
 
-          <!-- Category: Voice -->
-          <div class="card settings-group">
-            <div class="settings-group-header">
-              <div class="group-icon"><i data-lucide="mic"></i></div>
-              <div>
-                <h3>Voice & Feedback</h3>
-                <p>Test the real-time response of the TTS engine.</p>
+            <div class="card stat-card" data-component-id="health">
+              <div class="card-header">
+                <div class="card-icon health"><i data-lucide="shield"></i></div>
               </div>
+              <p class="card-label">Health Score</p>
+              <h2 id="health-status">Healthy</h2>
+              <div class="card-actions">
+                <button class="btn-primary btn-sm" id="btn-normalize">
+                  Normalize
+                </button>
+                <button class="btn-outline btn-sm" id="btn-health-details">
+                  Details
+                </button>
+              </div>
+              <p class="card-comparison">Optimized</p>
             </div>
-            <div class="settings-form">
-              <div class="form-group">
-                <label>Test TTS Message</label>
-                <div class="input-with-btn">
-                  <input type="text" id="tts-test-input" placeholder="Enter text for Fluffy to say..."
-                    value="Hello Boss, I am standing by.">
-                  <button class="btn-primary" id="btn-test-tts">Test Voice</button>
+
+            <div
+              class="card stat-card network-card"
+              data-component-id="network"
+            >
+              <div class="card-header">
+                <div class="card-icon" id="net-card-icon">
+                  <i data-lucide="globe"></i>
                 </div>
               </div>
-            </div>
-          </div>
-
-          <!-- Category: Speech Recognition (STT) -->
-          <div class="card settings-group">
-            <div class="settings-group-header">
-              <div class="group-icon"><i data-lucide="mic"></i></div>
-              <div>
-                <h3>Speech Recognition (STT)</h3>
-                <p>Test offline speech-to-text recognition powered by Vosk.</p>
-              </div>
-            </div>
-            <div class="settings-form">
-              <div class="form-group">
-                <label>Microphone Test</label>
-                <div class="stt-test-container">
-                  <button class="btn-primary" id="btn-start-stt">
-                    <i data-lucide="mic"></i> Start Listening
-                  </button>
-                  <button class="btn-outline" id="btn-stop-stt" disabled>
-                    <i data-lucide="mic-off"></i> Stop
-                  </button>
+              <p class="card-label">Network Usage</p>
+              <div class="speed-row">
+                <div class="speed-item">
+                  <span class="speed-dir">RX:</span>
+                  <span id="net-rx-value">--</span>
                 </div>
-                <div id="stt-status" class="stt-status-box">
-                  <p class="status-label">Status: <span id="stt-status-text">Ready</span></p>
-                  <div id="stt-transcription" class="transcription-box">
-                    <p class="transcription-label">Transcription:</p>
-                    <p id="stt-result-text" class="transcription-text">Speak to see results...</p>
+                <div class="speed-item">
+                  <span class="speed-dir">TX:</span>
+                  <span id="net-tx-value">--</span>
+                </div>
+              </div>
+              <p class="card-comparison" id="net-status-label">Offline</p>
+            </div>
+
+            <!-- Speed Test Container -->
+            <div
+              class="card speed-test-card"
+              id="speed-test-container"
+              data-component-id="speedtest"
+            >
+              <div class="speed-test-header">
+                <div class="speed-test-title">
+                  <span class="speed-test-icon"
+                    ><i data-lucide="gauge"></i
+                  ></span>
+                  <h3>Internet Speed Test</h3>
+                </div>
+              </div>
+              <div class="speed-test-body">
+                <div class="speed-display">
+                  <div class="speed-circle">
+                    <span id="speed-result-value">0.0</span>
+                    <span class="speed-unit">Mbps</span>
                   </div>
                 </div>
-              </div>
-            </div>
-          </div>
-
-          <!-- FTP Server Section - Add this after the Guardian Intelligence section in Settings -->
-          <div class="card settings-group">
-            <div class="settings-group-header">
-              <div class="group-icon"><i data-lucide="folder-sync"></i></div>
-              <div>
-                <h3>FTP File Sharing</h3>
-                <p>Share files over local network with secure FTP server.</p>
-              </div>
-            </div>
-
-            <div class="ftp-container">
-              <!-- FTP Status Header -->
-              <div class="ftp-status-header">
-                <div class="ftp-status-badge" id="ftp-status-badge">
-                  <span class="status-dot"></span>
-                  <span id="ftp-status-text">Stopped</span>
-                </div>
-                <div class="ftp-controls">
-                  <button id="btn-start-ftp" class="btn-primary">
-                    <i data-lucide="play"></i> Start Server
-                  </button>
-                  <button id="btn-stop-ftp" class="btn-outline" disabled>
-                    <i data-lucide="stop-circle"></i> Stop Server
+                <div class="speed-info-group">
+                  <p id="speed-test-status">Ready to check connection speed</p>
+                  <button class="btn-primary" id="btn-run-speedtest">
+                    Check Now
                   </button>
                 </div>
               </div>
+            </div>
 
-              <!-- Folder Selector -->
-              <div class="ftp-folder-selector">
-                <label for="ftp-shared-folder"><i data-lucide="folder"></i> Shared Folder:</label>
-                <div class="folder-input-group">
-                  <input type="text" id="ftp-shared-folder" readonly placeholder="Select a folder to share...">
-                  <button id="btn-browse-folder" class="btn-outline btn-sm">
-                    <i data-lucide="folder-open"></i> Browse...
+            <div class="card stat-card fluffy-card" data-component-id="fluffy">
+              <div class="card-header">
+                <div class="card-icon self"><i data-lucide="sparkles"></i></div>
+              </div>
+              <p class="card-label">Fluffy Usage</p>
+              <h2 id="fluffy-usage">--%</h2>
+              <!-- Circular Progress SVG -->
+              <div class="circular-progress-container">
+                <svg viewBox="0 0 36 36" class="circular-progress">
+                  <circle class="bg" cx="18" cy="18" r="16"></circle>
+                  <circle
+                    id="fluffy-progress-circle"
+                    class="progress"
+                    cx="18"
+                    cy="18"
+                    r="16"
+                  ></circle>
+                </svg>
+              </div>
+              <p class="card-comparison" id="fluffy-ram">-- MB RAM</p>
+            </div>
+
+            <div class="card stat-card" data-component-id="sessions">
+              <div class="card-header">
+                <div class="card-icon session"><i data-lucide="users"></i></div>
+              </div>
+              <p class="card-label">Active Sessions</p>
+              <h2 id="session-count">--</h2>
+              <p class="card-comparison">Live interactions</p>
+            </div>
+
+            <!-- Chart & Top Offenders -->
+            <div class="card chart-card" data-component-id="chart">
+              <div class="card-header">
+                <h3>Resource History</h3>
+              </div>
+              <div class="chart-container">
+                <div class="chart-y-labels">
+                  <span>100%</span>
+                  <span>50%</span>
+                  <span>0%</span>
+                </div>
+                <svg
+                  id="resource-chart"
+                  viewBox="0 0 400 150"
+                  preserveAspectRatio="none"
+                >
+                  <defs>
+                    <linearGradient
+                      id="cpu-gradient"
+                      x1="0"
+                      y1="0"
+                      x2="0"
+                      y2="1"
+                    >
+                      <stop
+                        offset="0%"
+                        stop-color="var(--accent)"
+                        stop-opacity="0.3"
+                      />
+                      <stop
+                        offset="100%"
+                        stop-color="var(--accent)"
+                        stop-opacity="0"
+                      />
+                    </linearGradient>
+                    <linearGradient
+                      id="ram-gradient"
+                      x1="0"
+                      y1="0"
+                      x2="0"
+                      y2="1"
+                    >
+                      <stop
+                        offset="0%"
+                        stop-color="var(--success)"
+                        stop-opacity="0.3"
+                      />
+                      <stop
+                        offset="100%"
+                        stop-color="var(--success)"
+                        stop-opacity="0"
+                      />
+                    </linearGradient>
+                    <filter
+                      id="soft-blur"
+                      x="-20%"
+                      y="-20%"
+                      width="140%"
+                      height="140%"
+                    >
+                      <feGaussianBlur in="SourceGraphic" stdDeviation="3" />
+                    </filter>
+                  </defs>
+                  <!-- Grid Lines -->
+                  <line x1="0" y1="0" x2="400" y2="0" class="chart-grid-line" />
+                  <line
+                    x1="0"
+                    y1="75"
+                    x2="400"
+                    y2="75"
+                    class="chart-grid-line"
+                  />
+                  <line
+                    x1="0"
+                    y1="150"
+                    x2="400"
+                    y2="150"
+                    class="chart-grid-line"
+                  />
+
+                  <path id="cpu-area" class="chart-area cpu" d=""></path>
+                  <path id="ram-area" class="chart-area ram" d=""></path>
+                  <path id="cpu-path" class="chart-line cpu" d=""></path>
+                  <path id="ram-path" class="chart-line ram" d=""></path>
+                </svg>
+                <div class="chart-legend">
+                  <span class="legend-item cpu">CPU</span>
+                  <span class="legend-item ram">RAM</span>
+                </div>
+              </div>
+            </div>
+
+            <div class="card offenders-card" data-component-id="offenders">
+              <div class="card-header">
+                <h3>RAM Offenders</h3>
+              </div>
+              <div id="offenders-list" class="offenders-list"></div>
+            </div>
+          </div>
+        </section>
+
+        <!-- VIEW: PROCESSES (Restored Tree) -->
+        <section id="section-processes" class="view-section">
+          <div class="card full-width">
+            <div class="card-header">
+              <h3>Process Hierarchy</h3>
+              <div class="header-actions">
+                <div class="sort-selector">
+                  <label>Sort:</label>
+                  <select id="process-sort-mode">
+                    <option value="ram">Most RAM</option>
+                    <option value="cpu">Highest CPU</option>
+                    <option value="name">Name (A-Z)</option>
+                  </select>
+                </div>
+                <div class="inline-search">
+                  <i data-lucide="search"></i>
+                  <input
+                    type="text"
+                    id="process-search-input"
+                    placeholder="Search by name or PID..."
+                  />
+                  <button
+                    id="clear-search"
+                    class="clear-search-btn"
+                    title="Clear Search"
+                  >
+                    <i data-lucide="x"></i>
                   </button>
                 </div>
-                <p class="folder-hint">Choose which folder to share via FTP (server must be stopped to change)</p>
-              </div>
-              <!-- FTP Server Info (shown when running) -->
-              <div id="ftp-server-info" class="ftp-server-info" style="display: none;">
-                <div class="ftp-info-grid">
-                  <!-- Connection Details -->
-                  <div class="ftp-info-card">
-                    <h4><i data-lucide="server"></i> Connection Details</h4>
-                    <div class="ftp-detail-row">
-                      <span class="detail-label">Address:</span>
-                      <span id="ftp-address" class="detail-value">--</span>
-                    </div>
-                    <div class="ftp-detail-row">
-                      <span class="detail-label">Username:</span>
-                      <span id="ftp-username" class="detail-value">fluffy</span>
-                    </div>
-                    <div class="ftp-detail-row">
-                      <span class="detail-label">Password:</span>
-                      <div class="password-container">
-                        <span id="ftp-password" class="detail-value password-masked">••••••••••••••••</span>
-                        <button id="btn-copy-password" class="btn-icon" title="Copy Password">
-                          <i data-lucide="copy"></i>
-                        </button>
-                        <button id="btn-toggle-password" class="btn-icon" title="Show/Hide Password">
-                          <i data-lucide="eye"></i>
-                        </button>
-                      </div>
-                    </div>
-                  </div>
-
-                  <!-- QR Code -->
-                  <div class="ftp-info-card qr-card">
-                    <h4><i data-lucide="qr-code"></i> Quick Connect</h4>
-                    <div class="qr-code-container">
-                      <img id="ftp-qr-code" src="" alt="FTP QR Code" class="qr-code-img">
-                      <p class="qr-hint">Scan with mobile FTP app</p>
-                    </div>
-                  </div>
-                </div>
-
-                <!-- Connected Clients Section -->
-                <div class="ftp-clients-section">
-                  <h4><i data-lucide="users"></i> Connected Clients (<span id="ftp-clients-count">0</span>)</h4>
-                  <div id="ftp-clients-list" class="ftp-clients-list">
-                    <!-- Populated dynamically via JavaScript -->
-                  </div>
-                </div>
-
-                <!-- Activity Logs -->
-                <div class="ftp-logs-card">
-                  <div class="logs-header">
-                    <h4><i data-lucide="activity"></i> Activity Log</h4>
-                    <button id="btn-clear-ftp-logs" class="btn-outline btn-sm">Clear Logs</button>
-                  </div>
-                  <div id="ftp-logs-list" class="ftp-logs-list">
-                    <p class="empty-logs">No activity yet</p>
-                  </div>
-                </div>
-              </div>
-
-              <!-- FTP Info Message (shown when stopped) -->
-              <div id="ftp-stopped-info" class="ftp-stopped-info">
-                <div class="info-icon"><i data-lucide="info"></i></div>
-                <p>Start the FTP server to share files with devices on your local network.</p>
-                <ul class="info-list">
-                  <li>Secure random password generated per session</li>
-                  <li>Files shared from <code>/FluffyShared/</code> directory</li>
-                  <li>Server runs until manually stopped</li>
-                  <li>QR code for easy mobile connection</li>
-                </ul>
-              </div>
-            </div>
-          </div>
-
-          <!-- Category: Security -->
-          <div class="card settings-group danger-zone">
-            <div class="settings-group-header">
-              <div class="group-icon"><i data-lucide="brain-circuit"></i></div>
-              <div>
-                <h3>Guardian Intelligence</h3>
-                <p>Manage autonomous learning and behavioral data.</p>
-              </div>
-            </div>
-            <div class="setting-item">
-              <div class="setting-info">
-                <strong>Reset Recognition Data</strong>
-                <p>Wipe all learned patterns and restart the 5-minute learning phase. Use this if Guardian is flagging
-                  many false positives.</p>
-              </div>
-              <button id="btn-clear-guardian" class="btn-outline btn-danger">Clear Knowledge Base</button>
-            </div>
-          </div>
-
-
-        </div>
-      </section>
-
-      <!-- VIEW: NETWORK -->
-      <section id="section-network" class="view-section">
-        <div class="card full-width">
-          <div class="card-header">
-            <h3>LAN Distributed Monitoring</h3>
-            <p class="section-desc">Monitor multiple Fluffy instances across your local network</p>
-          </div>
-
-          <!-- Role Selection -->
-          <div class="network-role-section">
-            <h4>Current Mode</h4>
-            <div class="role-selector">
-              <button class="role-btn" id="role-standalone" data-role="standalone">
-                <i data-lucide="monitor"></i>
-                <span>Standalone</span>
-                <p>Local monitoring only</p>
-              </button>
-              <button class="role-btn" id="role-available" data-role="available">
-                <i data-lucide="radio-tower"></i>
-                <span>Availability</span>
-                <p>Allow remote monitoring</p>
-              </button>
-              <button class="role-btn" id="role-admin" data-role="admin">
-                <i data-lucide="server"></i>
-                <span>Admin</span>
-                <p>Monitor other instances</p>
-              </button>
-            </div>
-            <div id="role-status" class="role-status">
-              <span class="status-dot"></span>
-              <span id="role-status-text">Loading...</span>
-            </div>
-          </div>
-
-          <!-- Availability Mode Panel -->
-          <div id="availability-panel" class="network-panel" style="display: none;">
-            <div class="panel-header">
-              <h4><i data-lucide="radio-tower"></i> Availability Mode</h4>
-              <p>Allow other Fluffy instances to connect and monitor this machine</p>
-            </div>
-
-            <div id="availability-stopped" class="availability-stopped">
-              <div class="form-group">
-                <label>Port</label>
-                <input type="number" id="availability-port" value="8765" min="1024" max="65535">
-              </div>
-              <button class="btn-primary" id="btn-start-availability">
-                <i data-lucide="play"></i> Start Availability Server
-              </button>
-            </div>
-
-            <div id="availability-running" class="availability-running" style="display: none;">
-              <div class="server-info-card">
-                <div class="info-row">
-                  <span class="info-label">Status:</span>
-                  <span class="info-value"><span class="status-dot online"></span> Online</span>
-                </div>
-                <div class="info-row">
-                  <span class="info-label">IP Address:</span>
-                  <span class="info-value" id="availability-running-ip">Loading...</span>
-                </div>
-                <div class="info-row">
-                  <span class="info-label">Port:</span>
-                  <span class="info-value" id="availability-running-port">8765</span>
-                </div>
-                <div class="info-row">
-                  <span class="info-label">Connections:</span>
-                  <span class="info-value" id="availability-connections">HTTP (open)</span>
-                </div>
-              </div>
-              <div class="connection-hint">
-                <i data-lucide="info"></i>
-                <p>Other Fluffy instances can connect using the IP address and port shown above</p>
-              </div>
-              <button class="btn-outline btn-danger" id="btn-stop-availability">
-                <i data-lucide="stop-circle"></i> Stop Server
-              </button>
-            </div>
-          </div>
-
-          <!-- Admin Mode Panel -->
-          <div id="admin-panel" class="network-panel" style="display: none;">
-            <div class="panel-header">
-              <h4><i data-lucide="server"></i> Admin Mode</h4>
-              <p>Connect to and monitor other Fluffy instances on your network</p>
-            </div>
-
-            <!-- Add Connection Form -->
-            <div class="add-connection-form">
-              <h5>Add Fluffy Instance</h5>
-              <div class="form-row">
-                <div class="form-group">
-                  <label>IP Address</label>
-                  <input type="text" id="admin-ip" placeholder="192.168.1.100">
-                </div>
-                <div class="form-group">
-                  <label>Port</label>
-                  <input type="number" id="admin-port" placeholder="8765" value="8765" min="1024" max="65535">
-                </div>
-                <button class="btn-primary" id="btn-admin-connect">
-                  <i data-lucide="plus"></i> Add Machine
+                <button class="btn-outline" id="refresh-tree">
+                  Refresh Tree
                 </button>
               </div>
             </div>
+            <div id="processes-tree" class="process-tree-container">
+              <!-- Hierarchical tree populated via JS -->
+            </div>
+            <div id="top-consumer-highlight" class="top-consumer-card">
+              <!-- Populated via JS -->
+            </div>
+          </div>
+        </section>
 
-            <!-- Connected Machines List -->
-            <div class="connected-machines-section">
-              <h5>Connected Machines (<span id="machines-count">0</span>)</h5>
-              <div id="machines-list" class="machines-list">
-                <div class="empty-state">
-                  <i data-lucide="server-off"></i>
-                  <p>No machines connected</p>
-                  <p class="hint">Add a Fluffy instance above to start monitoring</p>
+        <!-- VIEW: GUARDIAN -->
+        <section id="section-guardian" class="view-section">
+          <div class="card full-width guardian-view-card">
+            <div class="card-header">
+              <div class="header-with-badge">
+                <h3>Behavioral Guardian</h3>
+                <span class="view-badge">Level 2 Protection</span>
+              </div>
+              <p class="section-desc">
+                Real-time intent analysis and behavioral chain tracking.
+              </p>
+              <div
+                id="learning-mode-indicator"
+                class="learning-banner"
+                style="display: none"
+              >
+                <span class="learning-icon"><i data-lucide="brain"></i></span>
+                <div class="learning-info">
+                  <strong>Initial Learning Phase</strong>
+                  <p>
+                    Establishing behavioral baselines. Alerts suppressed:
+                    <span id="learning-progress">0</span>%
+                  </p>
+                </div>
+              </div>
+            </div>
+            <div
+              id="guardian-alerts"
+              class="guardian-alerts-container large-view"
+            >
+              <!-- Populated via JS -->
+              <div class="guardian-empty-state">
+                <div class="empty-icon"><i data-lucide="shield-check"></i></div>
+                <h3>System Secure</h3>
+                <p>
+                  No suspicious behavioral chains detected in the last window.
+                </p>
+              </div>
+            </div>
+          </div>
+        </section>
+
+        <!-- VIEW: ANALYTICS -->
+        <section id="section-analytics" class="view-section">
+          <div class="card analytics-card full-width">
+            <div class="card-header">
+              <h3>System Insights</h3>
+              <h4
+                style="
+                  margin-left: auto;
+                  font-size: 0.8rem;
+                  font-weight: normal;
+                  opacity: 0.7;
+                "
+              >
+                That's where fluffy learn about your system
+              </h4>
+            </div>
+            <ul id="insights" class="insights-list"></ul>
+          </div>
+          <div class="card logs-card full-width shadow-top">
+            <div class="card-header">
+              <h3>Execution logs</h3>
+            </div>
+            <ul id="logs" class="log-container"></ul>
+          </div>
+        </section>
+
+        <!-- VIEW: APPS -->
+        <section id="section-apps" class="view-section">
+          <div class="card full-width">
+            <div class="card-header">
+              <h3>Installed Applications</h3>
+              <div class="header-actions">
+                <div class="search-box">
+                  <i data-lucide="search"></i>
+                  <input
+                    type="text"
+                    id="apps-search-input"
+                    placeholder="Search installed software..."
+                  />
+                </div>
+                <button
+                  class="btn-outline refresh-btn"
+                  id="btn-refresh-apps"
+                  title="Refresh App List"
+                >
+                  <i data-lucide="refresh-cw"></i>
+                </button>
+              </div>
+            </div>
+            <div class="apps-grid-container">
+              <div id="apps-loading-indicator" class="loading-overlay hidden">
+                <div class="spinner"></div>
+                <p>Scanning System Registry...</p>
+              </div>
+              <div id="apps-grid" class="apps-grid">
+                <!-- Populated via JS -->
+              </div>
+            </div>
+          </div>
+        </section>
+
+        <!-- VIEW: STARTUP APPS -->
+        <section id="section-startup" class="view-section">
+          <div class="card full-width">
+            <div class="card-header">
+              <h3>Startup Applications</h3>
+              <button class="btn-primary btn-sm" id="btn-add-startup">
+                + Add New
+              </button>
+            </div>
+            <div class="startup-list-container">
+              <table class="startup-table">
+                <thead>
+                  <tr>
+                    <th>Name</th>
+                    <th>Command / Path</th>
+                    <th>Status</th>
+                    <th>Action</th>
+                  </tr>
+                </thead>
+                <tbody id="startup-list-body">
+                  <!-- Populated via JS -->
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </section>
+
+        <!-- VIEW: SETTINGS -->
+        <section id="section-settings" class="view-section">
+          <div class="settings-container">
+            <!-- Category: Connection -->
+            <div class="card settings-group">
+              <div class="settings-group-header">
+                <div class="group-icon"><i data-lucide="network"></i></div>
+                <div>
+                  <h3>Connectivity</h3>
+                  <p>Backend communication and API configuration.</p>
+                </div>
+              </div>
+              <div class="settings-form">
+                <div class="form-row">
+                  <div class="form-group">
+                    <label>API Endpoint</label>
+                    <div class="readonly-value">http://127.0.0.1:5123</div>
+                  </div>
+                  <div class="form-group">
+                    <label>Security Token</label>
+                    <div class="readonly-value">••••••••••••••••</div>
+                  </div>
+                </div>
+                <div class="form-group">
+                  <label>Refresh Interval</label>
+                  <div class="readonly-value">2000 ms</div>
                 </div>
               </div>
             </div>
 
-            <!-- Active Machine Data Display -->
-            <div id="active-machine-data" class="active-machine-data" style="display: none;">
-              <h5>Monitoring: <span id="active-machine-name">--</span></h5>
-              <div class="machine-stats-grid">
-                <div class="stat-card-mini">
-                  <div class="stat-icon"><i data-lucide="cpu"></i></div>
-                  <div class="stat-info">
-                    <span class="stat-label">CPU</span>
-                    <span class="stat-value" id="remote-cpu">--%</span>
-                  </div>
-                </div>
-                <div class="stat-card-mini">
-                  <div class="stat-icon"><i data-lucide="database"></i></div>
-                  <div class="stat-info">
-                    <span class="stat-label">RAM</span>
-                    <span class="stat-value" id="remote-ram">-- MB</span>
-                  </div>
-                </div>
-                <div class="stat-card-mini">
-                  <div class="stat-icon"><i data-lucide="layers"></i></div>
-                  <div class="stat-info">
-                    <span class="stat-label">Processes</span>
-                    <span class="stat-value" id="remote-processes">--</span>
-                  </div>
-                </div>
-                <div class="stat-card-mini">
-                  <div class="stat-icon"><i data-lucide="network"></i></div>
-                  <div class="stat-info">
-                    <span class="stat-label">Network</span>
-                    <span class="stat-value" id="remote-network">-- KB/s</span>
-                  </div>
+            <!-- Category: Dashboard -->
+            <div class="card settings-group">
+              <div class="settings-group-header">
+                <div class="group-icon"><i data-lucide="layout"></i></div>
+                <div>
+                  <h3>Dashboard Layout</h3>
+                  <p>Customize the order and visibility of your stat cards.</p>
                 </div>
               </div>
-
-              <!-- All Processes from Remote Machine -->
-              <div class="remote-processes-section">
-                <div class="remote-processes-header">
-                  <h6>Processes</h6>
-                  <input type="text" id="remote-process-search" class="remote-process-search"
-                    placeholder="Search processes...">
-                </div>
-                <div id="remote-processes-list" class="remote-processes-list">
+              <div class="layout-settings">
+                <div id="layout-order-list" class="layout-order-list">
                   <!-- Populated via JS -->
                 </div>
               </div>
             </div>
+
+            <!-- Category: Voice -->
+            <div class="card settings-group">
+              <div class="settings-group-header">
+                <div class="group-icon"><i data-lucide="mic"></i></div>
+                <div>
+                  <h3>Voice & Feedback</h3>
+                  <p>Test the real-time response of the TTS engine.</p>
+                </div>
+              </div>
+              <div class="settings-form">
+                <div class="form-group">
+                  <label>Test TTS Message</label>
+                  <div class="input-with-btn">
+                    <input
+                      type="text"
+                      id="tts-test-input"
+                      placeholder="Enter text for Fluffy to say..."
+                      value="Hello Boss, I am standing by."
+                    />
+                    <button class="btn-primary" id="btn-test-tts">
+                      Test Voice
+                    </button>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <!-- Category: Speech Recognition (STT) -->
+            <div class="card settings-group">
+              <div class="settings-group-header">
+                <div class="group-icon"><i data-lucide="mic"></i></div>
+                <div>
+                  <h3>Speech Recognition (STT)</h3>
+                  <p>
+                    Test offline speech-to-text recognition powered by Vosk.
+                  </p>
+                </div>
+              </div>
+              <div class="settings-form">
+                <div class="form-group">
+                  <label>Microphone Test</label>
+                  <div class="stt-test-container">
+                    <button class="btn-primary" id="btn-start-stt">
+                      <i data-lucide="mic"></i> Start Listening
+                    </button>
+                    <button class="btn-outline" id="btn-stop-stt" disabled>
+                      <i data-lucide="mic-off"></i> Stop
+                    </button>
+                  </div>
+                  <div id="stt-status" class="stt-status-box">
+                    <p class="status-label">
+                      Status: <span id="stt-status-text">Ready</span>
+                    </p>
+                    <div id="stt-transcription" class="transcription-box">
+                      <p class="transcription-label">Transcription:</p>
+                      <p id="stt-result-text" class="transcription-text">
+                        Speak to see results...
+                      </p>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <!-- FTP Server Section - Add this after the Guardian Intelligence section in Settings -->
+            <div class="card settings-group">
+              <div class="settings-group-header">
+                <div class="group-icon"><i data-lucide="folder-sync"></i></div>
+                <div>
+                  <h3>FTP File Sharing</h3>
+                  <p>Share files over local network with secure FTP server.</p>
+                </div>
+              </div>
+
+              <div class="ftp-container">
+                <!-- FTP Status Header -->
+                <div class="ftp-status-header">
+                  <div class="ftp-status-badge" id="ftp-status-badge">
+                    <span class="status-dot"></span>
+                    <span id="ftp-status-text">Stopped</span>
+                  </div>
+                  <div class="ftp-controls">
+                    <button id="btn-start-ftp" class="btn-primary">
+                      <i data-lucide="play"></i> Start Server
+                    </button>
+                    <button id="btn-stop-ftp" class="btn-outline" disabled>
+                      <i data-lucide="stop-circle"></i> Stop Server
+                    </button>
+                  </div>
+                </div>
+
+                <!-- Folder Selector -->
+                <div class="ftp-folder-selector">
+                  <label for="ftp-shared-folder"
+                    ><i data-lucide="folder"></i> Shared Folder:</label
+                  >
+                  <div class="folder-input-group">
+                    <input
+                      type="text"
+                      id="ftp-shared-folder"
+                      readonly
+                      placeholder="Select a folder to share..."
+                    />
+                    <button id="btn-browse-folder" class="btn-outline btn-sm">
+                      <i data-lucide="folder-open"></i> Browse...
+                    </button>
+                  </div>
+                  <p class="folder-hint">
+                    Choose which folder to share via FTP (server must be stopped
+                    to change)
+                  </p>
+                </div>
+                <!-- FTP Server Info (shown when running) -->
+                <div
+                  id="ftp-server-info"
+                  class="ftp-server-info"
+                  style="display: none"
+                >
+                  <div class="ftp-info-grid">
+                    <!-- Connection Details -->
+                    <div class="ftp-info-card">
+                      <h4><i data-lucide="server"></i> Connection Details</h4>
+                      <div class="ftp-detail-row">
+                        <span class="detail-label">Address:</span>
+                        <span id="ftp-address" class="detail-value">--</span>
+                      </div>
+                      <div class="ftp-detail-row">
+                        <span class="detail-label">Username:</span>
+                        <span id="ftp-username" class="detail-value"
+                          >fluffy</span
+                        >
+                      </div>
+                      <div class="ftp-detail-row">
+                        <span class="detail-label">Password:</span>
+                        <div class="password-container">
+                          <span
+                            id="ftp-password"
+                            class="detail-value password-masked"
+                            >••••••••••••••••</span
+                          >
+                          <button
+                            id="btn-copy-password"
+                            class="btn-icon"
+                            title="Copy Password"
+                          >
+                            <i data-lucide="copy"></i>
+                          </button>
+                          <button
+                            id="btn-toggle-password"
+                            class="btn-icon"
+                            title="Show/Hide Password"
+                          >
+                            <i data-lucide="eye"></i>
+                          </button>
+                        </div>
+                      </div>
+                    </div>
+
+                    <!-- QR Code -->
+                    <div class="ftp-info-card qr-card">
+                      <h4><i data-lucide="qr-code"></i> Quick Connect</h4>
+                      <div class="qr-code-container">
+                        <img
+                          id="ftp-qr-code"
+                          src=""
+                          alt="FTP QR Code"
+                          class="qr-code-img"
+                        />
+                        <p class="qr-hint">Scan with mobile FTP app</p>
+                      </div>
+                    </div>
+                  </div>
+
+                  <!-- Connected Clients Section -->
+                  <div class="ftp-clients-section">
+                    <h4>
+                      <i data-lucide="users"></i> Connected Clients (<span
+                        id="ftp-clients-count"
+                        >0</span
+                      >)
+                    </h4>
+                    <div id="ftp-clients-list" class="ftp-clients-list">
+                      <!-- Populated dynamically via JavaScript -->
+                    </div>
+                  </div>
+
+                  <!-- Activity Logs -->
+                  <div class="ftp-logs-card">
+                    <div class="logs-header">
+                      <h4><i data-lucide="activity"></i> Activity Log</h4>
+                      <button
+                        id="btn-clear-ftp-logs"
+                        class="btn-outline btn-sm"
+                      >
+                        Clear Logs
+                      </button>
+                    </div>
+                    <div id="ftp-logs-list" class="ftp-logs-list">
+                      <p class="empty-logs">No activity yet</p>
+                    </div>
+                  </div>
+                </div>
+
+                <!-- FTP Info Message (shown when stopped) -->
+                <div id="ftp-stopped-info" class="ftp-stopped-info">
+                  <div class="info-icon"><i data-lucide="info"></i></div>
+                  <p>
+                    Start the FTP server to share files with devices on your
+                    local network.
+                  </p>
+                  <ul class="info-list">
+                    <li>Secure random password generated per session</li>
+                    <li>
+                      Files shared from <code>/FluffyShared/</code> directory
+                    </li>
+                    <li>Server runs until manually stopped</li>
+                    <li>QR code for easy mobile connection</li>
+                  </ul>
+                </div>
+              </div>
+            </div>
+
+            <!-- Category: Security -->
+            <div class="card settings-group danger-zone">
+              <div class="settings-group-header">
+                <div class="group-icon">
+                  <i data-lucide="brain-circuit"></i>
+                </div>
+                <div>
+                  <h3>Guardian Intelligence</h3>
+                  <p>Manage autonomous learning and behavioral data.</p>
+                </div>
+              </div>
+              <div class="setting-item">
+                <div class="setting-info">
+                  <strong>Reset Recognition Data</strong>
+                  <p>
+                    Wipe all learned patterns and restart the 5-minute learning
+                    phase. Use this if Guardian is flagging many false
+                    positives.
+                  </p>
+                </div>
+                <button id="btn-clear-guardian" class="btn-outline btn-danger">
+                  Clear Knowledge Base
+                </button>
+              </div>
+            </div>
           </div>
-        </div>
-      </section>
+        </section>
 
-      <!-- VIEW: CHAT -->
-      <section id="section-chat" class="view-section">
-        <div class="chat-layout">
-          <!-- History Sidebar -->
-          <aside id="chat-history-sidebar" class="chat-history-sidebar">
-            <div class="history-header">
-              <h3>📜 Chat History</h3>
-              <button id="close-history-btn" class="icon-btn" title="Close">
-                <i data-lucide="x"></i>
-              </button>
+        <!-- VIEW: NETWORK -->
+        <section id="section-network" class="view-section">
+          <div class="card full-width">
+            <div class="card-header">
+              <h3>LAN Distributed Monitoring</h3>
+              <p class="section-desc">
+                Monitor multiple Fluffy instances across your local network
+              </p>
             </div>
 
-            <button id="new-chat-btn" class="btn-primary new-chat-btn">
-              <i data-lucide="plus"></i>
-              New Chat
-            </button>
-
-            <div id="sessions-list" class="sessions-list">
-              <!-- Sessions will be populated here -->
-              <p class="empty-state">No chat history yet</p>
-            </div>
-          </aside>
-
-          <!-- Chat Container -->
-          <div class="chat-container">
-            <div class="chat-header">
-              <button id="toggle-history-btn" class="icon-btn" title="Toggle History">
-                <i data-lucide="history"></i>
-              </button>
-              <h2>Chat with Fluffy</h2>
-              <div class="chat-status" id="chat-status">
+            <!-- Role Selection -->
+            <div class="network-role-section">
+              <h4>Current Mode</h4>
+              <div class="role-selector">
+                <button
+                  class="role-btn"
+                  id="role-standalone"
+                  data-role="standalone"
+                >
+                  <i data-lucide="monitor"></i>
+                  <span>Standalone</span>
+                  <p>Local monitoring only</p>
+                </button>
+                <button
+                  class="role-btn"
+                  id="role-available"
+                  data-role="available"
+                >
+                  <i data-lucide="radio-tower"></i>
+                  <span>Availability</span>
+                  <p>Allow remote monitoring</p>
+                </button>
+                <button class="role-btn" id="role-admin" data-role="admin">
+                  <i data-lucide="server"></i>
+                  <span>Admin</span>
+                  <p>Monitor other instances</p>
+                </button>
+              </div>
+              <div id="role-status" class="role-status">
                 <span class="status-dot"></span>
-                <span>Ready</span>
+                <span id="role-status-text">Loading...</span>
               </div>
             </div>
 
-            <div id="chat-messages" class="chat-messages">
-              <div class="chat-watermark">
-                <img src="/logo.png" alt="Fluffy Watermark" />
+            <!-- Availability Mode Panel -->
+            <div
+              id="availability-panel"
+              class="network-panel"
+              style="display: none"
+            >
+              <div class="panel-header">
+                <h4><i data-lucide="radio-tower"></i> Availability Mode</h4>
+                <p>
+                  Allow other Fluffy instances to connect and monitor this
+                  machine
+                </p>
               </div>
-              <!-- Messages will be rendered here -->
+
+              <div id="availability-stopped" class="availability-stopped">
+                <div class="form-group">
+                  <label>Port</label>
+                  <input
+                    type="number"
+                    id="availability-port"
+                    value="8765"
+                    min="1024"
+                    max="65535"
+                  />
+                </div>
+                <button class="btn-primary" id="btn-start-availability">
+                  <i data-lucide="play"></i> Start Availability Server
+                </button>
+              </div>
+
+              <div
+                id="availability-running"
+                class="availability-running"
+                style="display: none"
+              >
+                <div class="server-info-card">
+                  <div class="info-row">
+                    <span class="info-label">Status:</span>
+                    <span class="info-value"
+                      ><span class="status-dot online"></span> Online</span
+                    >
+                  </div>
+                  <div class="info-row">
+                    <span class="info-label">IP Address:</span>
+                    <span class="info-value" id="availability-running-ip"
+                      >Loading...</span
+                    >
+                  </div>
+                  <div class="info-row">
+                    <span class="info-label">Port:</span>
+                    <span class="info-value" id="availability-running-port"
+                      >8765</span
+                    >
+                  </div>
+                  <div class="info-row">
+                    <span class="info-label">Connections:</span>
+                    <span class="info-value" id="availability-connections"
+                      >HTTP (open)</span
+                    >
+                  </div>
+                </div>
+                <div class="connection-hint">
+                  <i data-lucide="info"></i>
+                  <p>
+                    Other Fluffy instances can connect using the IP address and
+                    port shown above
+                  </p>
+                </div>
+                <button
+                  class="btn-outline btn-danger"
+                  id="btn-stop-availability"
+                >
+                  <i data-lucide="stop-circle"></i> Stop Server
+                </button>
+              </div>
             </div>
 
-            <div class="chat-input-container">
-              <div class="input-mode-toggle">
-                <button id="text-mode-btn" class="mode-btn active" title="Text Mode">
-                  <i data-lucide="keyboard"></i>
-                </button>
-                <button id="voice-mode-btn" class="mode-btn" title="Voice Mode">
-                  <i data-lucide="mic"></i>
+            <!-- Admin Mode Panel -->
+            <div id="admin-panel" class="network-panel" style="display: none">
+              <div class="panel-header">
+                <h4><i data-lucide="server"></i> Admin Mode</h4>
+                <p>
+                  Connect to and monitor other Fluffy instances on your network
+                </p>
+              </div>
+
+              <!-- Add Connection Form -->
+              <div class="add-connection-form">
+                <h5>Add Fluffy Instance</h5>
+                <div class="form-row">
+                  <div class="form-group">
+                    <label>IP Address</label>
+                    <input
+                      type="text"
+                      id="admin-ip"
+                      placeholder="192.168.1.100"
+                    />
+                  </div>
+                  <div class="form-group">
+                    <label>Port</label>
+                    <input
+                      type="number"
+                      id="admin-port"
+                      placeholder="8765"
+                      value="8765"
+                      min="1024"
+                      max="65535"
+                    />
+                  </div>
+                  <button class="btn-primary" id="btn-admin-connect">
+                    <i data-lucide="plus"></i> Add Machine
+                  </button>
+                </div>
+              </div>
+
+              <!-- Connected Machines List -->
+              <div class="connected-machines-section">
+                <h5>Connected Machines (<span id="machines-count">0</span>)</h5>
+                <div id="machines-list" class="machines-list">
+                  <div class="empty-state">
+                    <i data-lucide="server-off"></i>
+                    <p>No machines connected</p>
+                    <p class="hint">
+                      Add a Fluffy instance above to start monitoring
+                    </p>
+                  </div>
+                </div>
+              </div>
+
+              <!-- Active Machine Data Display -->
+              <div
+                id="active-machine-data"
+                class="active-machine-data"
+                style="display: none"
+              >
+                <h5>Monitoring: <span id="active-machine-name">--</span></h5>
+                <div class="machine-stats-grid">
+                  <div class="stat-card-mini">
+                    <div class="stat-icon"><i data-lucide="cpu"></i></div>
+                    <div class="stat-info">
+                      <span class="stat-label">CPU</span>
+                      <span class="stat-value" id="remote-cpu">--%</span>
+                    </div>
+                  </div>
+                  <div class="stat-card-mini">
+                    <div class="stat-icon"><i data-lucide="database"></i></div>
+                    <div class="stat-info">
+                      <span class="stat-label">RAM</span>
+                      <span class="stat-value" id="remote-ram">-- MB</span>
+                    </div>
+                  </div>
+                  <div class="stat-card-mini">
+                    <div class="stat-icon"><i data-lucide="layers"></i></div>
+                    <div class="stat-info">
+                      <span class="stat-label">Processes</span>
+                      <span class="stat-value" id="remote-processes">--</span>
+                    </div>
+                  </div>
+                  <div class="stat-card-mini">
+                    <div class="stat-icon"><i data-lucide="network"></i></div>
+                    <div class="stat-info">
+                      <span class="stat-label">Network</span>
+                      <span class="stat-value" id="remote-network"
+                        >-- KB/s</span
+                      >
+                    </div>
+                  </div>
+                </div>
+
+                <!-- All Processes from Remote Machine -->
+                <div class="remote-processes-section">
+                  <div class="remote-processes-header">
+                    <h6>Processes</h6>
+                    <input
+                      type="text"
+                      id="remote-process-search"
+                      class="remote-process-search"
+                      placeholder="Search processes..."
+                    />
+                  </div>
+                  <div id="remote-processes-list" class="remote-processes-list">
+                    <!-- Populated via JS -->
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </section>
+
+        <!-- VIEW: CHAT -->
+        <section id="section-chat" class="view-section">
+          <div class="chat-layout">
+            <!-- History Sidebar -->
+            <aside id="chat-history-sidebar" class="chat-history-sidebar">
+              <div class="history-header">
+                <h3>📜 Chat History</h3>
+                <button id="close-history-btn" class="icon-btn" title="Close">
+                  <i data-lucide="x"></i>
                 </button>
               </div>
 
-              <input type="text" id="chat-input" placeholder="Type a command or question..." autocomplete="off" />
+              <button id="new-chat-btn" class="btn-primary new-chat-btn">
+                <i data-lucide="plus"></i>
+                New Chat
+              </button>
 
-              <button id="send-btn" class="btn-send">
-                <i data-lucide="send"></i>
+              <div id="sessions-list" class="sessions-list">
+                <!-- Sessions will be populated here -->
+                <p class="empty-state">No chat history yet</p>
+              </div>
+            </aside>
+
+            <!-- Chat Container -->
+            <div class="chat-container">
+              <div class="chat-header">
+                <button
+                  id="toggle-history-btn"
+                  class="icon-btn"
+                  title="Toggle History"
+                >
+                  <i data-lucide="history"></i>
+                </button>
+                <h2>Chat with Fluffy</h2>
+                <div class="chat-status" id="chat-status">
+                  <span class="status-dot"></span>
+                  <span>Ready</span>
+                </div>
+              </div>
+
+              <div id="chat-messages" class="chat-messages">
+                <div class="chat-watermark">
+                  <img src="/logo.png" alt="Fluffy Watermark" />
+                </div>
+                <!-- Messages will be rendered here -->
+              </div>
+
+              <div class="chat-input-container">
+                <div class="input-mode-toggle">
+                  <button
+                    id="text-mode-btn"
+                    class="mode-btn active"
+                    title="Text Mode"
+                  >
+                    <i data-lucide="keyboard"></i>
+                  </button>
+                  <button
+                    id="voice-mode-btn"
+                    class="mode-btn"
+                    title="Voice Mode"
+                  >
+                    <i data-lucide="mic"></i>
+                  </button>
+                </div>
+
+                <input
+                  type="text"
+                  id="chat-input"
+                  placeholder="Type a command or question..."
+                  autocomplete="off"
+                />
+
+                <button id="send-btn" class="btn-send">
+                  <i data-lucide="send"></i>
+                </button>
+              </div>
+            </div>
+          </div>
+        </section>
+      </main>
+    </div>
+
+    <div id="toast-container" class="toast-container"></div>
+
+    <!-- Security Details Modal -->
+    <div id="security-modal" class="modal-overlay">
+      <div class="modal-card">
+        <div class="modal-header">
+          <h3>System Protection Details</h3>
+          <button class="close-btn" id="close-modal">
+            <i data-lucide="x"></i>
+          </button>
+        </div>
+        <div class="modal-body">
+          <div class="protection-status-header">
+            <div class="pulse-ring healthy"></div>
+            <span>Active Behavioral Monitoring</span>
+          </div>
+          <div class="details-grid">
+            <div class="detail-item">
+              <span class="detail-icon"
+                ><i data-lucide="folder-search"></i
+              ></span>
+              <div class="detail-text">
+                <strong>Path Integrity</strong>
+                <p>
+                  Detects processes executing from temporary or suspicious
+                  locations.
+                </p>
+              </div>
+            </div>
+            <div class="detail-item">
+              <span class="detail-icon"><i data-lucide="zap"></i></span>
+              <div class="detail-text">
+                <strong>Resource Anomaly</strong>
+                <p>
+                  Flags sudden CPU, RAM, or Disk spikes that don't match user
+                  activity.
+                </p>
+              </div>
+            </div>
+            <div class="detail-item">
+              <span class="detail-icon"><i data-lucide="git-branch"></i></span>
+              <div class="detail-text">
+                <strong>Child Spawning</strong>
+                <p>
+                  Monitors for rapid creation of sub-processes, a common malware
+                  indicator.
+                </p>
+              </div>
+            </div>
+            <div class="detail-item">
+              <span class="detail-icon"><i data-lucide="key"></i></span>
+              <div class="detail-text">
+                <strong>Persistence Guard</strong>
+                <p>
+                  Watches Registry and Startup entries for unauthorized auto-run
+                  attempts.
+                </p>
+              </div>
+            </div>
+          </div>
+        </div>
+        <div class="modal-footer">
+          <button class="btn-primary" id="modal-ok">Got it</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Startup Modal -->
+    <div id="startup-modal" class="modal-overlay">
+      <div class="modal-card">
+        <div class="modal-header">
+          <h3>Add Startup App</h3>
+          <button id="close-startup-modal" class="close-btn">
+            <i data-lucide="x"></i>
+          </button>
+        </div>
+        <div class="modal-body">
+          <div class="form-group">
+            <label>Application Name</label>
+            <input
+              type="text"
+              id="new-startup-name"
+              placeholder="e.g., My App"
+            />
+          </div>
+          <div class="form-group">
+            <label>Path or Command</label>
+            <div class="input-with-action">
+              <input
+                type="text"
+                id="new-startup-path"
+                placeholder="C:\Path\To\App.exe"
+              />
+              <button
+                id="btn-browse-app"
+                class="btn-outline btn-sm shadow-hover"
+              >
+                Browse
               </button>
             </div>
           </div>
         </div>
-      </section>
-
-    </main>
-  </div>
-
-  <div id="toast-container" class="toast-container"></div>
-
-  <!-- Security Details Modal -->
-  <div id="security-modal" class="modal-overlay">
-    <div class="modal-card">
-      <div class="modal-header">
-        <h3>System Protection Details</h3>
-        <button class="close-btn" id="close-modal"><i data-lucide="x"></i></button>
-      </div>
-      <div class="modal-body">
-        <div class="protection-status-header">
-          <div class="pulse-ring healthy"></div>
-          <span>Active Behavioral Monitoring</span>
-        </div>
-        <div class="details-grid">
-          <div class="detail-item">
-            <span class="detail-icon"><i data-lucide="folder-search"></i></span>
-            <div class="detail-text">
-              <strong>Path Integrity</strong>
-              <p>Detects processes executing from temporary or suspicious locations.</p>
-            </div>
-          </div>
-          <div class="detail-item">
-            <span class="detail-icon"><i data-lucide="zap"></i></span>
-            <div class="detail-text">
-              <strong>Resource Anomaly</strong>
-              <p>Flags sudden CPU, RAM, or Disk spikes that don't match user activity.</p>
-            </div>
-          </div>
-          <div class="detail-item">
-            <span class="detail-icon"><i data-lucide="git-branch"></i></span>
-            <div class="detail-text">
-              <strong>Child Spawning</strong>
-              <p>Monitors for rapid creation of sub-processes, a common malware indicator.</p>
-            </div>
-          </div>
-          <div class="detail-item">
-            <span class="detail-icon"><i data-lucide="key"></i></span>
-            <div class="detail-text">
-              <strong>Persistence Guard</strong>
-              <p>Watches Registry and Startup entries for unauthorized auto-run attempts.</p>
-            </div>
-          </div>
+        <div class="modal-footer">
+          <button class="btn-primary" id="btn-confirm-add-startup">
+            Add to Startup
+          </button>
         </div>
       </div>
-      <div class="modal-footer">
-        <button class="btn-primary" id="modal-ok">Got it</button>
-      </div>
     </div>
-  </div>
 
-  <!-- Startup Modal -->
-  <div id="startup-modal" class="modal-overlay">
-    <div class="modal-card">
-      <div class="modal-header">
-        <h3>Add Startup App</h3>
-        <button id="close-startup-modal" class="close-btn"><i data-lucide="x"></i></button>
-      </div>
-      <div class="modal-body">
-        <div class="form-group">
-          <label>Application Name</label>
-          <input type="text" id="new-startup-name" placeholder="e.g., My App">
+    <!-- Result Modal -->
+    <div id="result-modal" class="modal-overlay">
+      <div class="modal-card result-card">
+        <div class="modal-header">
+          <h3 id="result-title">Normalization Success</h3>
+          <button id="close-result-modal" class="close-btn">
+            <i data-lucide="x"></i>
+          </button>
         </div>
-        <div class="form-group">
-          <label>Path or Command</label>
-          <div class="input-with-action">
-            <input type="text" id="new-startup-path" placeholder="C:\Path\To\App.exe">
-            <button id="btn-browse-app" class="btn-outline btn-sm shadow-hover">Browse</button>
+        <div class="modal-body text-center">
+          <div id="result-icon" class="status-icon large">
+            <i data-lucide="check-circle"></i>
           </div>
+          <p id="result-message" class="result-text">
+            System has been successfully optimized.
+          </p>
+          <div id="result-details" class="result-details-box"></div>
+        </div>
+        <div class="modal-footer">
+          <button class="btn-primary" id="result-ok">Close</button>
         </div>
       </div>
-      <div class="modal-footer">
-        <button class="btn-primary" id="btn-confirm-add-startup">Add to Startup</button>
+    </div>
+
+    <!-- Floating Window: Guardian Notifications -->
+    <div id="notification-portal" class="notification-portal">
+      <div class="portal-header">
+        <h4>Guardian Alerts</h4>
+        <button id="close-portal" class="close-btn">
+          <i data-lucide="x"></i>
+        </button>
+      </div>
+      <div id="notification-list" class="notification-list">
+        <!-- Guardian autonomous alerts appear here -->
+        <p class="empty-notif">No new security suggestions.</p>
       </div>
     </div>
-  </div>
 
-  <!-- Result Modal -->
-  <div id="result-modal" class="modal-overlay">
-    <div class="modal-card result-card">
-      <div class="modal-header">
-        <h3 id="result-title">Normalization Success</h3>
-        <button id="close-result-modal" class="close-btn"><i data-lucide="x"></i></button>
-      </div>
-      <div class="modal-body text-center">
-        <div id="result-icon" class="status-icon large"><i data-lucide="check-circle"></i></div>
-        <p id="result-message" class="result-text">System has been successfully optimized.</p>
-        <div id="result-details" class="result-details-box"></div>
-      </div>
-      <div class="modal-footer">
-        <button class="btn-primary" id="result-ok">Close</button>
-      </div>
-    </div>
-  </div>
+    <button id="fab-chat" class="fab-chat" title="Chat with Fluffy">
+      <i data-lucide="message-circle"></i>
+    </button>
 
-  <!-- Floating Window: Guardian Notifications -->
-  <div id="notification-portal" class="notification-portal">
-    <div class="portal-header">
-      <h4>Guardian Alerts</h4>
-      <button id="close-portal" class="close-btn"><i data-lucide="x"></i></button>
-    </div>
-    <div id="notification-list" class="notification-list">
-      <!-- Guardian autonomous alerts appear here -->
-      <p class="empty-notif">No new security suggestions.</p>
-    </div>
-  </div>
-
-  <button id="fab-chat" class="fab-chat" title="Chat with Fluffy">
-    <i data-lucide="message-circle"></i>
-  </button>
-
-  <script type="module" src="/src/main.ts"></script>
-  <!-- Health Details Modal -->
-  <div id="health-details-modal" class="modal-overlay">
-    <div class="modal-card">
-      <div class="modal-header">
-        <h3>System Health Breakdown</h3>
-        <button class="close-btn" id="close-health-details"><i data-lucide="x"></i></button>
-      </div>
-      <div class="modal-body">
-        <p>Current health status is determined by aggregate resource pressure and security signals.</p>
-        <ul id="health-reasons-list" class="reason-list">
-          <!-- Populated via JS -->
-        </ul>
+    <script type="module" src="/src/main.ts"></script>
+    <!-- Health Details Modal -->
+    <div id="health-details-modal" class="modal-overlay">
+      <div class="modal-card">
+        <div class="modal-header">
+          <h3>System Health Breakdown</h3>
+          <button class="close-btn" id="close-health-details">
+            <i data-lucide="x"></i>
+          </button>
+        </div>
+        <div class="modal-body">
+          <p>
+            Current health status is determined by aggregate resource pressure
+            and security signals.
+          </p>
+          <ul id="health-reasons-list" class="reason-list">
+            <!-- Populated via JS -->
+          </ul>
+        </div>
       </div>
     </div>
-  </div>
-
-</body>
-
+  </body>
 </html>

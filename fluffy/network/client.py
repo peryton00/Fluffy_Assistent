@@ -10,6 +10,7 @@ import json
 import threading
 import time
 import uuid
+import os
 from typing import Optional, Dict, List
 from urllib.request import urlopen, Request
 from urllib.error import URLError
@@ -132,10 +133,10 @@ class AdminClient:
         url = f"http://{ip}:{port}/action"
         
         # Add token
-        from brain.routes.cluster_routes import FLUFFY_TOKEN
+        token = os.getenv("FLUFFY_TOKEN", "fluffy_dev_token")
         headers = {
             "Content-Type": "application/json",
-            "X-Fluffy-Token": FLUFFY_TOKEN
+            "X-Fluffy-Token": token
         }
         
         try:

@@ -1,21 +1,51 @@
 # =============================================
 # Fluffy Assistant - Python Dependencies
 # Install: pip install -r requirements.txt
+# Versions pinned from pip freeze (2026-03-03)
 # =============================================
 
 # --- Core (required) ---
-flask
-requests
-python-dotenv
+Flask==3.1.2
+requests==2.32.5
+python-dotenv==1.2.1
+
+# --- Web framework internals (pinned for stability) ---
+Werkzeug==3.1.5
+Jinja2==3.1.6
+click==8.3.1
+itsdangerous==2.2.0
+MarkupSafe==3.0.3
+blinker==1.9.0
 
 # --- Security / Auth ---
-bcrypt>=4.1.0
+bcrypt==5.0.0
+cffi==2.0.0
+pycparser==3.0
 
 # --- FTP Server (optional - file sharing) ---
-pyftpdlib
-qrcode[pil]
+pyftpdlib==2.2.0
+pyasynchat==1.0.5
+pyasyncore==1.0.5
+qrcode==8.2
+pillow==12.1.1
 
 # --- Voice STT (optional - speech-to-text) ---
-vosk
-sounddevice
-numpy
+vosk==0.3.45
+sounddevice==0.5.5
+numpy==2.4.2
+
+# --- Networking utilities ---
+certifi==2026.1.4
+charset-normalizer==3.4.4
+idna==3.11
+urllib3==2.6.3
+sseclient-py==1.9.0
+websockets==16.0
+
+# --- Misc utilities ---
+colorama==0.4.6
+psutil==7.2.2
+tqdm==4.67.3
+pyperclip==1.11.0
+srt==3.5.3
+uuid==1.30

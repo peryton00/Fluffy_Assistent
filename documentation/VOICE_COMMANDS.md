@@ -5,16 +5,18 @@
 ### Method 1: Via Web API (Recommended)
 
 **Start the Brain server:**
+
 ```bash
 cd brain
 python listener.py
 ```
 
 **Send a command:**
+
 ```bash
 curl -X POST http://127.0.0.1:5123/execute_command \
   -H "Content-Type: application/json" \
-  -H "X-Fluffy-Token: fluffy_dev_token" \
+  -H "X-Fluffy-Token: your_actual_token" \
   -d '{"command": "Open Chrome"}'
 ```
 
@@ -23,6 +25,7 @@ curl -X POST http://127.0.0.1:5123/execute_command \
 ## 📝 Supported Commands
 
 ### Open Applications
+
 ```
 "Open Chrome"
 "Launch Visual Studio Code"
@@ -30,24 +33,28 @@ curl -X POST http://127.0.0.1:5123/execute_command \
 ```
 
 ### Create Files
+
 ```
 "Create a file called notes.txt in Documents"
 "Make a file named test.py in Desktop"
 ```
 
 ### Create Folders
+
 ```
 "Create a folder named Projects in Documents"
 "Make a folder called TestData in Desktop"
 ```
 
 ### Delete Files (Requires Confirmation)
+
 ```
 "Delete the file temp.txt from Downloads"
 "Remove the file old.log from Documents"
 ```
 
 ### Research (Placeholder)
+
 ```
 "Research about Python async and save"
 "Search for Rust best practices and save"
@@ -58,14 +65,17 @@ curl -X POST http://127.0.0.1:5123/execute_command \
 ## 🛡️ Safety Features
 
 **Protected Paths (Blocked):**
+
 - Windows: `C:\Windows\`, `C:\Program Files\`
 - Linux: `/bin/`, `/etc/`, `/sys/`
 
 **Safe Paths (Allowed):**
+
 - `Documents`, `Desktop`, `Downloads`
 - `Pictures`, `Videos`, `Music`
 
 **Confirmation Required:**
+
 - All deletions
 - System files (.exe, .dll, .sys)
 - Operations outside safe paths
@@ -75,16 +85,19 @@ curl -X POST http://127.0.0.1:5123/execute_command \
 ## 🧪 Testing
 
 **Test command parser:**
+
 ```bash
 python brain/command_parser.py
 ```
 
 **Test action validator:**
+
 ```bash
 python brain/action_validator.py
 ```
 
 **Test command executor:**
+
 ```bash
 python brain/command_executor.py
 ```
@@ -110,12 +123,14 @@ TTS Feedback
 ## 📦 Files Created
 
 **Python Modules:**
+
 - `brain/command_parser.py` - Intent recognition
 - `brain/action_validator.py` - Safety validation
 - `brain/command_executor.py` - Command execution
 - `brain/web_api.py` - API endpoints (updated)
 
 **Rust Modules:**
+
 - `core/src/actions/mod.rs` - Module exports
 - `core/src/actions/filesystem.rs` - File operations
 - `core/src/actions/launcher.rs` - App launcher
@@ -140,7 +155,7 @@ import requests
 # Execute a voice command
 response = requests.post(
     "http://127.0.0.1:5123/execute_command",
-    headers={"X-Fluffy-Token": "fluffy_dev_token"},
+    headers={"X-Fluffy-Token": "your_actual_token"},
     json={"command": "Create a file called hello.txt in Documents"}
 )
 

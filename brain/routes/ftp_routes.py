@@ -6,10 +6,11 @@ from flask import Blueprint, jsonify, request
 import state
 import os
 import sys
+from auth_utils import token_required
 
 ftp_bp = Blueprint('ftp', __name__)
 
-FLUFFY_TOKEN = "fluffy_dev_token"
+# FLUFFY_TOKEN removed, using auth_utils instead
 
 
 def _ensure_services_path():
@@ -20,14 +21,9 @@ def _ensure_services_path():
 
 
 @ftp_bp.route("/ftp/start", methods=["POST"])
+@token_required
 def ftp_start():
     """Start the FTP server"""
-    if request.remote_addr not in ("127.0.0.1", "::1"):
-        return jsonify({"error": "Forbidden"}), 403
-    token = request.headers.get("X-Fluffy-Token")
-    if token != FLUFFY_TOKEN:
-        return jsonify({"error": "Unauthorized"}), 401
-    
     try:
         _ensure_services_path()
         from ftp_service import start_ftp_server
@@ -61,14 +57,9 @@ def ftp_start():
 
 
 @ftp_bp.route("/ftp/stop", methods=["POST"])
+@token_required
 def ftp_stop():
     """Stop the FTP server"""
-    if request.remote_addr not in ("127.0.0.1", "::1"):
-        return jsonify({"error": "Forbidden"}), 403
-    token = request.headers.get("X-Fluffy-Token")
-    if token != FLUFFY_TOKEN:
-        return jsonify({"error": "Unauthorized"}), 401
-    
     try:
         _ensure_services_path()
         from ftp_service import stop_ftp_server
@@ -87,14 +78,9 @@ def ftp_stop():
 
 
 @ftp_bp.route("/ftp/status", methods=["GET"])
+@token_required
 def ftp_status():
     """Get FTP server status"""
-    if request.remote_addr not in ("127.0.0.1", "::1"):
-        return jsonify({"error": "Forbidden"}), 403
-    token = request.headers.get("X-Fluffy-Token")
-    if token != FLUFFY_TOKEN:
-        return jsonify({"error": "Unauthorized"}), 401
-    
     try:
         _ensure_services_path()
         from ftp_service import get_ftp_status
@@ -116,14 +102,9 @@ def ftp_status():
 
 
 @ftp_bp.route("/ftp/logs", methods=["GET"])
+@token_required
 def ftp_logs():
     """Get FTP activity logs"""
-    if request.remote_addr not in ("127.0.0.1", "::1"):
-        return jsonify({"error": "Forbidden"}), 403
-    token = request.headers.get("X-Fluffy-Token")
-    if token != FLUFFY_TOKEN:
-        return jsonify({"error": "Unauthorized"}), 401
-    
     try:
         _ensure_services_path()
         from ftp_service import get_logs
@@ -137,14 +118,9 @@ def ftp_logs():
 
 
 @ftp_bp.route("/ftp/clear_logs", methods=["POST"])
+@token_required
 def ftp_clear_logs():
     """Clear FTP activity logs"""
-    if request.remote_addr not in ("127.0.0.1", "::1"):
-        return jsonify({"error": "Forbidden"}), 403
-    token = request.headers.get("X-Fluffy-Token")
-    if token != FLUFFY_TOKEN:
-        return jsonify({"error": "Unauthorized"}), 401
-    
     try:
         _ensure_services_path()
         from ftp_service import clear_logs
@@ -158,14 +134,9 @@ def ftp_clear_logs():
 
 
 @ftp_bp.route("/ftp/disconnect", methods=["POST"])
+@token_required
 def ftp_disconnect_client():
     """Disconnect a specific FTP client"""
-    if request.remote_addr not in ("127.0.0.1", "::1"):
-        return jsonify({"error": "Forbidden"}), 403
-    token = request.headers.get("X-Fluffy-Token")
-    if token != FLUFFY_TOKEN:
-        return jsonify({"error": "Unauthorized"}), 401
-    
     try:
         data = request.get_json()
         client_ip = data.get("client_ip")
@@ -188,14 +159,9 @@ def ftp_disconnect_client():
 
 
 @ftp_bp.route("/ftp/qr", methods=["GET"])
+@token_required
 def ftp_qr():
     """Get FTP QR code (only if server is running)"""
-    if request.remote_addr not in ("127.0.0.1", "::1"):
-        return jsonify({"error": "Forbidden"}), 403
-    token = request.headers.get("X-Fluffy-Token")
-    if token != FLUFFY_TOKEN:
-        return jsonify({"error": "Unauthorized"}), 401
-    
     try:
         _ensure_services_path()
         from ftp_service import get_ftp_status

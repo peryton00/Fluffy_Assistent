@@ -101,9 +101,9 @@ class _DataHandler(BaseHTTPRequestHandler):
         
         # Simple token-based auth
         auth_token = self.headers.get("X-Fluffy-Token")
-        from brain.routes.cluster_routes import FLUFFY_TOKEN
+        expected_token = os.getenv("FLUFFY_TOKEN", "fluffy_dev_token")
         
-        if auth_token != FLUFFY_TOKEN:
+        if auth_token != expected_token:
             self._send_json({"error": "Unauthorized"}, 401)
             return
 

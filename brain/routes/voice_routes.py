@@ -4,33 +4,27 @@ Handles: /stop_tts, /tts_test, /tts/speak, /tts/stop, /test_stt, /stop_stt, /stt
 """
 from flask import Blueprint, jsonify, request
 import state
+import os
 import sys
+from auth_utils import token_required
 
 voice_bp = Blueprint('voice', __name__)
 
-# Hardcoded token for development
-FLUFFY_TOKEN = "fluffy_dev_token"
+# FLUFFY_TOKEN removed, using auth_utils instead
 
 
 @voice_bp.route("/stop_tts", methods=["POST"])
+@token_required
 def stop_tts():
     """Stop all current and pending speech."""
-    if request.remote_addr not in ("127.0.0.1", "::1"):
-        return jsonify({"error": "Forbidden"}), 403
-    
     from voice import stop_speech
     stop_speech()
     return jsonify({"ok": True})
 
 
 @voice_bp.route("/tts_test", methods=["POST"])
+@token_required
 def tts_test():
-    if request.remote_addr not in ("127.0.0.1", "::1"):
-        return jsonify({"error": "Forbidden"}), 403
-    token = request.headers.get("X-Fluffy-Token")
-    if token != FLUFFY_TOKEN:
-        return jsonify({"error": "Unauthorized"}), 401
-    
     data = request.get_json(silent=True)
     if not data:
         return jsonify({"error": "Malformed JSON or empty payload"}), 400
@@ -53,14 +47,9 @@ def tts_test():
 
 
 @voice_bp.route("/tts/speak", methods=["POST"])
+@token_required
 def tts_speak():
     """Speak text using TTS engine (for 'Say' button in UI)"""
-    if request.remote_addr not in ("127.0.0.1", "::1"):
-        return jsonify({"error": "Forbidden"}), 403
-    token = request.headers.get("X-Fluffy-Token")
-    if token != FLUFFY_TOKEN:
-        return jsonify({"error": "Unauthorized"}), 401
-    
     try:
         data = request.get_json()
         text = data.get("text", "").strip()
@@ -83,11 +72,9 @@ def tts_speak():
 
 
 @voice_bp.route("/tts/stop", methods=["POST"])
+@token_required
 def tts_stop():
     """Stop current speech (respects priority)."""
-    if request.remote_addr not in ("127.0.0.1", "::1"):
-        return jsonify({"error": "Forbidden"}), 403
-    
     try:
         print("[API] Received /tts/stop request", file=sys.stderr)
         from voice import stop_speech
@@ -98,14 +85,9 @@ def tts_stop():
 
 
 @voice_bp.route("/test_stt", methods=["POST"])
+@token_required
 def test_stt():
     """Start STT listening test"""
-    if request.remote_addr not in ("127.0.0.1", "::1"):
-        return jsonify({"error": "Forbidden"}), 403
-    token = request.headers.get("X-Fluffy-Token")
-    if token != FLUFFY_TOKEN:
-        return jsonify({"error": "Unauthorized"}), 401
-    
     try:
         from voice import start_stt_test
         success = start_stt_test()
@@ -123,14 +105,9 @@ def test_stt():
 
 
 @voice_bp.route("/stop_stt", methods=["POST"])
+@token_required
 def stop_stt():
     """Stop STT listening test"""
-    if request.remote_addr not in ("127.0.0.1", "::1"):
-        return jsonify({"error": "Forbidden"}), 403
-    token = request.headers.get("X-Fluffy-Token")
-    if token != FLUFFY_TOKEN:
-        return jsonify({"error": "Unauthorized"}), 401
-    
     try:
         from voice import stop_stt_test
         stop_stt_test()
@@ -143,14 +120,9 @@ def stop_stt():
 
 
 @voice_bp.route("/stt_status", methods=["GET"])
+@token_required
 def stt_status():
     """Get current STT status and transcription"""
-    if request.remote_addr not in ("127.0.0.1", "::1"):
-        return jsonify({"error": "Forbidden"}), 403
-    token = request.headers.get("X-Fluffy-Token")
-    if token != FLUFFY_TOKEN:
-        return jsonify({"error": "Unauthorized"}), 401
-    
     try:
         from voice import get_stt_status
         status_data = get_stt_status()

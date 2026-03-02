@@ -5,12 +5,15 @@ This document describes the new LLM settings API endpoints that allow users to c
 ## New Endpoints
 
 ### GET /llm/config
+
 Get current LLM configuration
 
 **Headers:**
-- `X-Fluffy-Token`: fluffy_dev_token
+
+- `X-Fluffy-Token`: <your_dynamic_token>
 
 **Response:**
+
 ```json
 {
   "ok": true,
@@ -26,13 +29,16 @@ Get current LLM configuration
 ```
 
 ### POST /llm/config
+
 Update LLM configuration (API key and/or model)
 
 **Headers:**
-- `X-Fluffy-Token`: fluffy_dev_token
+
+- `X-Fluffy-Token`: <your_dynamic_token>
 - `Content-Type`: application/json
 
 **Request Body:**
+
 ```json
 {
   "api_key": "sk-or-v1-your-new-key",
@@ -41,6 +47,7 @@ Update LLM configuration (API key and/or model)
 ```
 
 **Response:**
+
 ```json
 {
   "ok": true,
@@ -57,12 +64,15 @@ Update LLM configuration (API key and/or model)
 ```
 
 ### GET /llm/models
+
 Get list of available LLM models
 
 **Headers:**
-- `X-Fluffy-Token`: fluffy_dev_token
+
+- `X-Fluffy-Token`: <your_dynamic_token>
 
 **Response:**
+
 ```json
 {
   "ok": true,
@@ -87,6 +97,7 @@ Get list of available LLM models
 ## Default Model: Kimi K2 Free
 
 The default model has been changed to **moonshotai/kimi-k2:free** which offers:
+
 - **Rate Limits**: 60 requests per minute
 - **Token Limit**: 500K tokens per day
 - **Cost**: Completely free (no cost for input/output)
@@ -98,46 +109,46 @@ The default model has been changed to **moonshotai/kimi-k2:free** which offers:
 
 ```javascript
 // Get current configuration
-const response = await fetch('http://localhost:5123/llm/config', {
+const response = await fetch("http://localhost:5123/llm/config", {
   headers: {
-    'X-Fluffy-Token': 'fluffy_dev_token'
-  }
+    "X-Fluffy-Token": "<your_dynamic_token>",
+  },
 });
 const data = await response.json();
-console.log('Current model:', data.config.model);
+console.log("Current model:", data.config.model);
 
 // Update API key
-await fetch('http://localhost:5123/llm/config', {
-  method: 'POST',
+await fetch("http://localhost:5123/llm/config", {
+  method: "POST",
   headers: {
-    'X-Fluffy-Token': 'fluffy_dev_token',
-    'Content-Type': 'application/json'
+    "X-Fluffy-Token": "fluffy_dev_token",
+    "Content-Type": "application/json",
   },
   body: JSON.stringify({
-    api_key: 'sk-or-v1-your-new-key'
-  })
+    api_key: "sk-or-v1-your-new-key",
+  }),
 });
 
 // Change model
-await fetch('http://localhost:5123/llm/config', {
-  method: 'POST',
+await fetch("http://localhost:5123/llm/config", {
+  method: "POST",
   headers: {
-    'X-Fluffy-Token': 'fluffy_dev_token',
-    'Content-Type': 'application/json'
+    "X-Fluffy-Token": "fluffy_dev_token",
+    "Content-Type": "application/json",
   },
   body: JSON.stringify({
-    model: 'openai/gpt-4'
-  })
+    model: "openai/gpt-4",
+  }),
 });
 
 // Get available models
-const modelsResponse = await fetch('http://localhost:5123/llm/models', {
+const modelsResponse = await fetch("http://localhost:5123/llm/models", {
   headers: {
-    'X-Fluffy-Token': 'fluffy_dev_token'
-  }
+    "X-Fluffy-Token": "fluffy_dev_token",
+  },
 });
 const modelsData = await modelsResponse.json();
-console.log('Available models:', modelsData.models);
+console.log("Available models:", modelsData.models);
 ```
 
 ## Settings UI Integration

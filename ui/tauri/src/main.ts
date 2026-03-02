@@ -2,7 +2,22 @@ import { invoke } from "@tauri-apps/api/core";
 import { listen } from '@tauri-apps/api/event';
 import { open } from '@tauri-apps/plugin-dialog';
 
-const FLUFFY_TOKEN = "fluffy_dev_token";
+// Token is fetched from the Brain at startup via /config/token.
+// Falls back to the legacy default if the Brain isn't ready yet.
+let FLUFFY_TOKEN = "";
+
+async function initToken() {
+  try {
+    const res = await fetch("http://localhost:5123/config/token");
+    if (res.ok) {
+      const data = await res.json();
+      if (data.token) FLUFFY_TOKEN = data.token;
+    }
+  } catch {
+    // Brain not ready yet — keep fallback, apiRequest retries will handle it
+  }
+}
+
 const expandedPids = new Set<number>();
 const pendingKills = new Set<number>();
 let lastData: any = null;
@@ -19,8 +34,16 @@ const statHistory = {
 let sortMode = localStorage.getItem("fluffy_sort_mode") || "ram";
 const pinnedProcesses = new Set<string>(JSON.parse(localStorage.getItem("fluffy_pinned_names") || "[]"));
 
-const DEFAULT_LAYOUT_ORDER = ["cpu", "ram", "proc", "health", "network", "speedtest", "fluffy", "sessions"];
+const DEFAULT_LAYOUT_ORDER = ["cpu", "ram", "proc", "health", "network", "speedtest", "fluffy", "sessions", "chart", "offenders"];
 let dashboardOrder = JSON.parse(localStorage.getItem("fluffy_dashboard_order") || JSON.stringify(DEFAULT_LAYOUT_ORDER));
+let hiddenComponents = new Set<string>(JSON.parse(localStorage.getItem("fluffy_hidden_components") || "[]"));
+
+// Sync dashboardOrder with default (add missing items)
+DEFAULT_LAYOUT_ORDER.forEach(id => {
+  if (!dashboardOrder.includes(id)) dashboardOrder.push(id);
+});
+
+const NAV_ITEMS = ["dashboard", "processes", "guardian", "apps", "analytics", "startup", "network", "settings"];
 
 /* =========================
    UTILITIES
@@ -127,17 +150,12 @@ function showToast(message: string, type: "success" | "error" | "info" | "warnin
    NAVIGATION & SEARCH
 ========================= */
 function setupNavigation() {
-  const navItems = ["dashboard", "processes", "guardian", "apps", "analytics", "startup", "network", "cluster", "settings"];
-  navItems.forEach(id => {
+  NAV_ITEMS.forEach(id => {
     const btn = document.getElementById(`nav-${id}`);
     if (btn) {
       btn.onclick = (e) => {
         e.preventDefault();
-        switchView(id);
-        if (id === "settings") renderLayoutSettings();
-        if (id === "dashboard") applyDashboardOrder();
-        if (id === "apps") fetchApps();
-        if (id === "network") initializeNetworkView();
+        navigateToView(id);
       };
     }
   });
@@ -398,6 +416,39 @@ function switchView(viewId: string) {
   if (lastData) renderUI(lastData);
 }
 
+function navigateToView(id: string) {
+  switchView(id);
+  if (id === "settings") renderLayoutSettings();
+  if (id === "dashboard") applyDashboardOrder();
+  if (id === "apps") fetchApps();
+  if (id === "network") initializeNetworkView();
+}
+
+function setupShortcuts() {
+  window.addEventListener('keydown', (e) => {
+    // Ctrl + Tab navigation
+    if (e.ctrlKey && e.key === 'Tab') {
+      e.preventDefault();
+      
+      const currentActive = document.querySelector('.nav-item.active')?.id.replace('nav-', '');
+      if (!currentActive) return;
+
+      const currentIndex = NAV_ITEMS.indexOf(currentActive);
+      let nextIndex;
+
+      if (e.shiftKey) {
+        // Ctrl + Shift + Tab (Prev)
+        nextIndex = (currentIndex - 1 + NAV_ITEMS.length) % NAV_ITEMS.length;
+      } else {
+        // Ctrl + Tab (Next)
+        nextIndex = (currentIndex + 1) % NAV_ITEMS.length;
+      }
+
+      navigateToView(NAV_ITEMS[nextIndex]);
+    }
+  });
+}
+
 /* =========================
    COMMANDS
 ========================= */
@@ -415,6 +466,7 @@ async function confirmCommand(commandId: string, approve: boolean = true) {
   }
   await fetchData();
 }
+(window as any).confirmCommand = confirmCommand;
 
 async function killProcess(pid: number, mode: string = "tree", skipConfirm = false) {
   const msg = mode === "tree"
@@ -444,6 +496,7 @@ async function killProcess(pid: number, mode: string = "tree", skipConfirm = fal
     if (lastData) renderUI(lastData);
   }
 }
+(window as any).killProcess = killProcess;
 
 function updateChart(cpu: number, ramUsagePercent: number) {
   statHistory.cpu.push(cpu);
@@ -1054,6 +1107,42 @@ function renderGuardianAlerts(data: any) {
   const container = document.getElementById("guardian-alerts");
   if (!container) return;
 
+  // --- Win #4: Guardian Learning Badge ---
+  const guardianState = data._guardian_state || {};
+  const isLearning: boolean = guardianState.is_learning === true;
+  const learningPct: number = Math.round(guardianState.learning_progress || 0);
+
+  let badge = document.getElementById("guardian-learning-badge");
+  if (!badge) {
+    badge = document.createElement("div");
+    badge.id = "guardian-learning-badge";
+    badge.className = "guardian-learning-badge";
+    // Insert before the alerts container
+    container.parentElement?.insertBefore(badge, container);
+  }
+
+  if (isLearning) {
+    badge.style.display = "flex";
+    badge.innerHTML = `
+      <div class="learning-badge-inner">
+        <span class="learning-badge-icon">🧠</span>
+        <div class="learning-badge-text">
+          <span class="learning-badge-title">Guardian Learning Mode</span>
+          <span class="learning-badge-sub">Analyzing process behaviors — alerts will activate when ready</span>
+        </div>
+        <div class="learning-badge-progress-wrap">
+          <div class="learning-badge-bar">
+            <div class="learning-badge-fill" style="width: ${learningPct}%"></div>
+          </div>
+          <span class="learning-badge-pct">${learningPct}%</span>
+        </div>
+      </div>
+    `;
+  } else {
+    badge.style.display = "none";
+  }
+
+  // --- Guardian Verdicts ---
   const verdicts = data._guardian_verdicts || [];
 
   if (verdicts.length === 0) {
@@ -1101,6 +1190,7 @@ function renderGuardianAlerts(data: any) {
     }
   });
 }
+
 
 async function toggleStartupApp(name: string, enabled: boolean) {
   addLog(`Requesting to ${enabled ? 'enable' : 'disable'} startup app: ${name}`, "action");
@@ -1188,6 +1278,7 @@ async function addStartupApp(name: string, path: string) {
   showToast("Request sent to add startup app", "info");
   await fetchData();
 }
+(window as any).addStartupApp = addStartupApp;
 
 async function removeStartupApp(name: string) {
   if (!confirm(`Are you sure you want to remove '${name}' from startup?`)) return;
@@ -1202,6 +1293,7 @@ async function removeStartupApp(name: string) {
   showToast("Request sent to remove startup app", "info");
   await fetchData();
 }
+(window as any).removeStartupApp = removeStartupApp;
 
 function renderUI(data: any) {
   if (!data) return;
@@ -1387,6 +1479,33 @@ async function fetchData() {
   }
 }
 
+async function initializeDashboard() {
+  addLog("Connecting to Fluffy Brain...", "system");
+  console.log("Initializing Fluffy Dashboard connection...");
+
+  // 1. Fetch Auth Token first
+  await initToken();
+
+  // 2. Setup UI listeners and navigation
+  setupNavigation();
+  setupUIListeners();
+  setupShortcuts();
+
+  // 3. Initialize feature-specific sessions/status
+  await initializeChatSession();
+  await loadSessionsList();
+  await fetchFtpStatus();
+
+  // 4. Connect to backend and start polling
+  const success = await apiRequest("/ui_connected", { method: "POST" });
+  if (success) {
+    console.log("Dashboard connected to brain.");
+    startPolling();
+  } else {
+    addLog("Failed to establish session with backend", "error");
+  }
+}
+
 async function fetchLogs() {
   if (!uiActive) return;
   const logs = await apiRequest("/logs");
@@ -1404,7 +1523,8 @@ async function fetchLogs() {
   }
 }
 
-setupNavigation();
+// Initial connection attempt now managed by initializeDashboard
+initializeDashboard();
 let dataInterval: any = null;
 let logsInterval: any = null;
 let lastDataHash: string = "";
@@ -1542,15 +1662,17 @@ if ((window as any).lucide) (window as any).lucide.createIcons();
 
 // Initial connection attempt
 if (!backendUIActive) {
-  apiRequest("/ui_connected", { method: "POST" }, 20).then((res) => {
-    if (res) {
-      console.log("Dashboard connected to brain.");
-      backendUIActive = true;
-      addLog("Connected to Fluffy Brain", "system");
-      startPolling();
-    } else {
-      addLog("Failed to connect to Brain after 20 attempts. Please check if Brain is running.", "error");
-    }
+  initToken().then(() => {
+    apiRequest("/ui_connected", { method: "POST" }, 20).then((res) => {
+      if (res) {
+        console.log("Dashboard connected to brain.");
+        backendUIActive = true;
+        addLog("Connected to Fluffy Brain", "system");
+        startPolling();
+      } else {
+        addLog("Failed to connect to Brain after 20 attempts. Please check if Brain is running.", "error");
+      }
+    });
   });
 }
 
@@ -1559,15 +1681,24 @@ if (!backendUIActive) {
 ========================= */
 
 function applyDashboardOrder() {
-  const grid = document.querySelector(".dashboard-grid");
+  const grid = document.querySelector(".dashboard-grid") as HTMLElement;
   if (!grid) return;
 
   const components: { [key: string]: HTMLElement } = {};
   grid.querySelectorAll("[data-component-id]").forEach(el => {
     const id = el.getAttribute("data-component-id");
-    if (id) components[id] = el as HTMLElement;
+    if (id) {
+      components[id] = el as HTMLElement;
+      // Handle visibility
+      if (hiddenComponents.has(id)) {
+        (el as HTMLElement).style.display = "none";
+      } else {
+        (el as HTMLElement).style.display = "";
+      }
+    }
   });
 
+  // Re-parent in order
   dashboardOrder.forEach((id: string) => {
     if (components[id]) {
       grid.appendChild(components[id]);
@@ -1589,21 +1720,27 @@ function renderLayoutSettings() {
     network: { name: "Network Usage", icon: "globe" },
     speedtest: { name: "Internet Speed Test", icon: "gauge" },
     fluffy: { name: "Fluffy Usage", icon: "sparkles" },
-    sessions: { name: "Active Sessions", icon: "users" }
+    sessions: { name: "Active Sessions", icon: "users" },
+    chart: { name: "Resource History Chart", icon: "line-chart" },
+    offenders: { name: "RAM Offenders List", icon: "list" }
   };
 
   dashboardOrder.forEach((id: string, index: number) => {
     const info = componentNames[id];
     if (!info) return;
 
+    const isHidden = hiddenComponents.has(id);
     const item = document.createElement("div");
-    item.className = "layout-item";
+    item.className = `layout-item ${isHidden ? 'is-hidden' : ''}`;
     item.innerHTML = `
       <div class="layout-item-info">
         <span class="layout-item-icon"><i data-lucide="${info.icon}"></i></span>
         <span class="layout-item-name">${info.name}</span>
       </div>
       <div class="layout-item-actions">
+        <button class="btn-layout toggle-visibility" data-id="${id}" title="${isHidden ? 'Show on Dashboard' : 'Hide from Dashboard'}">
+          <i data-lucide="${isHidden ? 'eye-off' : 'eye'}"></i>
+        </button>
         <button class="btn-layout" data-action="up" data-index="${index}" ${index === 0 ? 'disabled' : ''}>
           <i data-lucide="chevron-up"></i>
         </button>
@@ -1613,7 +1750,21 @@ function renderLayoutSettings() {
       </div>
     `;
 
-    item.querySelectorAll(".btn-layout").forEach(btn => {
+    // Toggle Visibility
+    const toggleBtn = item.querySelector(".toggle-visibility") as HTMLButtonElement;
+    toggleBtn.onclick = () => {
+      if (hiddenComponents.has(id)) {
+        hiddenComponents.delete(id);
+      } else {
+        hiddenComponents.add(id);
+      }
+      localStorage.setItem("fluffy_hidden_components", JSON.stringify(Array.from(hiddenComponents)));
+      renderLayoutSettings();
+      applyDashboardOrder();
+    };
+
+    // Reorder
+    item.querySelectorAll(".btn-layout:not(.toggle-visibility)").forEach(btn => {
       (btn as HTMLButtonElement).onclick = () => {
         const action = btn.getAttribute("data-action");
         const idx = parseInt(btn.getAttribute("data-index") || "0");
@@ -2346,7 +2497,8 @@ async function loadChatSession(sessionId: string) {
 }
 
 // Initialize chat session on load
-initializeChatSession();
+// Initialize chat session is now managed by initializeDashboard()
+// initializeChatSession();
 
 // ============================================================================
 // HISTORY SIDEBAR FUNCTIONS
@@ -2534,8 +2686,8 @@ if (newChatBtn) {
   newChatBtn.onclick = createNewChatSession;
 }
 
-// Load sessions list on init
-loadSessionsList();
+// Load sessions list on init is now managed strictly by initializeDashboard()
+// loadSessionsList();
 
 
 console.log('✅ Chat interface initialized');
@@ -2951,16 +3103,10 @@ function renderFtpClients(clients: any[]) {
         }
 
         try {
-          const response = await fetch('/ftp/disconnect', {
+          const data = await apiRequest('/ftp/disconnect', {
             method: 'POST',
-            headers: {
-              'Content-Type': 'application/json',
-              'X-Fluffy-Token': FLUFFY_TOKEN
-            },
             body: JSON.stringify({ client_ip: clientIp })
           });
-
-          const data = await response.json();
 
           if (data.ok) {
             showToast(`Client ${client.hostname || clientIp} disconnected`, 'success');
@@ -3569,8 +3715,11 @@ if (btnBrowseFolder) {
   btnBrowseFolder.onclick = () => browseFtpFolder();
 }
 
-// Check FTP status on page load
-fetchFtpStatus();
+// Check FTP status is now managed by initializeDashboard()
+// fetchFtpStatus();
 
 console.log('✅ FTP control interface initialized');
+
+// initToken() is now called earlier in the initialization sequence
+// to ensure it's available for the first connection attempt.
 

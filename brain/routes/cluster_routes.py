@@ -8,10 +8,11 @@ import state
 import os
 import sys
 import json
+from auth_utils import token_required
 
 cluster_bp = Blueprint('cluster', __name__)
 
-FLUFFY_TOKEN = "fluffy_dev_token"
+# FLUFFY_TOKEN removed, using auth_utils instead
 
 
 def _ensure_services_path():
@@ -22,12 +23,8 @@ def _ensure_services_path():
 
 
 @cluster_bp.route("/cluster/start_manager", methods=["POST"])
+@token_required
 def start_cluster_manager_endpoint():
-    if request.remote_addr not in ("127.0.0.1", "::1"):
-        return jsonify({"error": "Forbidden"}), 403
-    token = request.headers.get("X-Fluffy-Token")
-    if token != FLUFFY_TOKEN:
-        return jsonify({"error": "Unauthorized"}), 401
     try:
         _ensure_services_path()
         from cluster import start_cluster_manager
@@ -44,12 +41,8 @@ def start_cluster_manager_endpoint():
 
 
 @cluster_bp.route("/cluster/start_worker", methods=["POST"])
+@token_required
 def start_cluster_worker_endpoint():
-    if request.remote_addr not in ("127.0.0.1", "::1"):
-        return jsonify({"error": "Forbidden"}), 403
-    token = request.headers.get("X-Fluffy-Token")
-    if token != FLUFFY_TOKEN:
-        return jsonify({"error": "Unauthorized"}), 401
     try:
         _ensure_services_path()
         from cluster import start_cluster_worker
@@ -73,12 +66,8 @@ def start_cluster_worker_endpoint():
 
 
 @cluster_bp.route("/cluster/stop", methods=["POST"])
+@token_required
 def stop_cluster_endpoint():
-    if request.remote_addr not in ("127.0.0.1", "::1"):
-        return jsonify({"error": "Forbidden"}), 403
-    token = request.headers.get("X-Fluffy-Token")
-    if token != FLUFFY_TOKEN:
-        return jsonify({"error": "Unauthorized"}), 401
     try:
         _ensure_services_path()
         from cluster import stop_cluster_manager, stop_cluster_worker
@@ -93,12 +82,8 @@ def stop_cluster_endpoint():
 
 
 @cluster_bp.route("/cluster/status", methods=["GET"])
+@token_required
 def cluster_status_endpoint():
-    if request.remote_addr not in ("127.0.0.1", "::1"):
-        return jsonify({"error": "Forbidden"}), 403
-    token = request.headers.get("X-Fluffy-Token")
-    if token != FLUFFY_TOKEN:
-        return jsonify({"error": "Unauthorized"}), 401
     try:
         _ensure_services_path()
         from cluster import get_cluster_status, get_worker_status
@@ -116,12 +101,8 @@ def cluster_status_endpoint():
 
 
 @cluster_bp.route("/cluster/credentials", methods=["GET"])
+@token_required
 def get_cluster_credentials():
-    if request.remote_addr not in ("127.0.0.1", "::1"):
-        return jsonify({"error": "Forbidden"}), 403
-    token = request.headers.get("X-Fluffy-Token")
-    if token != FLUFFY_TOKEN:
-        return jsonify({"error": "Unauthorized"}), 401
     try:
         _ensure_services_path()
         from cluster import get_or_create_credentials
@@ -134,12 +115,8 @@ def get_cluster_credentials():
 
 
 @cluster_bp.route("/cluster/submit_task", methods=["POST"])
+@token_required
 def submit_cluster_task_endpoint():
-    if request.remote_addr not in ("127.0.0.1", "::1"):
-        return jsonify({"error": "Forbidden"}), 403
-    token = request.headers.get("X-Fluffy-Token")
-    if token != FLUFFY_TOKEN:
-        return jsonify({"error": "Unauthorized"}), 401
     try:
         _ensure_services_path()
         from cluster import submit_cluster_task
@@ -160,12 +137,8 @@ def submit_cluster_task_endpoint():
 
 
 @cluster_bp.route("/cluster/logs", methods=["GET"])
+@token_required
 def get_cluster_logs():
-    if request.remote_addr not in ("127.0.0.1", "::1"):
-        return jsonify({"error": "Forbidden"}), 403
-    token = request.headers.get("X-Fluffy-Token")
-    if token != FLUFFY_TOKEN:
-        return jsonify({"error": "Unauthorized"}), 401
     try:
         log_file = os.path.join(os.path.dirname(os.path.dirname(__file__)), "..", "services", "cluster", "logs", "cluster_logs.json")
         log_file = os.path.abspath(log_file)

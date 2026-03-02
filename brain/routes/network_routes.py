@@ -6,10 +6,11 @@ from flask import Blueprint, jsonify, request
 import state
 import os
 import sys
+from auth_utils import token_required
 
 network_bp = Blueprint('network', __name__)
 
-FLUFFY_TOKEN = "fluffy_dev_token"
+# FLUFFY_TOKEN removed, using auth_utils instead
 
 
 def _ensure_network_path():
@@ -22,14 +23,9 @@ def _ensure_network_path():
 # ── Role endpoints ─────────────────────────────────────────────────────────────
 
 @network_bp.route("/network/role", methods=["GET"])
+@token_required
 def get_network_role():
     """Get current network role (standalone/available/admin)"""
-    if request.remote_addr not in ("127.0.0.1", "::1"):
-        return jsonify({"error": "Forbidden"}), 403
-    token = request.headers.get("X-Fluffy-Token")
-    if token != FLUFFY_TOKEN:
-        return jsonify({"error": "Unauthorized"}), 401
-    
     try:
         _ensure_network_path()
         from role_manager import get_role_manager
@@ -41,14 +37,9 @@ def get_network_role():
 
 
 @network_bp.route("/network/role", methods=["POST"])
+@token_required
 def set_network_role():
     """Set network role (standalone/available/admin)"""
-    if request.remote_addr not in ("127.0.0.1", "::1"):
-        return jsonify({"error": "Forbidden"}), 403
-    token = request.headers.get("X-Fluffy-Token")
-    if token != FLUFFY_TOKEN:
-        return jsonify({"error": "Unauthorized"}), 401
-    
     try:
         data = request.get_json(silent=True)
         if not data or "role" not in data:
@@ -73,14 +64,9 @@ def set_network_role():
 # ── Availability endpoints ─────────────────────────────────────────────────────
 
 @network_bp.route("/network/availability/start", methods=["POST"])
+@token_required
 def start_availability():
     """Start availability mode (HTTP server, no auth required)"""
-    if request.remote_addr not in ("127.0.0.1", "::1"):
-        return jsonify({"error": "Forbidden"}), 403
-    token = request.headers.get("X-Fluffy-Token")
-    if token != FLUFFY_TOKEN:
-        return jsonify({"error": "Unauthorized"}), 401
-
     try:
         data = request.get_json(silent=True) or {}
         port = int(data.get("port", 8765))
@@ -102,14 +88,9 @@ def start_availability():
 
 
 @network_bp.route("/network/availability/stop", methods=["POST"])
+@token_required
 def stop_availability():
     """Stop availability mode"""
-    if request.remote_addr not in ("127.0.0.1", "::1"):
-        return jsonify({"error": "Forbidden"}), 403
-    token = request.headers.get("X-Fluffy-Token")
-    if token != FLUFFY_TOKEN:
-        return jsonify({"error": "Unauthorized"}), 401
-
     try:
         _ensure_network_path()
         from server import get_availability_server
@@ -124,14 +105,9 @@ def stop_availability():
 
 
 @network_bp.route("/network/availability/status", methods=["GET"])
+@token_required
 def get_availability_status():
     """Get availability mode status"""
-    if request.remote_addr not in ("127.0.0.1", "::1"):
-        return jsonify({"error": "Forbidden"}), 403
-    token = request.headers.get("X-Fluffy-Token")
-    if token != FLUFFY_TOKEN:
-        return jsonify({"error": "Unauthorized"}), 401
-
     try:
         _ensure_network_path()
         from server import get_availability_server
@@ -160,14 +136,9 @@ def get_availability_status():
 
 
 @network_bp.route("/network/availability/connections", methods=["GET"])
+@token_required
 def get_availability_connections():
     """Get list of admin IPs currently connected (polling) this client."""
-    if request.remote_addr not in ("127.0.0.1", "::1"):
-        return jsonify({"error": "Forbidden"}), 403
-    token = request.headers.get("X-Fluffy-Token")
-    if token != FLUFFY_TOKEN:
-        return jsonify({"error": "Unauthorized"}), 401
-
     try:
         _ensure_network_path()
         from server import get_availability_server
@@ -182,14 +153,9 @@ def get_availability_connections():
 # ── Admin endpoints ────────────────────────────────────────────────────────────
 
 @network_bp.route("/network/admin/add", methods=["POST"])
+@token_required
 def admin_add_machine():
     """Add a client machine to the admin's watch list."""
-    if request.remote_addr not in ("127.0.0.1", "::1"):
-        return jsonify({"error": "Forbidden"}), 403
-    token = request.headers.get("X-Fluffy-Token")
-    if token != FLUFFY_TOKEN:
-        return jsonify({"error": "Unauthorized"}), 401
-
     try:
         data = request.get_json(silent=True)
         if not data or "ip" not in data:
@@ -214,14 +180,9 @@ def admin_add_machine():
 
 
 @network_bp.route("/network/admin/remove", methods=["POST"])
+@token_required
 def admin_remove_machine():
     """Remove a machine from the admin's watch list."""
-    if request.remote_addr not in ("127.0.0.1", "::1"):
-        return jsonify({"error": "Forbidden"}), 403
-    token = request.headers.get("X-Fluffy-Token")
-    if token != FLUFFY_TOKEN:
-        return jsonify({"error": "Unauthorized"}), 401
-
     try:
         data = request.get_json(silent=True)
         if not data or "machine_id" not in data:
@@ -240,14 +201,9 @@ def admin_remove_machine():
 
 
 @network_bp.route("/network/admin/remove_all", methods=["POST"])
+@token_required
 def admin_remove_all_machines():
     """Remove all machines and stop polling."""
-    if request.remote_addr not in ("127.0.0.1", "::1"):
-        return jsonify({"error": "Forbidden"}), 403
-    token = request.headers.get("X-Fluffy-Token")
-    if token != FLUFFY_TOKEN:
-        return jsonify({"error": "Unauthorized"}), 401
-
     try:
         _ensure_network_path()
         from client import get_admin_client
@@ -260,14 +216,9 @@ def admin_remove_all_machines():
 
 
 @network_bp.route("/network/admin/machines", methods=["GET"])
+@token_required
 def get_admin_machines():
     """Get list of all known machines and their status."""
-    if request.remote_addr not in ("127.0.0.1", "::1"):
-        return jsonify({"error": "Forbidden"}), 403
-    token = request.headers.get("X-Fluffy-Token")
-    if token != FLUFFY_TOKEN:
-        return jsonify({"error": "Unauthorized"}), 401
-
     try:
         _ensure_network_path()
         from client import get_admin_client
@@ -283,14 +234,9 @@ def get_admin_machines():
 
 
 @network_bp.route("/network/admin/switch", methods=["POST"])
+@token_required
 def admin_switch_machine():
     """Switch the active machine view."""
-    if request.remote_addr not in ("127.0.0.1", "::1"):
-        return jsonify({"error": "Forbidden"}), 403
-    token = request.headers.get("X-Fluffy-Token")
-    if token != FLUFFY_TOKEN:
-        return jsonify({"error": "Unauthorized"}), 401
-
     try:
         data = request.get_json(silent=True)
         if not data or "machine_id" not in data:
@@ -309,14 +255,9 @@ def admin_switch_machine():
 
 
 @network_bp.route("/network/admin/data/<machine_id>", methods=["GET"])
+@token_required
 def get_machine_data(machine_id):
     """Get the latest polled data for a specific machine."""
-    if request.remote_addr not in ("127.0.0.1", "::1"):
-        return jsonify({"error": "Forbidden"}), 403
-    token = request.headers.get("X-Fluffy-Token")
-    if token != FLUFFY_TOKEN:
-        return jsonify({"error": "Unauthorized"}), 401
-
     try:
         _ensure_network_path()
         from client import get_admin_client
@@ -331,14 +272,9 @@ def get_machine_data(machine_id):
     except Exception as e:
         return jsonify({"error": str(e)}), 500
 @network_bp.route("/network/admin/action", methods=["POST"])
+@token_required
 def admin_machine_action():
     """Execute an action on a specific machine."""
-    if request.remote_addr not in ("127.0.0.1", "::1"):
-        return jsonify({"error": "Forbidden"}), 403
-    token = request.headers.get("X-Fluffy-Token")
-    if token != FLUFFY_TOKEN:
-        return jsonify({"error": "Unauthorized"}), 401
-
     try:
         data = request.get_json(silent=True)
         if not data or "machine_id" not in data or "action" not in data:

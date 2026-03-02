@@ -335,7 +335,7 @@
 }
 
 .info-list li::before {
-    content: "✓";
+    content: "\2713";
     color: #10b981;
     font-weight: bold;
 }

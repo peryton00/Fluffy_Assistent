@@ -1,6 +1,7 @@
 from flask import Flask, jsonify, send_from_directory, request
 import state
 from commands import send_command
+from auth_utils import token_required, _get_token
 import os
 import sys
 import socket
@@ -44,6 +45,7 @@ def root():
 
 
 @app.route("/status")
+@token_required
 def status():
     # Allow status check even if UI is not yet registered as active
     # to prevent 403 boot-loops in some UI logic
@@ -82,27 +84,30 @@ def status():
 
 
 @app.route("/logs")
+@token_required
 def logs():
     if not state.UI_ACTIVE:
         return jsonify({"error": "UI Disconnected"}), 403
     return jsonify(state.EXECUTION_LOGS)
 
 
-# Hardcoded token for development
-FLUFFY_TOKEN = "fluffy_dev_token"
+# Remove ad-hoc token helper, use auth_utils instead
+
+@app.route("/config/token", methods=["GET"])
+def get_token():
+    """
+    Returns the current auth token to loopback callers (UI only).
+    This endpoint itself does NOT require the token — it's how the UI discovers it.
+    """
+    if request.remote_addr not in ("127.0.0.1", "::1"):
+        return jsonify({"error": "Forbidden"}), 403
+    return jsonify({"token": _get_token()})
+
 
 @app.route("/command", methods=["POST"])
+@token_required
 def command():
-    # 1. Restrict to loopback
-    if request.remote_addr not in ("127.0.0.1", "::1"):
-        return jsonify({"error": "Forbidden - Loopback execution only"}), 403
-
-    # 2. Token guard
-    token = request.headers.get("X-Fluffy-Token")
-    if token != FLUFFY_TOKEN:
-        return jsonify({"error": "Unauthorized - Invalid token"}), 401
-
-    # 3. Validate JSON payload
+    # 1. Validate JSON payload
     cmd_data = request.get_json(silent=True)
     if not cmd_data:
         return jsonify({"error": "Invalid JSON payload"}), 400
@@ -118,13 +123,8 @@ def command():
 
 
 @app.route("/security_action", methods=["POST"])
+@token_required
 def security_action():
-    if request.remote_addr not in ("127.0.0.1", "::1"):
-        return jsonify({"error": "Forbidden"}), 403
-    
-    token = request.headers.get("X-Fluffy-Token")
-    if token != FLUFFY_TOKEN:
-        return jsonify({"error": "Unauthorized"}), 401
     
     data = request.get_json(silent=True)
     if not data or "pid" not in data or "action" not in data:
@@ -167,13 +167,8 @@ def security_action():
 
 
 @app.route("/trust_process", methods=["POST"])
+@token_required
 def trust_process():
-    if request.remote_addr not in ("127.0.0.1", "::1"):
-        return jsonify({"error": "Forbidden"}), 403
-    token = request.headers.get("X-Fluffy-Token")
-    if token != FLUFFY_TOKEN:
-        return jsonify({"error": "Unauthorized"}), 401
-    
     data = request.get_json(silent=True)
     process_name = data.get("process")
     if not process_name:
@@ -218,13 +213,9 @@ def trust_process():
     return jsonify({"ok": True, "message": f"Behavior for {process_name} marked as trusted."})
 
 
-@app.route("/clear_guardian_data", methods=["POST"])
+@app.route("/clear_guardian", methods=["POST"])
+@token_required
 def clear_guardian_data():
-    if request.remote_addr not in ("127.0.0.1", "::1"):
-        return jsonify({"error": "Forbidden"}), 403
-    token = request.headers.get("X-Fluffy-Token")
-    if token != FLUFFY_TOKEN:
-        return jsonify({"error": "Unauthorized"}), 401
 
     from guardian_manager import reset_guardian
     reset_guardian()
@@ -235,6 +226,7 @@ def clear_guardian_data():
 
 
 @app.route("/normalize", methods=["POST"])
+@token_required
 def normalize_system():
     # 1. Trigger Rust Normalization via IPC
     try:
@@ -262,6 +254,7 @@ def normalize_system():
 
 
 @app.route("/ui_connected", methods=["GET", "POST"])
+@token_required
 def ui_connected():
     if not state.UI_ACTIVE:
         state.UI_ACTIVE = True
@@ -269,6 +262,7 @@ def ui_connected():
     return jsonify({"status": "UI_CONNECTED", "ui_active": state.UI_ACTIVE})
 
 @app.route("/ui_disconnected", methods=["GET", "POST"])
+@token_required
 def ui_disconnected():
     if state.UI_ACTIVE:
         state.UI_ACTIVE = False
@@ -285,6 +279,7 @@ def ui_disconnected():
 
 
 @app.route("/net-speed", methods=["POST"])
+@token_required
 def net_speed():
     if not state.UI_ACTIVE:
         return jsonify({"error": "UI Disconnected"}), 403
@@ -309,12 +304,8 @@ def net_speed():
 
 
 @app.route("/apps", methods=["GET"])
+@token_required
 def get_apps():
-    if request.remote_addr not in ("127.0.0.1", "::1"):
-        return jsonify({"error": "Forbidden"}), 403
-    token = request.headers.get("X-Fluffy-Token")
-    if token != FLUFFY_TOKEN:
-        return jsonify({"error": "Unauthorized"}), 401
     try:
         from app_utils import list_installed_apps
         apps = list_installed_apps()
@@ -323,12 +314,8 @@ def get_apps():
         return jsonify({"error": str(e)}), 500
 
 @app.route("/apps/refresh", methods=["POST"])
+@token_required
 def refresh_apps():
-    if request.remote_addr not in ("127.0.0.1", "::1"):
-        return jsonify({"error": "Forbidden"}), 403
-    token = request.headers.get("X-Fluffy-Token")
-    if token != FLUFFY_TOKEN:
-        return jsonify({"error": "Unauthorized"}), 401
     try:
         from app_utils import scan_and_cache_apps
         apps = scan_and_cache_apps()
@@ -338,12 +325,8 @@ def refresh_apps():
 
 
 @app.route("/apps/launch", methods=["POST"])
+@token_required
 def launch_application():
-    if request.remote_addr not in ("127.0.0.1", "::1"):
-        return jsonify({"error": "Forbidden"}), 403
-    token = request.headers.get("X-Fluffy-Token")
-    if token != FLUFFY_TOKEN:
-        return jsonify({"error": "Unauthorized"}), 401
     data = request.get_json(silent=True)
     location = data.get("location")
     exe_path = data.get("exe_path")
@@ -362,11 +345,11 @@ def launch_application():
 
 
 @app.route("/apps/uninstall", methods=["POST"])
+@token_required
 def uninstall_application():
     if request.remote_addr not in ("127.0.0.1", "::1"):
         return jsonify({"error": "Forbidden"}), 403
-    token = request.headers.get("X-Fluffy-Token")
-    if token != FLUFFY_TOKEN:
+    if not _check_token(request):
         return jsonify({"error": "Unauthorized"}), 401
     data = request.get_json(silent=True)
     uninstall_string = data.get("uninstall_string")
@@ -385,17 +368,12 @@ def uninstall_application():
 
 
 @app.route("/execute_command", methods=["POST"])
+@token_required
 def execute_command():
     """
     Execute a voice command using the unified AI flow.
     Parses, validates, and executes with TTS feedback.
     """
-    if request.remote_addr not in ("127.0.0.1", "::1"):
-        return jsonify({"error": "Forbidden"}), 403
-    token = request.headers.get("X-Fluffy-Token")
-    if token != FLUFFY_TOKEN:
-        return jsonify({"error": "Unauthorized"}), 401
-    
     try:
         data = request.get_json()
         command_text = data.get("command", "").strip()
@@ -443,14 +421,9 @@ def execute_command():
 
 
 @app.route("/pending_confirmations", methods=["GET"])
+@token_required
 def get_pending_confirmations():
     """Get list of commands awaiting confirmation"""
-    if request.remote_addr not in ("127.0.0.1", "::1"):
-        return jsonify({"error": "Forbidden"}), 403
-    token = request.headers.get("X-Fluffy-Token")
-    if token != FLUFFY_TOKEN:
-        return jsonify({"error": "Unauthorized"}), 401
-    
     # Placeholder for now - will implement confirmation queue later
     return jsonify({"pending": []})
 
@@ -460,10 +433,9 @@ def get_pending_confirmations():
 # ============================================================================
 
 @app.route("/chat/create_session", methods=["POST"])
+@token_required
 def create_chat_session():
     """Create a new chat session"""
-    if request.remote_addr not in ("127.0.0.1", "::1"):
-        return jsonify({"error": "Forbidden"}), 403
     
     try:
         from chat_history import ChatHistory
@@ -479,10 +451,9 @@ def create_chat_session():
 
 
 @app.route("/chat/save_message", methods=["POST"])
+@token_required
 def save_chat_message():
     """Save a message to the current session"""
-    if request.remote_addr not in ("127.0.0.1", "::1"):
-        return jsonify({"error": "Forbidden"}), 403
     
     try:
         from chat_history import ChatHistory
@@ -505,10 +476,9 @@ def save_chat_message():
 
 
 @app.route("/chat/sessions", methods=["GET"])
+@token_required
 def list_chat_sessions():
     """List all chat sessions"""
-    if request.remote_addr not in ("127.0.0.1", "::1"):
-        return jsonify({"error": "Forbidden"}), 403
     
     try:
         from chat_history import ChatHistory
@@ -524,10 +494,9 @@ def list_chat_sessions():
 
 
 @app.route("/chat/session/<session_id>", methods=["GET"])
+@token_required
 def get_chat_session(session_id):
     """Get a specific chat session"""
-    if request.remote_addr not in ("127.0.0.1", "::1"):
-        return jsonify({"error": "Forbidden"}), 403
     
     try:
         from chat_history import ChatHistory
@@ -546,10 +515,9 @@ def get_chat_session(session_id):
 
 
 @app.route("/chat/session/<session_id>", methods=["DELETE"])
+@token_required
 def delete_chat_session(session_id):
     """Delete a chat session"""
-    if request.remote_addr not in ("127.0.0.1", "::1"):
-        return jsonify({"error": "Forbidden"}), 403
     
     try:
         from chat_history import ChatHistory
@@ -564,10 +532,9 @@ def delete_chat_session(session_id):
 
 
 @app.route("/chat/current_session", methods=["GET"])
+@token_required
 def get_current_session():
     """Get the current active session ID"""
-    if request.remote_addr not in ("127.0.0.1", "::1"):
-        return jsonify({"error": "Forbidden"}), 403
     
     try:
         from chat_history import ChatHistory
@@ -587,16 +554,12 @@ def get_current_session():
 # ============================================================================
 
 @app.route("/chat/message", methods=["POST"])
+@token_required
 def chat_message():
     """
     Process a chat message - either execute as command or query LLM
     Returns immediate response for commands, streaming response for LLM queries
     """
-    if request.remote_addr not in ("127.0.0.1", "::1"):
-        return jsonify({"error": "Forbidden"}), 403
-    token = request.headers.get("X-Fluffy-Token")
-    if token != FLUFFY_TOKEN:
-        return jsonify({"error": "Unauthorized"}), 401
     
     try:
         data = request.get_json()
@@ -726,16 +689,12 @@ def chat_message():
 
 
 @app.route("/chat/stream", methods=["POST"])
+@token_required
 def chat_stream():
     """
     Stream LLM response with Server-Sent Events
     Use this for real-time streaming responses in the UI
     """
-    if request.remote_addr not in ("127.0.0.1", "::1"):
-        return jsonify({"error": "Forbidden"}), 403
-    token = request.headers.get("X-Fluffy-Token")
-    if token != FLUFFY_TOKEN:
-        return jsonify({"error": "Unauthorized"}), 401
     
     try:
         data = request.get_json()
@@ -818,14 +777,9 @@ def chat_stream():
 # ============================================================================
 
 @app.route("/llm/config", methods=["GET"])
+@token_required
 def get_llm_config():
     """Get current LLM configuration"""
-    if request.remote_addr not in ("127.0.0.1", "::1"):
-        return jsonify({"error": "Forbidden"}), 403
-    token = request.headers.get("X-Fluffy-Token")
-    if token != FLUFFY_TOKEN:
-        return jsonify({"error": "Unauthorized"}), 401
-    
     try:
         # Import LLM config - add project root to path
         project_root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
@@ -844,14 +798,9 @@ def get_llm_config():
 
 
 @app.route("/llm/config", methods=["POST"])
+@token_required
 def update_llm_config():
     """Update LLM configuration (API key and/or model)"""
-    if request.remote_addr not in ("127.0.0.1", "::1"):
-        return jsonify({"error": "Forbidden"}), 403
-    token = request.headers.get("X-Fluffy-Token")
-    if token != FLUFFY_TOKEN:
-        return jsonify({"error": "Unauthorized"}), 401
-    
     try:
         data = request.get_json()
         api_key = data.get("api_key")
@@ -890,13 +839,9 @@ def update_llm_config():
 
 
 @app.route("/llm/models", methods=["GET"])
+@token_required
 def get_available_models():
     """Get list of available LLM models"""
-    if request.remote_addr not in ("127.0.0.1", "::1"):
-        return jsonify({"error": "Forbidden"}), 403
-    token = request.headers.get("X-Fluffy-Token")
-    if token != FLUFFY_TOKEN:
-        return jsonify({"error": "Unauthorized"}), 401
     
     # List of popular OpenRouter models
     models = [
@@ -954,11 +899,9 @@ def get_available_models():
 # ========== Memory System Endpoints ==========
 
 @app.route("/memory", methods=["GET"])
+@token_required
 def get_memory():
     """Get user's long-term memory"""
-    if request.remote_addr not in ("127.0.0.1", "::1"):
-        return jsonify({"error": "Forbidden"}), 403
-    
     try:
         from memory.long_term_memory import load_memory
         memory = load_memory()
@@ -968,15 +911,9 @@ def get_memory():
 
 
 @app.route("/memory", methods=["POST"])
+@token_required
 def update_memory_endpoint():
     """Update user's long-term memory"""
-    if request.remote_addr not in ("127.0.0.1", "::1"):
-        return jsonify({"error": "Forbidden"}), 403
-    
-    token = request.headers.get("X-Fluffy-Token")
-    if token != FLUFFY_TOKEN:
-        return jsonify({"error": "Unauthorized"}), 401
-    
     data = request.get_json(silent=True)
     if not data:
         return jsonify({"error": "Invalid payload"}), 400
@@ -990,11 +927,9 @@ def update_memory_endpoint():
 
 
 @app.route("/memory/preferences", methods=["GET"])
+@token_required
 def get_preferences():
     """Get user preferences"""
-    if request.remote_addr not in ("127.0.0.1", "::1"):
-        return jsonify({"error": "Forbidden"}), 403
-    
     try:
         from memory.long_term_memory import load_memory
         memory = load_memory()
@@ -1012,15 +947,9 @@ def get_preferences():
 
 
 @app.route("/memory/preferences", methods=["POST"])
+@token_required
 def set_preference_endpoint():
     """Set a specific preference"""
-    if request.remote_addr not in ("127.0.0.1", "::1"):
-        return jsonify({"error": "Forbidden"}), 403
-    
-    token = request.headers.get("X-Fluffy-Token")
-    if token != FLUFFY_TOKEN:
-        return jsonify({"error": "Unauthorized"}), 401
-    
     data = request.get_json(silent=True)
     if not data or "key" not in data or "value" not in data:
         return jsonify({"error": "Missing key or value"}), 400
@@ -1034,11 +963,9 @@ def set_preference_endpoint():
 
 
 @app.route("/memory/trusted_processes", methods=["GET"])
+@token_required
 def get_trusted_processes():
     """Get list of trusted processes"""
-    if request.remote_addr not in ("127.0.0.1", "::1"):
-        return jsonify({"error": "Forbidden"}), 403
-    
     try:
         from memory.long_term_memory import get_trusted_processes
         trusted = get_trusted_processes()
@@ -1048,15 +975,9 @@ def get_trusted_processes():
 
 
 @app.route("/memory/trusted_processes", methods=["POST"])
+@token_required
 def add_trusted_process_endpoint():
     """Add a process to trusted list"""
-    if request.remote_addr not in ("127.0.0.1", "::1"):
-        return jsonify({"error": "Forbidden"}), 403
-    
-    token = request.headers.get("X-Fluffy-Token")
-    if token != FLUFFY_TOKEN:
-        return jsonify({"error": "Unauthorized"}), 401
-    
     data = request.get_json(silent=True)
     if not data or "process_name" not in data:
         return jsonify({"error": "Missing process_name"}), 400
@@ -1071,15 +992,9 @@ def add_trusted_process_endpoint():
 
 
 @app.route("/memory/trusted_processes", methods=["DELETE"])
+@token_required
 def remove_trusted_process_endpoint():
     """Remove a process from trusted list"""
-    if request.remote_addr not in ("127.0.0.1", "::1"):
-        return jsonify({"error": "Forbidden"}), 403
-    
-    token = request.headers.get("X-Fluffy-Token")
-    if token != FLUFFY_TOKEN:
-        return jsonify({"error": "Unauthorized"}), 401
-    
     data = request.get_json(silent=True)
     if not data or "process_name" not in data:
         return jsonify({"error": "Missing process_name"}), 400
@@ -1094,15 +1009,9 @@ def remove_trusted_process_endpoint():
 
 
 @app.route("/session/reset", methods=["POST"])
+@token_required
 def reset_session():
     """Reset session memory"""
-    if request.remote_addr not in ("127.0.0.1", "::1"):
-        return jsonify({"error": "Forbidden"}), 403
-    
-    token = request.headers.get("X-Fluffy-Token")
-    if token != FLUFFY_TOKEN:
-        return jsonify({"error": "Unauthorized"}), 401
-    
     try:
         from memory.session_memory import reset_session_memory
         reset_session_memory()
@@ -1112,11 +1021,9 @@ def reset_session():
 
 
 @app.route("/session/status", methods=["GET"])
+@token_required
 def get_session_status():
     """Get current session status (pending intents, etc.)"""
-    if request.remote_addr not in ("127.0.0.1", "::1"):
-        return jsonify({"error": "Forbidden"}), 403
-    
     try:
         from memory.session_memory import get_session_memory
         session = get_session_memory()
@@ -1129,15 +1036,9 @@ def get_session_status():
 # ========== Interrupt Command Endpoints ==========
 
 @app.route("/interrupt", methods=["POST"])
+@token_required
 def interrupt():
     """Handle interrupt command (stop/cancel)"""
-    if request.remote_addr not in ("127.0.0.1", "::1"):
-        return jsonify({"error": "Forbidden"}), 403
-    
-    token = request.headers.get("X-Fluffy-Token")
-    if token != FLUFFY_TOKEN:
-        return jsonify({"error": "Unauthorized"}), 401
-    
     try:
         from interrupt_handler import handle_interrupt
         result = handle_interrupt()
@@ -1147,10 +1048,9 @@ def interrupt():
 
 
 @app.route("/interrupt/check", methods=["POST"])
+@token_required
 def check_interrupt():
     """Check if text contains interrupt command"""
-    if request.remote_addr not in ("127.0.0.1", "::1"):
-        return jsonify({"error": "Forbidden"}), 403
     
     data = request.get_json(silent=True)
     if not data or "text" not in data:
@@ -1165,11 +1065,9 @@ def check_interrupt():
 
 
 @app.route("/cancellable_actions", methods=["GET"])
+@token_required
 def get_cancellable_actions():
     """Get list of currently cancellable actions"""
-    if request.remote_addr not in ("127.0.0.1", "::1"):
-        return jsonify({"error": "Forbidden"}), 403
-    
     try:
         from interrupt_handler import get_cancellable_actions
         actions = get_cancellable_actions()
