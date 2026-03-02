@@ -32,9 +32,18 @@ if %ERRORLEVEL% NEQ 0 (
 )
 echo [OK] Python dependencies installed.
 
-REM ── Step 2: Node.js (for Tauri UI) ─────────────────────────
+REM ── Step 4: Piper Voice Engine ──────────────────────────
 echo.
-echo [4/4] Installing Node.js dependencies for Tauri UI...
+echo [4/5] Setting up Piper Voice Engine...
+if exist .venv\Scripts\python.exe (
+    .venv\Scripts\python.exe scripts\install_piper.py
+) else (
+    echo [SKIP] Virtual environment not found.
+)
+
+REM ── Step 5: Node.js (for Tauri UI) ─────────────────────────
+echo.
+echo [5/5] Installing Node.js dependencies for Tauri UI...
 where npm >nul 2>&1
 if %ERRORLEVEL% NEQ 0 (
     echo [WARN] npm not found. Install Node.js 18+ from https://nodejs.org

@@ -108,6 +108,16 @@ else {
     }
 }
 
+# ── Step 6: Piper Voice Engine ──────────────────────────
+Write-Host "`n[6/6] Setting up Piper Voice Engine..." -ForegroundColor Yellow
+$VenvPython = Join-Path (Get-Location) ".venv\Scripts\python.exe"
+if (Test-Path $VenvPython) {
+    & $VenvPython scripts\install_piper.py
+}
+else {
+    Write-Host "  ⚠ Virtual environment not found — skipping Piper setup." -ForegroundColor Yellow
+}
+
 # ── .env file ──────────────────────────────────────────────
 $EnvFile = Join-Path (Get-Location) ".env"
 $EnvExample = Join-Path (Get-Location) ".env.example"
