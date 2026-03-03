@@ -3,7 +3,10 @@ bluetooth_control Extension - Validator
 Validates Bluetooth control operations
 """
 
-from brain.action_validator import ValidationResult, SafetyLevel
+try:
+    from action_validator import ValidationResult, SafetyLevel
+except ImportError:
+    from brain.action_validator import ValidationResult, SafetyLevel
 
 class BluetoothControlValidator:
     """Validate Bluetooth control operations"""

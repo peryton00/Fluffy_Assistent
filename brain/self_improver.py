@@ -112,44 +112,64 @@ Say 'yes' to proceed or 'no' to cancel.
         try:
             print(f"\n[SelfImprover] 🚀 Starting self-improvement flow...")
             
-            # Step 1: Generate code
-            print(f"[SelfImprover] [1/4] Generating code for '{understanding.intent}'...")
-            
-            generated_code = self.code_generator.generate_intent_handler(
-                intent_name=understanding.intent,
-                description=understanding.suggested_implementation,
-                parameters=understanding.parameters
-            )
-            
-            # Check if code generation failed after retries
-            if generated_code is None:
+            # ── Step 1: Logic & Language ──────────────────────────────────────
+            # Decide best engine (python/html/js)
+            lang = self.code_generator.decide_language(understanding.suggested_implementation)
+            print(f"[SelfImprover] [1/4] Best engine for this: {lang}")
+
+            web_ui_files = None
+            js_handler = None
+            generated_code = None
+
+            if lang == "html":
+                # Generate Web Dashboard + Python Handler
+                print(f"[SelfImprover] Generating Web UI...")
+                web_ui_files = self.code_generator.generate_web_ui(understanding.intent, understanding.suggested_implementation)
+                # Still need a basic python handler to bridge
+                generated_code = self.code_generator.generate_intent_handler(
+                    intent_name=understanding.intent,
+                    description=f"UI bridge for {understanding.intent}. The UI is in the 'ui' folder.",
+                    parameters=understanding.parameters or {}
+                )
+            elif lang == "js":
+                # Generate JS script
+                print(f"[SelfImprover] Generating Node.js handler...")
+                js_handler = self.code_generator.generate_js_handler(
+                    understanding.intent, understanding.suggested_implementation, understanding.parameters or {}
+                )
+                # Need dummy patterns for creator
+                generated_code = type('Obj', (), {'executor_method': '', 'validation': '', 'patterns': []})()
+            else:
+                # Standard Python
+                generated_code = self.code_generator.generate_intent_handler(
+                    intent_name=understanding.intent,
+                    description=understanding.suggested_implementation,
+                    parameters=understanding.parameters or {}
+                )
+
+            if not generated_code and not js_handler:
                 return {
                     "success": False,
-                    "message": (
-                        "❌ **Code Generation Failed**\n\n"
-                        "I tried 3 times to generate valid code for this functionality, "
-                        "but encountered syntax errors each time.\n\n"
-                        "**Possible reasons:**\n"
-                        "- The functionality is too complex for automatic generation\n"
-                        "- The LLM is having trouble with the specific requirements\n\n"
-                        "**What you can do:**\n"
-                        "1. Try rephrasing your request with more details\n"
-                        "2. Break it into smaller, simpler tasks\n"
-                        "3. Report this issue if it persists"
-                    ),
+                    "message": "❌ **Generation Failed**",
                     "action": "error"
                 }
-            
-            print(f"[SelfImprover] ✓ Code generated ({len(generated_code.executor_method)} chars)")
-            
-            # Step 2: Create extension
-            print(f"[SelfImprover] [2/4] Creating extension...")
-            
+
+            # ── Step 2: Create extension ──────────────────────────────────────
+            metadata = {
+                "language": lang,
+                "has_ui": lang == "html"
+            }
+            print(f"[SelfImprover] [2/4] Creating {lang} extension...")
+
             actual_intent = self.extension_creator.create_extension(
                 intent_name=understanding.intent,
                 generated_code=generated_code,
                 description=understanding.suggested_implementation,
-                parameters=understanding.parameters
+                parameters=understanding.parameters,
+                language=lang,
+                has_ui=(lang == "html"),
+                web_ui_files=web_ui_files,
+                js_handler=js_handler
             )
             
             if not actual_intent:
@@ -190,36 +210,58 @@ Say 'yes' to proceed or 'no' to cancel.
             # Step 4: Execute the command
             print(f"[SelfImprover] [4/4] Executing command...")
             
-            # Create a mock command object for the extension
-            # Extensions don't need full Command object, just intent and parameters
-            class MockCommand:
-                def __init__(self, intent_value, params):
-                    self.intent = type('Intent', (), {'value': intent_value})()
-                    self.parameters = params
+            # ── Step 4: Execute the command with Self-Healing ────────────────
+            print(f"[SelfImprover] [4/4] Executing command (with self-healing)...")
             
-            command = MockCommand(final_intent, understanding.parameters)
+            # Mock Command object compatible with ExtensionLoader.execute_extension
+            class Command:
+                def __init__(self, i, p):
+                    self.intent = type('Int', (), {'value': i})()
+                    self.parameters = p
+
+            cmd = Command(final_intent, understanding.parameters)
             
-            result = self.extension_loader.execute(command, None)
-            
-            print(f"[SelfImprover] ✓ Command executed")
-            
-            # Add enhanced success message
-            if result.get("success"):
-                result["message"] = (
-                    f"🎉 **Extension '{final_intent}' is now active!**\n\n"
-                    f"Your command has been executed successfully.\n\n"
-                    f"**Result:**\n{result.get('message', '')}\n\n"
-                    f"💡 You can use this capability anytime now - no restart needed!"
-                )
-            else:
-                # Extension loaded but execution failed
-                result["message"] = (
-                    f"✅ Extension '{final_intent}' was created and loaded successfully.\n\n"
-                    f"⚠️ However, execution failed:\n{result.get('message', 'Unknown error')}\n\n"
-                    f"The extension is installed and can be debugged in `brain/extensions/{final_intent}/`"
-                )
-            
-            return result
+            # Execute with retry logic for healing
+            try:
+                result = self.extension_loader.execute(cmd, None)
+                
+                # If it failed with a Python error (and it's a python extension), try to fix it
+                if not result.get("success") and "language" in metadata and metadata["language"] == "python":
+                    error_msg = result.get("message", "")
+                    # Check if it looks like a code error
+                    if any(x in error_msg for x in ["NameError", "TypeError", "AttributeError", "SyntaxError", "ImportError"]):
+                        print(f"[SelfImprover] 🛠 Runtime error detected. Attempting self-healing...")
+                        handler_path = self.extension_loader.extensions_dir / final_intent / "handler.py"
+                        if handler_path.exists():
+                            old_code = handler_path.read_text(encoding="utf-8")
+                            fixed_code = self.code_generator.fix_handler(final_intent, old_code, error_msg)
+                            if fixed_code and fixed_code != old_code:
+                                if self.extension_creator.rewrite_handler(final_intent, fixed_code):
+                                    self.extension_loader.reload_extension(final_intent)
+                                    print(f"[SelfImprover] 🩹 Fixed code applied. Retrying...")
+                                    result = self.extension_loader.execute(cmd, None)
+
+                # Add enhanced success message
+                if result.get("success"):
+                    result["message"] = (
+                        f"🎉 **Extension '{final_intent}' is now active!**\n\n"
+                        f"Your command has been executed successfully.\n\n"
+                        f"**Result:**\n{result.get('message', '')}\n\n"
+                        f"💡 You can use this capability anytime now - no restart needed!"
+                    )
+                else:
+                    # Extension loaded but execution failed
+                    result["message"] = (
+                        f"✅ Extension '{final_intent}' was created and loaded successfully.\n\n"
+                        f"⚠️ However, execution failed:\n{result.get('message', 'Unknown error')}\n\n"
+                        f"The extension is installed and can be debugged in the Extensions tab or directly in `brain/extensions/{final_intent}/`"
+                    )
+
+                return result
+
+            except Exception as e:
+                print(f"[SelfImprover] Execution crash: {e}")
+                return {"success": False, "message": f"Execution failed: {e}", "action": "error"}
             
         except Exception as e:
             print(f"[SelfImprover] ✗ Error during improvement: {e}")

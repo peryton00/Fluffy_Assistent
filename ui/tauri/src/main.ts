@@ -18,6 +18,8 @@ async function initToken() {
   }
 }
 
+const API_BASE = "http://localhost:5123";
+
 const expandedPids = new Set<number>();
 const pendingKills = new Set<number>();
 let lastData: any = null;
@@ -43,7 +45,7 @@ DEFAULT_LAYOUT_ORDER.forEach(id => {
   if (!dashboardOrder.includes(id)) dashboardOrder.push(id);
 });
 
-const NAV_ITEMS = ["dashboard", "processes", "guardian", "apps", "analytics", "startup", "network", "settings"];
+const NAV_ITEMS = ["dashboard", "processes", "guardian", "apps", "extensions", "analytics", "startup", "network", "settings"];
 
 /* =========================
    UTILITIES
@@ -58,7 +60,8 @@ async function apiRequest(url: string, options: any = {}, retries = 3): Promise<
   for (let i = 0; i < retries; i++) {
     const start = performance.now();
     try {
-      const res = await fetch(url, { ...options, headers });
+      const fullUrl = url.startsWith("http") ? url : `${API_BASE}${url}`;
+      const res = await fetch(fullUrl, { ...options, headers });
       const latency = performance.now() - start;
       updatePing(latency);
 
@@ -162,8 +165,8 @@ function setupNavigation() {
 
   const appsSearchInput = document.getElementById("apps-search-input") as HTMLInputElement;
   if (appsSearchInput) {
-    appsSearchInput.oninput = (e) => {
-      const q = (e.target as HTMLInputElement).value.toLowerCase();
+    appsSearchInput.oninput = () => {
+      const q = appsSearchInput.value.toLowerCase();
       renderApps(null, q); // Filter current list
     };
   }
@@ -183,8 +186,8 @@ function setupNavigation() {
   };
 
   if (searchInput) {
-    searchInput.oninput = (e) => {
-      searchQuery = (e.target as HTMLInputElement).value.toLowerCase();
+    searchInput.oninput = () => {
+      searchQuery = searchInput.value.toLowerCase();
       if (lastData) renderUI(lastData);
     };
   }
@@ -291,7 +294,226 @@ function setupNavigation() {
       if (icon) icon.style.opacity = '1';
     };
   }
+
+  // Extensions Refresh
+  const refreshExtBtn = document.getElementById("btn-refresh-extensions");
+  if (refreshExtBtn) {
+    refreshExtBtn.onclick = () => fetchExtensions();
+  }
+
+  initExtensions();
 }
+
+/* =========================
+   EXTENSIONS MANAGEMENT
+========================= */
+
+let currentEditingIntent: string | null = null;
+
+function initExtensions() {
+  // Editor close
+  document.getElementById("btn-editor-close")?.addEventListener("click", () => {
+    document.getElementById("extension-editor-panel")?.classList.remove("open");
+  });
+
+  // Editor save
+  document.getElementById("btn-editor-save")?.addEventListener("click", async () => {
+    if (!currentEditingIntent) return;
+    const code = (document.getElementById("code-editor-textarea") as HTMLTextAreaElement)?.value;
+    const btn = document.getElementById("btn-editor-save") as HTMLButtonElement;
+    
+    if (btn) btn.innerText = "Saving...";
+    
+    const res = await apiRequest(`/extensions/${currentEditingIntent}/code`, {
+      method: "PUT",
+      body: JSON.stringify({ code })
+    });
+
+    if (res && res.success) {
+      showToast("Extension saved and reloaded", "success");
+      fetchExtensions();
+    } else {
+      showToast(res?.error || "Save failed", "error");
+    }
+    if (btn) btn.innerText = "Save";
+  });
+
+  // VS Code
+  document.getElementById("btn-editor-vscode")?.addEventListener("click", async () => {
+    if (!currentEditingIntent) return;
+    const res = await apiRequest(`/extensions/${currentEditingIntent}/open-vscode`, { method: "POST" });
+    if (res && res.success) showToast(res.message, "info");
+    else showToast(res?.message || "VS Code failed", "error");
+  });
+
+  // UI close
+  document.getElementById("btn-ui-close")?.addEventListener("click", () => {
+    document.getElementById("extension-ui-panel")?.classList.remove("open");
+    (document.getElementById("extension-ui-frame") as HTMLIFrameElement).src = "about:blank";
+  });
+
+  // Refresh
+  document.getElementById("btn-refresh-extensions")?.addEventListener("click", () => {
+    fetchExtensions();
+    showToast("Refreshing extensions...", "info");
+  });
+
+  // Run / Test
+  document.getElementById("btn-editor-run")?.addEventListener("click", async () => {
+    if (!currentEditingIntent) return;
+    const output = document.getElementById("console-output");
+    const status = document.getElementById("editor-status");
+    const btn = document.getElementById("btn-editor-run") as HTMLButtonElement;
+
+    if (output) {
+      output.innerText = "Running...";
+      output.classList.remove("error");
+    }
+    if (status) status.innerText = "Executing...";
+
+    try {
+      const res = await apiRequest(`/extensions/${currentEditingIntent}/run`, { method: "POST" });
+      if (res && res.success) {
+        if (output) output.innerText = JSON.stringify(res.result, null, 2);
+        if (status) status.innerText = "Success";
+      } else {
+        if (output) {
+          output.innerText = `Error: ${res?.error || res?.message || "Execution failed"}`;
+          output.classList.add("error");
+        }
+        if (status) status.innerText = "Failed";
+      }
+    } catch (e: any) {
+      if (output) {
+        output.innerText = `Catastrophic Error: ${e.message}`;
+        output.classList.add("error");
+      }
+      if (status) status.innerText = "Error";
+    }
+  });
+}
+
+function fetchExtensions() {
+  const loading = document.getElementById("extensions-loading");
+  const grid = document.getElementById("extensions-grid");
+  
+  if (loading) loading.classList.remove("hidden");
+  if (grid) grid.innerHTML = "";
+
+  apiRequest("/extensions").then(data => {
+    if (data && data.extensions) {
+      renderExtensions(data.extensions);
+    }
+  }).catch(() => {
+    showToast("Failed to load extensions", "error");
+  }).finally(() => {
+    if (loading) loading.classList.add("hidden");
+  });
+}
+
+function renderExtensions(extensions: any[]) {
+  const grid = document.getElementById("extensions-grid");
+  if (!grid) return;
+
+  if (extensions.length === 0) {
+    grid.innerHTML = `
+      <div class="empty-state">
+        <i data-lucide="package-x"></i>
+        <p>No extensions found in the registry.</p>
+        <button class="btn-outline btn-sm" onclick="fetchExtensions()">Scan Again</button>
+      </div>
+    `;
+  } else {
+    grid.innerHTML = extensions.map(ext => `
+      <div class="extension-card ${ext.enabled ? '' : 'disabled'}" id="ext-card-${ext.intent}">
+        <div class="ext-card-header">
+          <div class="ext-logo-container">
+            <img src="${API_BASE}/extensions/${ext.intent}/logo?t=${Date.now()}" class="ext-logo" alt="logo" 
+                 onerror="this.src='${API_BASE}/fluffy-default-logo.svg'">
+          </div>
+          <span class="ext-status-badge ${ext.enabled ? 'active' : 'disabled'}">
+            ${ext.enabled ? 'Enabled' : 'Disabled'}
+          </span>
+        </div>
+        <div class="ext-info">
+          <h4>${ext.name}</h4>
+          <p class="ext-description">${ext.description || 'No description provided.'}</p>
+        </div>
+        <div class="ext-meta">
+          <span class="ext-lang">${ext.language}</span>
+          <span class="ext-version">v${ext.version}</span>
+        </div>
+        <div class="ext-actions">
+          <button class="btn-outline btn-sm" onclick="toggleExtension('${ext.intent}')">
+             <i data-lucide="${ext.enabled ? 'toggle-right' : 'toggle-left'}"></i>
+            ${ext.enabled ? 'Disable' : 'Enable'}
+          </button>
+          <button class="btn-outline btn-sm" onclick="openExtensionEditor('${ext.intent}')">
+            <i data-lucide="edit-3"></i>
+            Edit Code
+          </button>
+          ${ext.has_ui ? `
+            <button class="btn-primary btn-sm" onclick="openExtensionUI('${ext.intent}')">
+              <i data-lucide="external-link"></i>
+              Launch UI
+            </button>
+          ` : ''}
+        </div>
+      </div>
+    `).join("");
+  }
+
+  // Refresh Lucide icons for newly added elements
+  if ((window as any).lucide) {
+    (window as any).lucide.createIcons();
+  }
+}
+
+async function toggleExtension(intent: string) {
+  const res = await apiRequest(`/extensions/${intent}/toggle`, { method: "POST" });
+  if (res && res.success) {
+    showToast(res.message, "success");
+    fetchExtensions();
+  }
+}
+
+async function openExtensionEditor(intent: string) {
+  currentEditingIntent = intent;
+  const panel = document.getElementById("extension-editor-panel");
+  const container = document.getElementById("code-editor-container");
+  const title = document.getElementById("editor-title");
+  
+  if (title) title.innerText = `Edit: ${intent}`;
+  if (panel) panel.classList.add("open");
+  if (container) container.innerHTML = '<div class="spinner-small"></div>';
+
+  const data = await apiRequest(`/extensions/${intent}/code`);
+  if (data && data.code) {
+    if (container) {
+      container.innerHTML = `
+        <textarea id="code-editor-textarea" style="width:100%; height:100%; background:#05050a; color:#e0e0e0; border:none; padding:1.5rem; font-family:'JetBrains Mono', monospace; font-size:13px; line-height:1.5; resize:none; outline:none;" spellcheck="false">${data.code}</textarea>
+      `;
+    }
+  } else {
+    showToast("Failed to load code", "error");
+    if (panel) panel.classList.remove("open");
+  }
+}
+
+function openExtensionUI(intent: string) {
+  const panel = document.getElementById("extension-ui-panel");
+  const frame = document.getElementById("extension-ui-frame") as HTMLIFrameElement;
+  const title = document.getElementById("ui-panel-title");
+  
+  if (title) title.innerText = `${intent} Interface`;
+  if (frame) frame.src = `/extensions/${intent}/ui`;
+  if (panel) panel.classList.add("open");
+}
+
+(window as any).toggleExtension = toggleExtension;
+(window as any).openExtensionEditor = openExtensionEditor;
+(window as any).openExtensionUI = openExtensionUI;
+(window as any).fetchExtensions = fetchExtensions;
 
 async function normalizeSystem() {
   const btn = document.getElementById("btn-normalize") as HTMLButtonElement;
@@ -421,6 +643,7 @@ function navigateToView(id: string) {
   if (id === "settings") renderLayoutSettings();
   if (id === "dashboard") applyDashboardOrder();
   if (id === "apps") fetchApps();
+  if (id === "extensions") fetchExtensions();
   if (id === "network") initializeNetworkView();
 }
 

@@ -62,6 +62,17 @@ class ContextManager:
                         # Handle both role/content and type/text formats
                         role = msg.get("role") or ("user" if msg.get("type") == "user" else "assistant")
                         content = msg.get("content") or msg.get("text") or ""
+                        
+                        # Enhancement: If there's a command_result, append it to context content
+                        # so the LLM knows what happened in that turn (e.g. WiFi scan results)
+                        if role == "assistant" and "command_result" in msg:
+                            result_data = msg["command_result"]
+                            if isinstance(result_data, dict) and result_data.get("success"):
+                                context_snippet = f"\n[Execution Result: {result_data.get('message', 'Success')}]"
+                                if "networks" in result_data: # Specific to WiFi scanning
+                                    context_snippet += f" Found networks: {result_data['networks']}"
+                                content += context_snippet
+
                         if content and role in ("user", "assistant"):
                             turns.append({"role": role, "content": content})
                     context["conversation_turns"] = turns

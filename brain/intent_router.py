@@ -167,9 +167,18 @@ class IntentRouter:
             pass
 
         success = result.get("success", False)
-        # Build the message: use the LLM-generated text on success, executor message on failure
+        # Build the message:
+        # 1. On success: Use the executor's message if it's descriptive, otherwise fall back to LLM acknowledgement
+        # 2. On failure: Use the executor's error message
         if success:
-            msg = getattr(cmd, "llm_response", None) or result.get("message", "Done!")
+            exec_msg = result.get("message")
+            llm_ack = getattr(cmd, "llm_response", None)
+            
+            # Simple heuristic: if executor returned something substantial, use it
+            if exec_msg and len(exec_msg) > 10 and exec_msg != "Success":
+                msg = exec_msg
+            else:
+                msg = llm_ack or exec_msg or "Done!"
         else:
             msg = f"I'm sorry, I couldn't do that. {result.get('message', 'An error occurred.')}"
 
@@ -206,8 +215,17 @@ class IntentRouter:
                 pass
 
             success = result.get("success", False)
-            response_text = understanding.text or result.get("message", "Done!")
-            if not success:
+            
+            # For extensions, the result message is usually the most important part (e.g. scan results)
+            if success:
+                exec_msg = result.get("message")
+                llm_ack = understanding.text
+                
+                if exec_msg and len(exec_msg) > 5 and exec_msg != "Success":
+                    response_text = exec_msg
+                else:
+                    response_text = llm_ack or exec_msg or "Done!"
+            else:
                 response_text = f"I'm sorry, I couldn't do that. {result.get('message', 'An error occurred.')}"
 
             return {

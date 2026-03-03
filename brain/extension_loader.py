@@ -35,10 +35,15 @@ class ExtensionLoader:
     
     def load_all_extensions(self):
         """Load all extensions from extensions folder"""
-        # Add extensions to Python path
-        extensions_parent = str(self.extensions_dir.parent)
-        if extensions_parent not in sys.path:
-            sys.path.insert(0, extensions_parent)
+        # Add project root to path for brain.xxx imports
+        project_root = str(self.extensions_dir.parent.parent)
+        if project_root not in sys.path:
+            sys.path.insert(0, project_root)
+        
+        # Add brain to path for direct imports
+        brain_dir = str(self.extensions_dir.parent)
+        if brain_dir not in sys.path:
+            sys.path.insert(0, brain_dir)
         
         loaded_count = 0
         
@@ -80,7 +85,7 @@ class ExtensionLoader:
                 }
                 
                 loaded_count += 1
-                print(f"[ExtensionLoader] ✓ Loaded: {metadata.get('name', intent)}")
+                print(f"[ExtensionLoader] [OK] Loaded: {metadata.get('name', intent)}")
                 
                 # Clear any previous errors for this extension
                 if intent in self.load_errors:
@@ -90,7 +95,7 @@ class ExtensionLoader:
                 # Store detailed error for user feedback
                 error_msg = f"{type(e).__name__}: {str(e)}"
                 self.load_errors[ext_dir.name] = error_msg
-                print(f"[ExtensionLoader] ✗ Failed to load {ext_dir.name}: {error_msg}")
+                print(f"[ExtensionLoader] [ERROR] Failed to load {ext_dir.name}: {error_msg}")
         
         if loaded_count > 0:
             print(f"[ExtensionLoader] Total extensions loaded: {loaded_count}")
@@ -174,7 +179,7 @@ class ExtensionLoader:
             # Reload extension data
             self.load_all_extensions()
             
-            print(f"[ExtensionLoader] ✓ Reloaded: {intent}")
+            print(f"[ExtensionLoader] [OK] Reloaded: {intent}")
             return True
             
         except Exception as e:
@@ -242,9 +247,9 @@ class ExtensionLoader:
                     "description": ext_metadata.get("description", "")
                 }
                 newly_loaded.append(intent)
-                print(f"[ExtensionLoader] ✓ Hot-loaded: {intent}")
+                print(f"[ExtensionLoader] [OK] Hot-loaded: {intent}")
             except Exception as e:
-                print(f"[ExtensionLoader] ✗ Failed to hot-load {intent}: {e}")
+                print(f"[ExtensionLoader] [ERROR] Failed to hot-load {intent}: {e}")
                 self.load_errors[intent] = str(e)
         return newly_loaded
     

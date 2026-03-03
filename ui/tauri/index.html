@@ -10,6 +10,7 @@
     <link rel="stylesheet" href="/src/cluster-styles.css" />
     <link rel="stylesheet" href="/src/ftp-styles.css" />
     <link rel="stylesheet" href="/src/network-styles.css" />
+    <link rel="stylesheet" href="/src/extensions.css" />
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
     <link
@@ -69,6 +70,10 @@
           <a href="#" class="nav-item" id="nav-network">
             <span class="nav-icon"><i data-lucide="network"></i></span>
             <span class="nav-text">Network</span>
+          </a>
+          <a href="#" class="nav-item" id="nav-extensions">
+            <span class="nav-icon"><i data-lucide="plug"></i></span>
+            <span class="nav-text">Extensions</span>
           </a>
           <a href="#" class="nav-item" id="nav-settings">
             <span class="nav-icon"><i data-lucide="settings"></i></span>
@@ -569,6 +574,73 @@
                   <!-- Populated via JS -->
                 </tbody>
               </table>
+            </div>
+          </div>
+        </section>
+
+        <!-- VIEW: EXTENSIONS -->
+        <section id="section-extensions" class="view-section">
+          <div class="extensions-container">
+            <div class="extensions-header">
+              <div class="header-left">
+                <h3>Extension Management</h3>
+                <p>Custom capabilities developed by Fluffy AI.</p>
+              </div>
+              <div class="header-actions">
+                <button class="btn-outline refresh-btn" id="btn-refresh-extensions" title="Refresh Extensions">
+                  <i data-lucide="refresh-cw"></i>
+                </button>
+              </div>
+            </div>
+
+            <div id="extensions-loading" class="loading-overlay hidden">
+              <div class="spinner"></div>
+              <p>Scanning Extensions Registry...</p>
+            </div>
+
+            <div id="extensions-grid" class="extensions-grid">
+              <!-- Populated via JS -->
+            </div>
+          </div>
+
+          <!-- Extension Code Editor Panel (Hidden by default) -->
+          <div id="extension-editor-panel" class="editor-side-panel">
+            <div class="panel-header">
+              <div class="panel-title">
+                <i data-lucide="code"></i>
+                <h4 id="editor-title">Edit Extension</h4>
+              </div>
+              <div class="panel-actions">
+                <button id="btn-editor-vscode" class="btn-icon" title="Open in VS Code">
+                  <i data-lucide="external-link"></i>
+                </button>
+                <button id="btn-editor-run" class="btn-icon" title="Run / Test">
+                  <i data-lucide="play"></i>
+                </button>
+                <button id="btn-editor-save" class="btn-primary btn-sm">Save</button>
+                <button id="btn-editor-close" class="btn-icon"><i data-lucide="x"></i></button>
+              </div>
+            </div>
+            <div id="code-editor-container" class="code-editor-box"></div>
+            <div id="editor-console" class="editor-console">
+              <div class="console-header">Output</div>
+              <pre id="console-output">Ready to test...</pre>
+            </div>
+            <div class="panel-footer">
+              <p id="editor-status">Ready</p>
+            </div>
+          </div>
+
+          <!-- Extension Web UI Panel (Hidden by default) -->
+          <div id="extension-ui-panel" class="ui-panel-overlay">
+            <div class="ui-panel-content">
+              <div class="ui-panel-header">
+                <h4 id="ui-panel-title">Extension UI</h4>
+                <button id="btn-ui-close" class="btn-icon"><i data-lucide="x"></i></button>
+              </div>
+              <div class="ui-panel-body">
+                <iframe id="extension-ui-frame" class="extension-iframe"></iframe>
+              </div>
             </div>
           </div>
         </section>

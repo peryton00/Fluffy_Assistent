@@ -7,10 +7,12 @@ import sys
 import json
 import re
 from pathlib import Path
-from typing import Dict, Any, List
+from typing import Dict, Any, List, Optional
 
-# Add ai module to path
-sys.path.insert(0, str(Path(__file__).parent.parent / "ai" / "src"))
+# Add ai/src to path so llm_client is importable directly
+_ai_src = str(Path(__file__).parent.parent / "ai" / "src")
+if _ai_src not in sys.path:
+    sys.path.insert(0, _ai_src)
 
 
 class GeneratedCode:
@@ -33,18 +35,32 @@ class CodeGenerator:
     """Generate code for new functionality using LLM"""
     
     def __init__(self):
-        self.llm = None  # Lazy load
-    
-    def _get_llm(self):
-        """Lazy load LLM service"""
-        if self.llm is None:
+        self.llm_client = None  # Direct reference to avoid circular import
+
+    def _get_llm_client(self):
+        """Lazy load raw LLM client (avoids circular import with LLMService)."""
+        if self.llm_client is None:
             try:
-                from llm_service import get_service
-                self.llm = get_service()
+                from llm_client import get_client
+                self.llm_client = get_client()
             except Exception as e:
-                print(f"[CodeGenerator] Failed to load LLM service: {e}")
-                self.llm = None
-        return self.llm
+                print(f"[CodeGenerator] Failed to load LLM client: {e}")
+        return self.llm_client
+
+    def _query(self, prompt: str, system: str = None) -> str:
+        """Run a prompt through the LLM and return full string response."""
+        client = self._get_llm_client()
+        if not client:
+            return ""
+        messages = [
+            {"role": "system", "content": system or "You are an expert Python/JS developer."},
+            {"role": "user", "content": prompt}
+        ]
+        try:
+            return "".join(str(c) for c in client.chat(messages))
+        except Exception as e:
+            print(f"[CodeGenerator] LLM query error: {e}")
+            return ""
     
     def generate_intent_handler(
         self,
@@ -52,52 +68,35 @@ class CodeGenerator:
         description: str,
         parameters: Dict[str, Any],
         max_retries: int = 3
-    ) -> GeneratedCode:
+    ) -> Optional["GeneratedCode"]:
         """
-        Generate all code needed for a new intent with automatic validation and fixing
-        
-        Args:
-            intent_name: Name of the intent (e.g., "download_file")
-            description: What this intent does
-            parameters: Parameters needed for this intent
-            max_retries: Maximum attempts to fix syntax errors (default: 3)
-            
-        Returns:
-            GeneratedCode object with all necessary code blocks, or None if failed
+        Generate all code needed for a new intent with automatic validation and fixing.
         """
-        
-        llm = self._get_llm()
-        if not llm:
+        client = self._get_llm_client()
+        if not client:
             return self._generate_fallback_code(intent_name, description, parameters)
         
         # Import validator
-        from brain.code_validator import validate_extension_code
-        
+        try:
+            from code_validator import validate_extension_code
+        except ImportError:
+            from brain.code_validator import validate_extension_code
+
         # Try generating and validating code
         for attempt in range(max_retries):
             try:
                 print(f"[CodeGenerator] Attempt {attempt + 1}/{max_retries}")
-                
+
                 # Build prompt (use fix prompt if retrying)
                 if attempt == 0:
                     prompt = self._build_generation_prompt(intent_name, description, parameters)
                 else:
                     prompt = self._build_fix_prompt(generated, validation_result, intent_name, description)
-                
-                # Query LLM
-                result = llm.query_llm(prompt)
-                
-                # Collect streaming response
-                full_response = ""
-                for chunk in result["stream"]:
-                    full_response += chunk
-                
+
+                full_response = self._query(prompt)
                 print(f"[CodeGenerator] Generated {len(full_response)} chars of code")
-                
-                # Parse response
+
                 generated = self._parse_generated_code(full_response, intent_name, description)
-                
-                # Validate the generated code
                 validation_result = validate_extension_code(
                     generated.executor_method,
                     generated.validation
@@ -364,6 +363,7 @@ CRITICAL: Escape all special characters properly in JSON strings.
         })
 
 
+
 # Global singleton
 _code_generator = None
 
@@ -373,6 +373,120 @@ def get_code_generator() -> CodeGenerator:
     if _code_generator is None:
         _code_generator = CodeGenerator()
     return _code_generator
+
+
+# ── Multi-language methods (added to CodeGenerator via monkey-patch-friendly style)
+
+def _decide_language(self, description: str) -> str:
+    """Decide the best language for an extension based on its description."""
+    prompt = f"""You are helping decide the best implementation language for a Fluffy assistant extension.
+
+Extension description: "{description}"
+
+Choose ONE of these options:
+- python    → system actions, file ops, subprocess, networking, APIs
+- html      → needs a visual dashboard or interactive UI (charts, forms, controls)
+- js        → pure data transformation, JSON APIs without a persistent UI
+
+Rules:
+- If the extension interacts with the OS, files, or runs subprocesses → python
+- If the extension displays a rich UI for the user to interact with → html
+- If it just transforms data or calls a web API → python (preferred over js)
+
+Reply with ONLY one word: python, html, or js."""
+    response = self._query(prompt).strip().lower()
+    first = response.split()[0] if response.split() else "python"
+    return first if first in ("python", "html", "js") else "python"
+
+CodeGenerator.decide_language = _decide_language
+
+
+def _fix_handler(self, intent_name: str, handler_code: str, error_message: str) -> str:
+    """Ask LLM to fix a broken handler given the error text. Returns fixed code string."""
+    prompt = f"""A Fluffy extension handler for '{intent_name}' failed at runtime with this error:
+
+Error:
+{error_message}
+
+Current handler.py code:
+```python
+{handler_code}
+```
+
+Fix ALL problems so the handler runs successfully.
+- Keep the execute(self, command) signature.
+- Return fixed Python code ONLY — no markdown fences, no explanation.
+"""
+    fixed = self._query(prompt, system="You are an expert Python debugger. Output only corrected Python code.")
+    # Strip any accidental fences
+    if "```" in fixed:
+        lines = fixed.splitlines()
+        fixed = "\n".join(l for l in lines if not l.strip().startswith("```"))
+    return fixed.strip()
+
+CodeGenerator.fix_handler = _fix_handler
+
+
+def _generate_web_ui(self, intent_name: str, description: str) -> dict:
+    """Generate HTML+CSS+JS files for an extension with a visual UI."""
+    prompt = f"""Create a complete web-based UI for a Fluffy assistant extension.
+
+Intent: {intent_name}
+Description: {description}
+
+Generate a modern, dark-themed single-page UI.
+The page communicates back to Fluffy's API at the same origin.
+
+Return ONLY valid JSON with this structure:
+{{
+    "index.html": "complete HTML content",
+    "styles.css": "complete CSS content",
+    "app.js": "complete JS content"
+}}"""
+    raw = self._query(prompt, system="You are an expert frontend developer. Output only JSON.")
+    try:
+        if "{" in raw:
+            raw = raw[raw.index("{"):raw.rindex("}") + 1]
+        return json.loads(raw)
+    except Exception as e:
+        print(f"[CodeGenerator] Web UI parse error: {e}")
+        return {
+            "index.html": f"""<!DOCTYPE html>
+<html lang="en">
+<head><meta charset="UTF-8"><title>{intent_name}</title>
+<style>body{{background:#1a1a2e;color:#e0e0e0;font-family:sans-serif;padding:2rem}}</style>
+</head>
+<body><h1>{intent_name}</h1><p>{description}</p></body>
+</html>""",
+            "styles.css": "body { background: #1a1a2e; color: #e0e0e0; }",
+            "app.js": "// Extension UI placeholder"
+        }
+
+CodeGenerator.generate_web_ui = _generate_web_ui
+
+
+def _generate_js_handler(self, intent_name: str, description: str, parameters: dict) -> str:
+    """Generate a Node.js handler script for an extension."""
+    prompt = f"""Generate a Node.js script for a Fluffy assistant extension.
+
+Intent: {intent_name}
+Description: {description}
+Parameters (passed as JSON via stdin): {json.dumps(parameters)}
+
+The script must:
+1. Read parameters from stdin as JSON: const params = JSON.parse(require('fs').readFileSync(0,'utf8'))
+2. Perform the task
+3. Print a JSON result to stdout: {{"success": true/false, "message": "..."}}
+
+Return ONLY the Node.js code — no markdown fences."""
+    code = self._query(prompt, system="You are an expert Node.js developer. Output only executable JS code.")
+    if "```" in code:
+        lines = code.splitlines()
+        code = "\n".join(l for l in lines if not l.strip().startswith("```"))
+    return code.strip()
+
+CodeGenerator.generate_js_handler = _generate_js_handler
+
 
 
 # Test function

@@ -98,6 +98,10 @@ body {
   border-radius: 10px;
 }
 
+.hidden {
+  display: none !important;
+}
+
 ::-webkit-scrollbar-thumb:hover {
   background: var(--text-secondary);
 }
