@@ -81,10 +81,6 @@
           </a>
         </nav>
         <div class="sidebar-footer">
-          <div class="upgrade-card">
-            <p>System is <strong>Protected</strong></p>
-            <button class="upgrade-btn">Details</button>
-          </div>
           <div class="theme-toggle">
             <span>Dark Mode</span>
             <label class="switch">
@@ -522,6 +518,14 @@
             <div class="card-header">
               <h3>Installed Applications</h3>
               <div class="header-actions">
+                <div class="sort-selector">
+                  <label>Sort:</label>
+                  <select id="apps-sort-mode">
+                    <option value="active">Active Apps</option>
+                    <option value="name">By Name</option>
+                    <option value="size">By Size</option>
+                  </select>
+                </div>
                 <div class="search-box">
                   <i data-lucide="search"></i>
                   <input
@@ -1259,69 +1263,6 @@
     <div id="toast-container" class="toast-container"></div>
 
     <!-- Security Details Modal -->
-    <div id="security-modal" class="modal-overlay">
-      <div class="modal-card">
-        <div class="modal-header">
-          <h3>System Protection Details</h3>
-          <button class="close-btn" id="close-modal">
-            <i data-lucide="x"></i>
-          </button>
-        </div>
-        <div class="modal-body">
-          <div class="protection-status-header">
-            <div class="pulse-ring healthy"></div>
-            <span>Active Behavioral Monitoring</span>
-          </div>
-          <div class="details-grid">
-            <div class="detail-item">
-              <span class="detail-icon"
-                ><i data-lucide="folder-search"></i
-              ></span>
-              <div class="detail-text">
-                <strong>Path Integrity</strong>
-                <p>
-                  Detects processes executing from temporary or suspicious
-                  locations.
-                </p>
-              </div>
-            </div>
-            <div class="detail-item">
-              <span class="detail-icon"><i data-lucide="zap"></i></span>
-              <div class="detail-text">
-                <strong>Resource Anomaly</strong>
-                <p>
-                  Flags sudden CPU, RAM, or Disk spikes that don't match user
-                  activity.
-                </p>
-              </div>
-            </div>
-            <div class="detail-item">
-              <span class="detail-icon"><i data-lucide="git-branch"></i></span>
-              <div class="detail-text">
-                <strong>Child Spawning</strong>
-                <p>
-                  Monitors for rapid creation of sub-processes, a common malware
-                  indicator.
-                </p>
-              </div>
-            </div>
-            <div class="detail-item">
-              <span class="detail-icon"><i data-lucide="key"></i></span>
-              <div class="detail-text">
-                <strong>Persistence Guard</strong>
-                <p>
-                  Watches Registry and Startup entries for unauthorized auto-run
-                  attempts.
-                </p>
-              </div>
-            </div>
-          </div>
-        </div>
-        <div class="modal-footer">
-          <button class="btn-primary" id="modal-ok">Got it</button>
-        </div>
-      </div>
-    </div>
 
     <!-- Startup Modal -->
     <div id="startup-modal" class="modal-overlay">

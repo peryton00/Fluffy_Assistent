@@ -1,0 +1,17 @@
+{
+  "name": "list_desktop_files",
+  "version": "1.0.0",
+  "description": "Create a Python function that utilizes the os module to fetch and return a list of files on the user's desktop. The function should handle file system operations, error handling, and provide the file list in a user-friendly format.",
+  "author": "Fluffy AI",
+  "created": "2026-03-03T22:39:03.679262",
+  "intent": "list_desktop_files",
+  "language": "python",
+  "has_ui": false,
+  "logo": "logo.svg",
+  "patterns": [
+    "list desktop files",
+    "show desktop files"
+  ],
+  "parameters": {},
+  "safety_level": "needs_confirmation"
+}

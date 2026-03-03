@@ -104,10 +104,6 @@ body.light-mode {
     padding: 10px;
   }
 
-  .upgrade-card {
-    font-size: 12px;
-    padding: 12px;
-  }
 
   .dashboard-grid {
     grid-template-columns: repeat(2, 1fr);

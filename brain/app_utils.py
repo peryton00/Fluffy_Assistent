@@ -214,6 +214,7 @@ def _scan_windows_registry() -> List[Dict]:
                                 "install_location": install_location,
                                 "exe_path": exe_path,
                                 "icon_data": icon_data,
+                                "size_kb": get_val("EstimatedSize") or 0,
                                 "uninstall_string": uninstall_string
                             }
                             

@@ -203,7 +203,9 @@ Classify the message into exactly ONE of these categories:
 
 IMPORTANT: Requests like "write a program to X", "write a script to X", "write code for X",
 "create a python file that X", "make a program that X" are COMMANDS (they must create and save files).
-NOT chat.
+IMPORTANT: Requests like "make an EXTENSION", "create an EXTENSION", "learn a NEW SKILL", 
+"add a CAPABILITY to yourself" are NEW_FEATURE (Fluffy learning to do something new).
+NOT chat and NOT standard command.
 
 Available system commands: {available_str}
 
@@ -256,7 +258,9 @@ Rules:
 - If it is a MULTI-STEP command (e.g., "open notepad and type hello"), use intent "multi_step" with a "steps" array.
 - Each step in "steps" must have: intent, parameters, text.
 - Use "text" for a friendly human response describing what you will do.
-- If command needs a feature NOT in the list above, set requires_new_functionality to true.
+- If the user wants you to LEARN a new skill, create an EXTENSION, or add a CAPABILITY (e.g., "make an extension to X"), 
+  set "requires_new_functionality" to true and set "intent" to "new_feature".
+- If the command needs a feature NOT in the list above, set requires_new_functionality to true.
 - Set memory_update only if user shared personal info (name, location, preferences).
 
 Return ONLY valid JSON (no markdown, no extra text):

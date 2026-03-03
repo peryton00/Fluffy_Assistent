@@ -1,0 +1,34 @@
+class Song:
+    def __init__(self, title, lyrics):
+        self.title = title
+        self.lyrics = lyrics
+
+    def sing(self):
+        print(f"Singing {self.title}:")
+        for line in self.lyrics:
+            print(line)
+
+
+class FluffySong(Song):
+    def __init__(self):
+        title = "Fluffy"
+        lyrics = [
+            "Fluffy, oh Fluffy, so soft and so sweet",
+            "Fur as white as snow, and eyes that can't be beat",
+            "You purr and you cuddle, and steal hearts away",
+            "Fluffy, oh Fluffy, our love for you will always stay",
+            "You chase and you pounce, with energy to spare",
+            "A ball of fur and joy, beyond compare",
+            "Your little meows, and snuggles too",
+            "Make our lives richer, with a love that's true",
+        ]
+        super().__init__(title, lyrics)
+
+
+def main():
+    fluffy_song = FluffySong()
+    fluffy_song.sing()
+
+
+if __name__ == "__main__":
+    main()

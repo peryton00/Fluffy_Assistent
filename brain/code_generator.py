@@ -137,69 +137,48 @@ class CodeGenerator:
         description: str,
         parameters: Dict[str, Any]
     ) -> str:
-        """Build prompt for code generation"""
+        """Build prompt for code generation with strict architectural rules"""
         
-        prompt = f"""Generate Python code for a new Fluffy command capability.
+        prompt = f"""Generate a high-quality Python extension for the Fluffy AI Assistant.
 
-Intent Name: {intent_name}
-Description: {description}
-Parameters: {json.dumps(parameters, indent=2)}
+INTENT: {intent_name}
+DESCRIPTION: {description}
+EXPECTED PARAMETERS: {json.dumps(parameters, indent=2)}
 
-Generate the following code blocks:
+### ARCHITECTURAL REQUIREMENTS:
+1. **Module Structure**: 
+   - You must provide a class `ScanHandler` (or relevant name) with an `execute(self, command: Command) -> Dict[str, Any]` method.
+   - You MUST include a module-level function `get_handler() -> ScanHandler` that returns an instance of your class.
+   - You MUST include a module-level function `get_validator() -> ActionValidator` if a custom validator is needed (otherwise it uses standard).
 
-1. **Intent Enum Entry** - Constant name for the intent
-   Format: descriptive string (e.g. "RENAME_FILES")
+2. **Error Handling**:
+   - Use a broad `try-except` block inside `execute`.
+   - On error, return `{{"success": False, "message": "User friendly error message", "error_detail": "traceback/exception"}}`.
 
-2. **Regex Patterns** - List of strings
-   Example: ["rename\\s+(.+)", "change\\s+names\\s+in\\s+(.+)"]
+3. **Output Formatting**:
+   - For lists of data (like WiFi, files, processes), return a Markdown-formatted string in the `"message"` field so it looks beautiful in the chat.
+   - Return raw data in specific keys (e.g., `"networks": [...]`) for internal AI reasoning.
 
-4. **Executor Method** - Complete Python method for CommandExecutor.
-   Template:
-   ```python
-   def execute(self, command: Command) -> Dict[str, Any]:
-       \"\"\"Brief description\"\"\"
-       try:
-           # Get params from command.parameters
-           param1 = command.parameters.get("name")
-           # Logic here (use os, shutil, etc.)
-           return {{"success": True, "message": "Success message"}}
-       except Exception as e:
-           return {{"success": False, "message": f"Error: {{str(e)}}"}}
-   ```
+4. **Dependencies**:
+   - Use ONLY standard Python libraries (`os`, `subprocess`, `sys`, `json`, `re`, `platform`).
+   - If you need `netsh` (Windows) or `nmcli` (Linux), be OS-aware using `platform.system()`.
 
-5. **Validation Logic** - Python code for ActionValidator.
-   Template:
-   ```python
-   def validate(self, command: Command):
-       \"\"\"Brief description\"\"\"
-       if command.intent.value == "intent_name":
-           return ValidationResult(is_valid=True, safety_level=SafetyLevel.SAFE, message="Safe")
-       return None
-   ```
+5. **Security**:
+   - Sanitize all inputs from `command.parameters`.
+   - Never use `eval()` or `os.system()` with unsanitized strings. Use `subprocess.run(..., shell=False)`.
 
-Return your response as a SINGLE JSON OBJECT. 
-CRITICAL: NO NOT use "self.extract_parameters" or "self.validate_folder". Use "command.parameters" and standard library calls.
-CRITICAL: All Python code blocks MUST be escape-encoded as JSON strings (escape backslashes, double quotes, and newlines).
-
-JSON Structure:
+### REQUIRED JSON STRUCTURE:
+Return ONLY a JSON object. The code strings MUST be properly escaped for JSON (use \\n for newlines, \\" for quotes).
 {{
-    "intent_enum": "DESCRIPTIVE_NAME",
-    "patterns": ["pattern1"],
-    "parameter_extraction": "Python code...",
-    "executor_method": "def execute(self, command): ...",
-    "validation": "Python code...",
-    "description": "brief description"
+    "intent_enum": "{intent_name.upper()}",
+    "patterns": ["Regex matching user command"],
+    "executor_method": "import os\\nfrom typing import Dict, Any\\n\\nclass {intent_name.title().replace('_', '')}Handler:\\n    def execute(self, command) -> Dict[str, Any]:\\n        ...",
+    "validation": "from brain.action_validator import ValidationResult, SafetyLevel\\n\\nclass {intent_name.title().replace('_', '')}Validator:\\n    ...",
+    "description": "{description}"
 }}
 
-Make the code:
-- Production-ready with error handling
-- Well-commented
-- Following Fluffy's existing code style
-- Safe and secure (no arbitrary code execution)
-
-Generate code for: {intent_name}
-"""
-        
+CRITICAL: The `executor_method` string must be the ENTIRE content for `handler.py`. Use standard indentation (4 spaces) within the string.
+        """
         return prompt
     
     def _build_fix_prompt(
@@ -273,10 +252,11 @@ CRITICAL: Escape all special characters properly in JSON strings.
         intent_name: str,
         description: str
     ) -> GeneratedCode:
-        """Parse LLM's generated code"""
+        """Parse LLM's generated code with robust JSON extraction"""
         
         try:
-            # Extract JSON
+            # 1. Try to find JSON block
+            json_str = ""
             if "```json" in response:
                 json_start = response.find("```json") + 7
                 json_end = response.find("```", json_start)
@@ -285,10 +265,22 @@ CRITICAL: Escape all special characters properly in JSON strings.
                 json_start = response.find("{")
                 json_end = response.rfind("}") + 1
                 json_str = response[json_start:json_end]
-            else:
-                raise ValueError("No JSON found in response")
             
-            data = json.loads(json_str)
+            if not json_str:
+                raise ValueError("No JSON block found")
+
+            # 2. Try to fix common LLM mistakes (like unescaped newlines in strings)
+            # This is risky but often helps. For now, let's try direct parse first.
+            try:
+                data = json.loads(json_str)
+            except json.JSONDecodeError:
+                # If it failed, maybe there are literal newlines?
+                # This regex tries to find strings and escape their newlines
+                fixed_json = re.sub(r'":\s*"(.*?)"(?=\s*[,}\n])', 
+                                    lambda m: '": "' + m.group(1).replace('\n', '\\n').replace('\r', '\\r') + '"', 
+                                    json_str, flags=re.DOTALL)
+                data = json.loads(fixed_json)
+                
             data["intent_name"] = intent_name
             data["description"] = description
             
@@ -296,6 +288,7 @@ CRITICAL: Escape all special characters properly in JSON strings.
             
         except Exception as e:
             print(f"[CodeGenerator] Failed to parse generated code: {e}")
+            # Log the response to help debugging (vocalize that it failed)
             return self._generate_fallback_code(intent_name, description, {})
     
     def _generate_fallback_code(
@@ -304,61 +297,34 @@ CRITICAL: Escape all special characters properly in JSON strings.
         description: str,
         parameters: Dict[str, Any]
     ) -> GeneratedCode:
-        """Generate basic fallback code when LLM fails"""
+        """Generate basic fallback code when LLM fails. Must be VALID Python."""
         
-        # Convert intent_name to enum format
         intent_enum = intent_name.upper()
+        patterns = [f"r'{intent_name.replace('_', ' ')}'"]
         
-        # Basic pattern
-        patterns = [f"r\"{intent_name.replace('_', ' ')}\\s+(.+)\""]
+        # VALID Python module (no top-level indentation)
+        executor_method = f'''"""{intent_name} Extension - Fallback"""
+from typing import Dict, Any
+
+class {intent_name.title().replace('_', '')}Handler:
+    def execute(self, command) -> Dict[str, Any]:
+        return {{"success": False, "message": "Extension generation failed. Please edit this file to fix."}}
+
+def get_handler():
+    return {intent_name.title().replace('_', '')}Handler()
+'''
         
-        # Basic parameter extraction
-        param_extraction = f"""
-        if intent == Intent.{intent_enum}:
-            # Extract parameters from match
-            params = {{"description": match.group(1).strip()}}
-            return params
-        """
-        
-        # Basic executor method
-        executor_method = f"""
-    def execute(self, command: Command) -> Dict[str, Any]:
-        \"\"\"Execute {intent_name} command\"\"\"
-        try:
-            # TODO: Implement {description}
-            return {{
-                "success": False,
-                "message": "Functionality not yet implemented",
-                "action": "error"
-            }}
-        except Exception as e:
-            return {{
-                "success": False,
-                "message": f"Error: {{str(e)}}",
-                "action": "error"
-            }}
-        """
-        
-        # Basic validation
-        validation = f"""
-    def validate(self, command: Command):
-        \"\"\"Validate {intent_name} command\"\"\"
-        if command.intent.value == "{intent_name}":
-            return ValidationResult(
-                is_valid=True,
-                safety_level=SafetyLevel.SAFE,
-                message="{description} is safe"
-            )
-        return None
-        """
+        validation_code = f'''"""{intent_name} Extension - Validation Fallback"""
+def get_validator():
+    return None
+'''
         
         return GeneratedCode({
             "intent_name": intent_name,
             "intent_enum": intent_enum,
             "patterns": patterns,
-            "parameter_extraction": param_extraction,
             "executor_method": executor_method,
-            "validation": validation,
+            "validation": validation_code,
             "description": description
         })
 

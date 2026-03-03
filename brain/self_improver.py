@@ -137,8 +137,14 @@ Say 'yes' to proceed or 'no' to cancel.
                 js_handler = self.code_generator.generate_js_handler(
                     understanding.intent, understanding.suggested_implementation, understanding.parameters or {}
                 )
-                # Need dummy patterns for creator
-                generated_code = type('Obj', (), {'executor_method': '', 'validation': '', 'patterns': []})()
+                # Use a safe intent name if LLM missed it
+                intent_enum = understanding.intent.upper() if understanding.intent else "UNKNOWN_SKILL"
+                generated_code = type('Obj', (), {
+                    'executor_method': '', 
+                    'validation': '', 
+                    'patterns': [f"r'{understanding.intent}'"],
+                    'intent_enum': intent_enum
+                })()
             else:
                 # Standard Python
                 generated_code = self.code_generator.generate_intent_handler(
@@ -148,9 +154,10 @@ Say 'yes' to proceed or 'no' to cancel.
                 )
 
             if not generated_code and not js_handler:
+                print(f"[SelfImprover] ✗ ALL generation attempts failed for: {understanding.intent}")
                 return {
                     "success": False,
-                    "message": "❌ **Generation Failed**",
+                    "message": "❌ **Generation Failed** (I couldn't write the code correctly after multiple attempts. This usually happens with complex logic. Try asking for a simpler version first.)",
                     "action": "error"
                 }
 
@@ -175,7 +182,7 @@ Say 'yes' to proceed or 'no' to cancel.
             if not actual_intent:
                 return {
                     "success": False,
-                    "message": "Failed to create extension",
+                    "message": f"❌ **Creation Failed**: The extension folder or files could not be initialized.",
                     "action": "error"
                 }
             
@@ -210,64 +217,98 @@ Say 'yes' to proceed or 'no' to cancel.
             # Step 4: Execute the command
             print(f"[SelfImprover] [4/4] Executing command...")
             
-            # ── Step 4: Execute the command with Self-Healing ────────────────
-            print(f"[SelfImprover] [4/4] Executing command (with self-healing)...")
+            # ── Step 4: Execute & Self-Heal (3 Retries) ──────────────────────
+            print(f"[SelfImprover] [4/4] Executing command with 3-retry self-healing...")
             
-            # Mock Command object compatible with ExtensionLoader.execute_extension
-            class Command:
-                def __init__(self, i, p):
+            # Mock Command object compatible with ExtensionLoader.execute
+            class MockCommand:
+                def __init__(self, i, p, raw):
                     self.intent = type('Int', (), {'value': i})()
                     self.parameters = p
+                    self.raw_text = raw
+                    self.llm_response = ""
 
-            cmd = Command(final_intent, understanding.parameters)
+            cmd = MockCommand(final_intent, understanding.parameters, user_command)
             
-            # Execute with retry logic for healing
-            try:
-                result = self.extension_loader.execute(cmd, None)
-                
-                # If it failed with a Python error (and it's a python extension), try to fix it
-                if not result.get("success") and "language" in metadata and metadata["language"] == "python":
-                    error_msg = result.get("message", "")
-                    # Check if it looks like a code error
-                    if any(x in error_msg for x in ["NameError", "TypeError", "AttributeError", "SyntaxError", "ImportError"]):
-                        print(f"[SelfImprover] 🛠 Runtime error detected. Attempting self-healing...")
+            max_healing_tries = 3
+            last_result = {"success": False, "message": "Initial state"}
+            
+            for attempt in range(max_healing_tries):
+                print(f"[SelfImprover] Execution attempt {attempt + 1}/{max_healing_tries}...")
+                try:
+                    # Clear any cached module to ensure we load the latest fixed version
+                    self.extension_loader.reload_extension(final_intent)
+                    last_result = self.extension_loader.execute(cmd, None)
+                    
+                    if last_result.get("success"):
+                        print(f"[SelfImprover] ✓ Success on attempt {attempt + 1}!")
+                        break
+                    
+                    # If it failed, check if it's a code error we can fix
+                    error_msg = last_result.get("message", "")
+                    error_detail = last_result.get("error_detail", "") or error_msg
+                    
+                    if any(x in error_detail for x in ["NameError", "TypeError", "AttributeError", "SyntaxError", "ImportError", "ModuleNotFoundError"]):
+                        if attempt < max_healing_tries - 1:
+                            print(f"[SelfImprover] 🛠 Runtime error detected. Attempting self-healing fix...")
+                            handler_path = self.extension_loader.extensions_dir / final_intent / "handler.py"
+                            if handler_path.exists():
+                                old_code = handler_path.read_text(encoding="utf-8")
+                                fixed_code = self.code_generator.fix_handler(final_intent, old_code, error_detail)
+                                if fixed_code and fixed_code != old_code:
+                                    self.extension_creator.rewrite_handler(final_intent, fixed_code)
+                                    continue # Try again
+                        else:
+                            print(f"[SelfImprover] ✗ Max retries reached.")
+                    else:
+                        # Probably a logic error or environment issue (like WiFi off), don't retry code fix
+                        break
+
+                except Exception as e:
+                    import traceback
+                    error_detail = traceback.format_exc()
+                    print(f"[SelfImprover] Execution crash: {e}")
+                    last_result = {"success": False, "message": str(e), "error_detail": error_detail}
+                    if attempt < max_healing_tries - 1:
+                        # Attempt to fix the crash
                         handler_path = self.extension_loader.extensions_dir / final_intent / "handler.py"
                         if handler_path.exists():
                             old_code = handler_path.read_text(encoding="utf-8")
-                            fixed_code = self.code_generator.fix_handler(final_intent, old_code, error_msg)
-                            if fixed_code and fixed_code != old_code:
-                                if self.extension_creator.rewrite_handler(final_intent, fixed_code):
-                                    self.extension_loader.reload_extension(final_intent)
-                                    print(f"[SelfImprover] 🩹 Fixed code applied. Retrying...")
-                                    result = self.extension_loader.execute(cmd, None)
+                            fixed_code = self.code_generator.fix_handler(final_intent, old_code, error_detail)
+                            if fixed_code:
+                                self.extension_creator.rewrite_handler(final_intent, fixed_code)
+                                continue
 
-                # Add enhanced success message
-                if result.get("success"):
-                    result["message"] = (
-                        f"🎉 **Extension '{final_intent}' is now active!**\n\n"
-                        f"Your command has been executed successfully.\n\n"
-                        f"**Result:**\n{result.get('message', '')}\n\n"
-                        f"💡 You can use this capability anytime now - no restart needed!"
-                    )
-                else:
-                    # Extension loaded but execution failed
-                    result["message"] = (
-                        f"✅ Extension '{final_intent}' was created and loaded successfully.\n\n"
-                        f"⚠️ However, execution failed:\n{result.get('message', 'Unknown error')}\n\n"
-                        f"The extension is installed and can be debugged in the Extensions tab or directly in `brain/extensions/{final_intent}/`"
-                    )
+            # ── Final Response Formatting ────────────────────────────────────
+            if last_result.get("success"):
+                last_result["message"] = (
+                    f"🎉 **Extension '{final_intent}' is now active and working!**\n\n"
+                    f"{last_result.get('message', 'Execution successful.')}\n\n"
+                    f"💡 This capability is now permanently part of my skills."
+                )
+            else:
+                # Provide diagnostic report
+                handler_rel_path = f"brain/extensions/{final_intent}/handler.py"
+                last_result["message"] = (
+                    f"⚠️ **Extension Created, but encountered a flaw.**\n\n"
+                    f"I tried to fix it automatically 3 times, but it still has an issue:\n"
+                    f"```\n{last_result.get('message', 'Unknown error')}\n```\n\n"
+                    f"**How to solve it:**\n"
+                    f"1. Open the [Extensions Tab] and click **'Edit'** on `{final_intent}`.\n"
+                    f"2. Check the code in `{handler_rel_path}`.\n"
+                    f"3. You can ask me to 'Fix my {final_intent} extension' by pasting the error or describing what's wrong."
+                )
 
-                return result
-
-            except Exception as e:
-                print(f"[SelfImprover] Execution crash: {e}")
-                return {"success": False, "message": f"Execution failed: {e}", "action": "error"}
+            return last_result
             
         except Exception as e:
-            print(f"[SelfImprover] ✗ Error during improvement: {e}")
+            import traceback
+            err_detail = traceback.format_exc()
+            print(f"[SelfImprover] ✗ Error during improvement: {e}\n{err_detail}")
             return {
                 "success": False,
-                "message": f"Self-improvement failed: {str(e)}",
+                "message": f"❌ **Self-improvement failed**: {str(e)}",
+                "error_detail": err_detail,
                 "action": "error"
             }
     

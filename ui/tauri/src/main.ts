@@ -236,7 +236,6 @@ function setupNavigation() {
     };
   }
 
-  setupModal();
 
   const normalizeBtn = document.getElementById("btn-normalize");
   if (normalizeBtn) {
@@ -363,7 +362,6 @@ function initExtensions() {
     if (!currentEditingIntent) return;
     const output = document.getElementById("console-output");
     const status = document.getElementById("editor-status");
-    const btn = document.getElementById("btn-editor-run") as HTMLButtonElement;
 
     if (output) {
       output.innerText = "Running...";
@@ -458,6 +456,10 @@ function renderExtensions(extensions: any[]) {
               Launch UI
             </button>
           ` : ''}
+          <button class="btn-danger btn-sm" onclick="deleteExtension('${ext.intent}')">
+            <i data-lucide="trash-2"></i>
+            Delete
+          </button>
         </div>
       </div>
     `).join("");
@@ -474,6 +476,20 @@ async function toggleExtension(intent: string) {
   if (res && res.success) {
     showToast(res.message, "success");
     fetchExtensions();
+  }
+}
+
+async function deleteExtension(intent: string) {
+  if (!confirm(`Are you sure you want to delete the extension '${intent}'? This action cannot be undone.`)) {
+    return;
+  }
+  
+  const res = await apiRequest(`/extensions/${intent}`, { method: "DELETE" });
+  if (res && res.success) {
+    showToast(res.message, "success");
+    fetchExtensions();
+  } else {
+    showToast(res?.message || "Deletion failed", "error");
   }
 }
 
@@ -514,6 +530,7 @@ function openExtensionUI(intent: string) {
 (window as any).openExtensionEditor = openExtensionEditor;
 (window as any).openExtensionUI = openExtensionUI;
 (window as any).fetchExtensions = fetchExtensions;
+(window as any).deleteExtension = deleteExtension;
 
 async function normalizeSystem() {
   const btn = document.getElementById("btn-normalize") as HTMLButtonElement;
@@ -596,30 +613,6 @@ function showResultModal(title: string, message: string, icon: string, detailsHt
   modal.classList.add("active");
 }
 
-function setupModal() {
-  const modal = document.getElementById("security-modal");
-  const detailsBtn = document.querySelector(".upgrade-btn") as HTMLButtonElement;
-  const closeBtn = document.getElementById("close-modal");
-  const okBtn = document.getElementById("modal-ok");
-
-  if (!modal || !detailsBtn || !closeBtn || !okBtn) return;
-
-  const show = () => modal.classList.add("active");
-  const hide = () => modal.classList.remove("active");
-
-  detailsBtn.onclick = (e) => {
-    e.preventDefault();
-    show();
-  };
-
-  closeBtn.onclick = hide;
-  okBtn.onclick = hide;
-
-  // Close on outside click
-  modal.onclick = (e) => {
-    if (e.target === modal) hide();
-  };
-}
 
 function switchView(viewId: string) {
   // Update active nav state
@@ -1545,6 +1538,10 @@ function renderUI(data: any) {
   else if (activeSection === "section-guardian") renderGuardianAlerts(data);
   else if (activeSection === "section-analytics") renderAnalytics(data);
   else if (activeSection === "section-startup") renderStartupApps(data);
+  else if (activeSection === "section-apps") {
+    const q = (document.getElementById("apps-search-input") as HTMLInputElement)?.value.toLowerCase() || "";
+    renderApps(allApps, q);
+  }
 
   // Learning Mode Banner
   const learningBanner = document.getElementById("learning-mode-indicator");
@@ -2020,6 +2017,7 @@ if (document.getElementById("section-settings")?.classList.contains("active")) {
 ========================= */
 let allApps: any[] = [];
 let appsRefreshBound = false;
+let appSortMode = localStorage.getItem("fluffy_apps_sort_mode") || "name";
 
 async function fetchApps(forceRefresh = false) {
   const loader = document.getElementById("apps-loading-indicator");
@@ -2029,6 +2027,17 @@ async function fetchApps(forceRefresh = false) {
 
   if (!appsRefreshBound) {
     document.getElementById("btn-refresh-apps")?.addEventListener("click", () => fetchApps(true));
+    
+    const sortSelect = document.getElementById("apps-sort-mode") as HTMLSelectElement;
+    if (sortSelect) {
+      sortSelect.value = appSortMode;
+      sortSelect.onchange = () => {
+        appSortMode = sortSelect.value;
+        localStorage.setItem("fluffy_apps_sort_mode", appSortMode);
+        renderApps(allApps);
+      };
+    }
+    
     appsRefreshBound = true;
   }
 
@@ -2064,7 +2073,32 @@ function renderApps(apps: any[] | null = null, filter: string = "") {
   const grid = document.getElementById("apps-grid");
   if (!grid) return;
 
-  const list = apps || allApps;
+  const list = [...(apps || allApps)];
+  
+  // Apply Sorting
+  if (appSortMode === "name") {
+    list.sort((a, b) => a.name.localeCompare(b.name));
+  } else if (appSortMode === "size") {
+    list.sort((a, b) => (b.size_kb || 0) - (a.size_kb || 0));
+  } else if (appSortMode === "active") {
+    const runningProcesses = lastData?.system?.processes?.top_ram || [];
+    const isAppRunning = (app: any) => {
+      if (!app.exe_path) return false;
+      const exeName = app.exe_path.split(/[\\/]/).pop()?.toLowerCase();
+      return runningProcesses.some((p: any) => {
+        const procName = p.name.toLowerCase();
+        return procName === exeName || procName === exeName?.replace(".exe", "");
+      });
+    };
+    list.sort((a, b) => {
+      const aRunning = isAppRunning(a);
+      const bRunning = isAppRunning(b);
+      if (aRunning && !bRunning) return -1;
+      if (!aRunning && bRunning) return 1;
+      return a.name.localeCompare(b.name);
+    });
+  }
+
   grid.innerHTML = "";
 
   const filtered = list.filter(app =>
@@ -2095,12 +2129,16 @@ function renderApps(apps: any[] | null = null, filter: string = "") {
     // Only show launch button if we have a valid exe_path
     const showLaunch = !!app.exe_path;
 
-    // Check if app is running
+    // Check if app is running and capture PID
     const runningProcesses = lastData?.system?.processes?.top_ram || [];
-    const isRunning = app.exe_path && runningProcesses.some((p: any) => {
+    const runningProc = app.exe_path ? runningProcesses.find((p: any) => {
       const exeName = app.exe_path.split(/[\\/]/).pop()?.toLowerCase();
-      return p.name.toLowerCase() === exeName || p.name.toLowerCase() === exeName?.replace(".exe", "");
-    });
+      const procName = p.name.toLowerCase();
+      return procName === exeName || procName === exeName?.replace(".exe", "");
+    }) : null;
+    
+    const isRunning = !!runningProc;
+    const runningPid = runningProc ? runningProc.pid : null;
 
     card.innerHTML = `
       <div class="app-card-header">
@@ -2120,6 +2158,11 @@ function renderApps(apps: any[] | null = null, filter: string = "") {
           <i data-lucide="info"></i>
           <span>Version: ${app.version}</span>
         </div>
+        ${app.size_kb ? `
+        <div class="meta-item">
+          <i data-lucide="database"></i>
+          <span>Size: ${(app.size_kb / 1024).toFixed(1)} MB</span>
+        </div>` : ''}
         ${app.install_location ? `
         <div class="meta-item">
           <i data-lucide="folder"></i>
@@ -2127,10 +2170,14 @@ function renderApps(apps: any[] | null = null, filter: string = "") {
         </div>` : ''}
       </div>
       <div class="app-actions">
-        ${showLaunch ? `
+        ${isRunning ? `
+        <button class="btn-app-action btn-kill" data-pid="${runningPid}">
+          <i data-lucide="power"></i> Close
+        </button>` : (showLaunch ? `
         <button class="btn-app-action btn-launch" data-app-id="${app.id}">
           <i data-lucide="play"></i> Launch
-        </button>` : '<span></span>'}
+        </button>` : '<span></span>')}
+        
         <button class="btn-app-action btn-uninstall" data-app-id="${app.id}">
           <i data-lucide="trash-2"></i> Uninstall
         </button>
@@ -2138,6 +2185,7 @@ function renderApps(apps: any[] | null = null, filter: string = "") {
     `;
 
     const launchBtn = card.querySelector(".btn-launch") as HTMLButtonElement;
+    const killBtn = card.querySelector(".btn-kill") as HTMLButtonElement;
     const uninstallBtn = card.querySelector(".btn-uninstall") as HTMLButtonElement;
 
     if (launchBtn) {
@@ -2154,6 +2202,14 @@ function renderApps(apps: any[] | null = null, filter: string = "") {
         if (res && res.ok) showToast(`Launching ${app.name}...`, "success");
         else showToast(`Failed to launch ${app.name}`, "error");
         launchBtn.disabled = false;
+      };
+    }
+
+    if (killBtn && runningPid) {
+      killBtn.onclick = async () => {
+        if (confirm(`Are you sure you want to close ${app.name}?`)) {
+          await killProcess(runningPid, "tree", true);
+        }
       };
     }
 

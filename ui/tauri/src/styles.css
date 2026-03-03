@@ -288,38 +288,6 @@ body.light-mode .nav-item.active {
   gap: 20px;
 }
 
-.upgrade-card {
-  background: #1d1e26;
-  padding: 16px;
-  border-radius: 12px;
-  font-size: 13px;
-  border: 1px solid #2d2e3a;
-}
-
-.upgrade-btn {
-  width: 100%;
-  background: rgba(255, 255, 255, 0.05);
-  border: 1px solid var(--border);
-  color: var(--text-primary);
-  padding: 10px;
-  border-radius: 8px;
-  margin-top: 10px;
-  cursor: pointer;
-  font-weight: 600;
-  transition: var(--transition);
-}
-
-body.light-mode .upgrade-btn {
-  background: white;
-  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.05);
-}
-
-.upgrade-btn:hover {
-  background: var(--accent);
-  border-color: var(--accent);
-  color: white;
-  box-shadow: 0 4px 12px rgba(139, 92, 246, 0.3);
-}
 
 .theme-toggle {
   display: flex;
@@ -687,10 +655,17 @@ body.light-mode .upgrade-btn {
 }
 
 .header-actions {
-  display: flex;
+  display: flex !important;
+  flex-direction: row !important;
   align-items: center;
   gap: 16px;
-  flex-wrap: wrap;
+  flex-wrap: nowrap;
+}
+
+.header-actions .search-box,
+.header-actions .inline-search {
+  flex: 1;
+  min-width: 200px;
 }
 
 .card-icon {
@@ -2022,31 +1997,63 @@ input:checked + .slider {
   border: 1px solid var(--border);
 }
 
-/* Sort Selector */
+/* Sort Selector - Industrial Ready UI */
 .sort-selector {
   display: flex;
   align-items: center;
-  gap: 8px;
-  background: var(--bg-card);
-  padding: 4px 12px;
-  border-radius: 8px;
+  gap: 12px;
+  background: var(--overlay-subtle);
+  padding: 6px 14px;
+  border-radius: var(--radius-lg);
   border: 1px solid var(--border);
+  transition: var(--transition);
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+  box-shadow: 0 2px 10px rgba(0, 0, 0, 0.2);
+}
+
+.sort-selector:hover {
+  border-color: var(--accent-light);
+  box-shadow: 0 4px 15px rgba(0, 0, 0, 0.3);
 }
 
 .sort-selector label {
-  font-size: 12px;
+  font-size: 11px;
   color: var(--text-secondary);
-  font-weight: 500;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  opacity: 0.8;
 }
 
 .sort-selector select {
   background: transparent;
   border: none;
   color: var(--text-primary);
-  font-size: 12px;
+  font-size: 13px;
   font-weight: 600;
   outline: none;
   cursor: pointer;
+  padding: 2px 24px 2px 4px;
+  border-radius: 4px;
+  transition: var(--transition);
+  appearance: none;
+  -webkit-appearance: none;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16' viewBox='0 0 24 24' fill='none' stroke='%2394a3b8' stroke-width='2.5' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m6 9 6 6 6-6'/%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-position: right center;
+}
+
+.sort-selector select:focus {
+  color: var(--accent);
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16' viewBox='0 0 24 24' fill='none' stroke='%238b5cf6' stroke-width='2.5' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m6 9 6 6 6-6'/%3E%3C/svg%3E");
+}
+
+.sort-selector select option {
+  background: var(--bg-card);
+  color: var(--text-primary);
+  padding: 12px;
+  font-weight: 500;
 }
 
 /* Light Mode Overrides */
@@ -3101,6 +3108,17 @@ input:checked + .slider:before {
   color: white;
 }
 
+.btn-kill {
+  background: rgba(239, 68, 68, 0.1);
+  color: var(--error);
+  border: 1px solid transparent;
+}
+
+.btn-kill:hover {
+  background: var(--error);
+  color: white;
+}
+
 .btn-uninstall {
   background: var(--overlay-subtle);
   color: var(--text-secondary);
@@ -3175,7 +3193,6 @@ input:checked + .slider:before {
 
   .logo-text,
   .nav-text,
-  .upgrade-card,
   .sidebar-footer span:not(.switch) {
     display: none;
     opacity: 0;
@@ -3253,8 +3270,7 @@ input:checked + .slider:before {
     box-shadow: 0 -2px 10px var(--accent-light);
   }
 
-  .sidebar-footer,
-  .upgrade-card {
+  .sidebar-footer {
     display: none;
   }
 
