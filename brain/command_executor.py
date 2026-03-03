@@ -22,14 +22,8 @@ class CommandExecutor:
     
     def execute(self, command: Command, validation: ValidationResult) -> Dict[str, Any]:
         """
-        Execute a validated command
-        
-        Args:
-            command: Parsed command
-            validation: Validation result
-            
-        Returns:
-            Execution result with success status and message
+        Execute a validated command.
+        Handles both Intent enum values and plain string intents from the new parser.
         """
         if not validation.is_valid:
             return {
@@ -37,13 +31,11 @@ class CommandExecutor:
                 "message": validation.message,
                 "action": "blocked"
             }
-        
+
         if validation.safety_level == SafetyLevel.NEEDS_CONFIRMATION:
-            # Save to session memory so user can confirm
             try:
                 from brain.memory.session_memory import get_session_memory
                 session = get_session_memory()
-                # Mark validation as confirmed so it can execute
                 confirmed_validation = ValidationResult(
                     is_valid=True,
                     safety_level=SafetyLevel.SAFE,
@@ -52,75 +44,61 @@ class CommandExecutor:
                 session.set_pending_validation(command, confirmed_validation)
             except Exception as e:
                 print(f"[CommandExecutor] Failed to save pending validation: {e}\n")
-                return {
+            return {
                 "success": False,
                 "message": validation.message,
                 "action": "needs_confirmation",
                 "command": command.raw_text
             }
-        
-        # Execute based on intent
-        if command.intent == Intent.OPEN_APP:
+
+        # Normalize intent to string for comparison (handles both enum and string)
+        intent_value = command.intent.value if hasattr(command.intent, 'value') else str(command.intent)
+
+        # Execute based on normalized intent string
+        if intent_value == "open_app":
             return self._execute_open_app(command)
-        
-        elif command.intent == Intent.CLOSE_APP:
+        elif intent_value == "close_app":
             return self._execute_close_app(command)
-        
-        elif command.intent == Intent.CREATE_FILE:
+        elif intent_value == "create_file":
             return self._execute_create_file(command)
-        
-        elif command.intent == Intent.CREATE_FOLDER:
+        elif intent_value == "create_folder":
             return self._execute_create_folder(command)
-        
-        elif command.intent == Intent.DELETE_FILE:
+        elif intent_value == "delete_file":
             return self._execute_delete_file(command)
-        
-        elif command.intent == Intent.DELETE_FOLDER:
+        elif intent_value == "delete_folder":
             return self._execute_delete_folder(command)
-        
-        elif command.intent == Intent.SYSTEM_COMMAND:
+        elif intent_value == "system_command":
             return self._execute_system_command(command)
-        
-        elif command.intent == Intent.KILL_PROCESS:
+        elif intent_value == "kill_process":
             return self._execute_kill_process(command)
-        
-        elif command.intent == Intent.TYPE_TEXT:
+        elif intent_value == "type_text":
             return self._type_text(
                 command.parameters.get("text", ""),
                 command.parameters.get("target_app")
             )
-        
-        elif command.intent == Intent.CREATE_PROJECT:
+        elif intent_value == "create_project":
             return self._execute_create_project(command)
-        
-        elif command.intent == Intent.RESEARCH:
+        elif intent_value == "research":
             return self._execute_research(command)
-        
-        elif command.intent == Intent.HELP:
+        elif intent_value == "help":
             return self._execute_help(command)
-        
-        elif command.intent == Intent.CHAT:
+        elif intent_value == "chat":
             return self._execute_chat(command)
-        
-        # Try extensions (plugin system)
+        elif intent_value == "web_search":
+            return self._execute_web_search(command)
+        elif intent_value == "write_code":
+            return self._execute_write_code(command)
+
+        # Try extensions (plugin system) — normalized intent_value
         try:
             from brain.extension_loader import get_extension_loader
             loader = get_extension_loader()
-            
-            if loader.has_extension(command.intent.value):
+            if loader.has_extension(intent_value):
                 return loader.execute(command, validation)
         except Exception as e:
             print(f"[CommandExecutor] Extension error: {e}")
-        
-        # Unknown command - try self-improvement
-        if command.intent == Intent.UNKNOWN:
-            try:
-                from brain.self_improver import get_self_improver
-                improver = get_self_improver()
-                return improver.handle_unknown_command(command.original_text)
-            except Exception as e:
-                print(f"[CommandExecutor] Self-improver error: {e}")
-        
+
+        # Unknown / unrecognized — fallback
         return {
             "success": False,
             "message": "I didn't quite get that. Type 'help' to see what I can do!",
@@ -196,6 +174,104 @@ class CommandExecutor:
                     "action": "error"
                 }
     
+    def _execute_write_code(self, command: Command) -> Dict[str, Any]:
+        """Generate code with LLM, save to a new folder, and open it."""
+        import sys, os
+        from pathlib import Path
+
+        params = command.parameters
+        language    = params.get("language", "python").strip().lower()
+        description = params.get("description") or command.raw_text
+        filename    = params.get("filename", "").strip()
+        location    = params.get("location", "").strip()
+
+        # ── Extension map ────────────────────────────────────────────────
+        ext_map = {
+            "python": "py", "py": "py",
+            "javascript": "js", "js": "js",
+            "typescript": "ts", "ts": "ts",
+            "html": "html", "css": "css",
+            "java": "java", "c": "c", "cpp": "cpp",
+            "bash": "sh", "shell": "sh",
+            "ruby": "rb", "go": "go",
+        }
+        ext = ext_map.get(language, "txt")
+
+        # ── Resolve location ─────────────────────────────────────────────
+        if not location or location.lower() in ("desktop", "the desktop"):
+            base_path = Path.home() / "Desktop"
+        elif location.lower() in ("documents", "the documents"):
+            base_path = Path.home() / "Documents"
+        else:
+            base_path = Path(location)
+
+        # ── Auto-name the file and folder ────────────────────────────────
+        import re
+        safe_desc = re.sub(r'[^\w\s-]', '', description).strip()
+        safe_desc = re.sub(r'[-\s]+', '_', safe_desc)[:40]
+        folder_name = safe_desc or f"{language}_program"
+        if not filename:
+            filename = f"{folder_name}.{ext}"
+
+        save_dir = base_path / folder_name
+        save_dir.mkdir(parents=True, exist_ok=True)
+        full_path = save_dir / filename
+
+        # ── Generate code with LLM ───────────────────────────────────────
+        try:
+            _ai_src = str(Path(__file__).parent.parent / "ai" / "src")
+            if _ai_src not in sys.path:
+                sys.path.insert(0, _ai_src)
+            from llm_client import get_client
+            client = get_client()
+
+            prompt_messages = [
+                {"role": "system", "content": (
+                    f"You are an expert {language} programmer. Write clean, well-commented code. "
+                    "Output ONLY the code — no explanation, no markdown fences."
+                )},
+                {"role": "user", "content": f"Write a {language} program that: {description}"}
+            ]
+            stream = client.chat(prompt_messages)
+            code = "".join(str(c) for c in stream).strip()
+
+            # Strip accidental markdown fences from the LLM output
+            if code.startswith("```"):
+                lines = code.splitlines()
+                code = "\n".join(lines[1:-1] if lines[-1].strip() == "```" else lines[1:])
+
+        except Exception as e:
+            return {
+                "success": False,
+                "message": f"Failed to generate code: {e}",
+                "action": "error"
+            }
+
+        # ── Save the file ────────────────────────────────────────────────
+        try:
+            with open(full_path, "w", encoding="utf-8") as f:
+                f.write(code)
+        except Exception as e:
+            return {
+                "success": False,
+                "message": f"Failed to save file: {e}",
+                "action": "error"
+            }
+
+        # ── Auto-open the folder ─────────────────────────────────────────
+        try:
+            platform_utils.open_folder(str(save_dir))
+        except Exception as e:
+            print(f"[Executor] Failed to open folder: {e}")
+
+        return {
+            "success": True,
+            "message": f"Wrote {language} program '{filename}' → {save_dir.name}/",
+            "action": "code_written",
+            "path": str(full_path),
+            "folder": str(save_dir)
+        }
+
     def _execute_create_file(self, command: Command) -> Dict[str, Any]:
         """Execute file creation"""
         import os

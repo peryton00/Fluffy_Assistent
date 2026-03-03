@@ -30,10 +30,15 @@ def _empty_memory() -> dict:
                 "pinned_processes": {"value": []}
             }
         },
+        "behavior": {
+            "frequent_intents": {},
+            "learned_apps": [],
+            "command_history": []
+        },
         "metadata": {
             "created_at": datetime.utcnow().isoformat() + "Z",
             "last_updated": datetime.utcnow().isoformat() + "Z",
-            "version": "1.0"
+            "version": "2.0"
         }
     }
 
@@ -261,7 +266,40 @@ def get_minimal_memory_for_llm() -> dict:
     return {k: v for k, v in result.items() if v}
 
 
-# Initialize memory on module load
+# ── Behavioral Memory ─────────────────────────────────────────────────────────
+
+def record_command(intent: str, success: bool) -> None:
+    """Record a command execution to behavioral memory (keeps last 100)."""
+    memory = load_memory()
+
+    behavior = memory.setdefault("behavior", {"frequent_intents": {}, "learned_apps": [], "command_history": []})
+
+    # Update frequency counter
+    frequent = behavior.setdefault("frequent_intents", {})
+    frequent[intent] = frequent.get(intent, 0) + 1
+
+    # Append to history (trim to last 100)
+    history = behavior.setdefault("command_history", [])
+    history.append({
+        "intent": intent,
+        "success": success,
+        "timestamp": datetime.utcnow().isoformat() + "Z"
+    })
+    behavior["command_history"] = history[-100:]
+
+    save_memory(memory)
+
+
+def get_frequent_intents(top_n: int = 5) -> list:
+    """Get the most frequently used intents for smarter defaults."""
+    memory = load_memory()
+    frequent = memory.get("behavior", {}).get("frequent_intents", {})
+    sorted_intents = sorted(frequent.items(), key=lambda x: x[1], reverse=True)
+    return [intent for intent, _ in sorted_intents[:top_n]]
+
+
+# ── Initialize memory on module load ──────────────────────────────────────────
+
 def _initialize():
     """Initialize memory file if it doesn't exist"""
     if not MEMORY_PATH.exists():

@@ -629,6 +629,8 @@ def chat_message():
                 history.save_message(session_id, {
                     "role": "assistant",
                     "content": response_text,
+                    "type": "fluffy", # Legacy support
+                    "text": response_text, # Legacy support
                     "timestamp": __import__('time').time(),
                     "command_result": result["result"]
                 })
@@ -663,6 +665,8 @@ def chat_message():
                 history.save_message(session_id, {
                     "role": "assistant",
                     "content": full_response,
+                    "type": "fluffy", # Legacy support
+                    "text": full_response, # Legacy support
                     "timestamp": __import__('time').time()
                 })
             

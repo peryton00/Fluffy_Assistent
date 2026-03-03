@@ -2068,14 +2068,16 @@ interface ChatMessage {
 const chatState = {
   messages: [] as ChatMessage[],
   isListening: false,
+  isProcessing: false, // Concurrency guard
   inputMode: 'text' as 'text' | 'voice',
   sttPollInterval: null as any,
   currentSessionId: null as string | null
 };
 
-function addChatMessage(text: string, type: 'user' | 'fluffy' | 'system', metadata: Partial<ChatMessage> = {}) {
+function addChatMessage(text: string, type: 'user' | 'fluffy' | 'system', metadata: Partial<ChatMessage> = {}, persist: boolean = true) {
+  // Use a more robust unique ID (timestamp + random suffix) to avoid rendering collisions
   const message: ChatMessage = {
-    id: Date.now(),
+    id: Date.now() + Math.floor(Math.random() * 1000),
     text,
     type,
     timestamp: new Date(),
@@ -2086,8 +2088,8 @@ function addChatMessage(text: string, type: 'user' | 'fluffy' | 'system', metada
   renderChatMessage(message);
   scrollChatToBottom();
 
-  // Auto-save to backend if we have a session
-  if (chatState.currentSessionId && type !== 'system') {
+  // Auto-save to backend if we have a session and persist is true
+  if (chatState.currentSessionId && type !== 'system' && persist) {
     saveChatMessageToBackend(message);
   }
 }
@@ -2216,14 +2218,18 @@ async function sendTextCommand() {
   const input = document.getElementById('chat-input') as HTMLInputElement;
   if (!input) return;
 
+  if (chatState.isProcessing) return;
+
   const text = input.value.trim();
   if (!text) return;
 
+  chatState.isProcessing = true; // Block further inputs until done
+  
   // Interrupt any ongoing speech when user sends a new command
   stopTTS();
 
-  // Add user message
-  addChatMessage(text, 'user', { inputMode: 'text' });
+  // Add user message (Don't persist here, the backend /chat/message endpoint handles it)
+  addChatMessage(text, 'user', { inputMode: 'text' }, false);
   input.value = '';
 
   // Show processing
@@ -2258,17 +2264,17 @@ async function sendTextCommand() {
         status = response.result.success ? 'success' : 'error';
       }
 
-      addChatMessage(messageText, 'fluffy', { status });
+      // Add assistant message (Don't persist here, /chat/message backend handles it)
+      addChatMessage(messageText, 'fluffy', { status }, false);
     } else {
       const errorMsg = response?.error || 'Failed to process message';
       console.error('Chat error:', errorMsg, response);
       addChatMessage(errorMsg, 'fluffy', { status: 'error' });
     }
   } catch (error: any) {
-    removeLastSystemMessage();
-    updateChatStatus('Ready', 'ready');
-    console.error('Chat exception:', error);
-    addChatMessage(`Error: ${error.message}`, 'fluffy', { status: 'error' });
+    addChatMessage(`Error: ${error.message}`, 'fluffy', { status: 'error' }, false);
+  } finally {
+    chatState.isProcessing = false; // Release lock
   }
 }
 
@@ -2327,7 +2333,7 @@ async function startVoiceInput() {
         chatState.isListening = false;
         updateChatStatus('Ready', 'ready');
 
-        // Auto-send
+        // Auto-send (will not persist locally because sendTextCommand has persist=false)
         await sendTextCommand();
       }
     }, 500);
@@ -2450,8 +2456,9 @@ async function initializeChatSession() {
         chatState.currentSessionId = createResponse.session_id;
         console.log('Created new chat session:', createResponse.session_id);
 
-        // Add welcome message for new session
-        addChatMessage("Welcome back Boss! Fluffy is standing by. How can I help you today?", 'fluffy');
+        // Add welcome message for new session (persist: false because backend doesn't store empty/init sessions usually, 
+        // or we don't want to double-save what might already be on disk if the backend had a different idea)
+        addChatMessage("Welcome back Boss! Fluffy is standing by. How can I help you today?", 'fluffy', {}, false);
       }
     }
   } catch (error) {
@@ -2475,11 +2482,18 @@ async function loadChatSession(sessionId: string) {
 
       // Load messages from session
       for (const msg of response.session.messages) {
+        // Handle both formats: backend (role/content) and frontend (type/text)
+        const text = msg.content || msg.text || "";
+        const type = msg.role === 'assistant' ? 'fluffy' : (msg.role === 'user' ? 'user' : (msg.type || 'system'));
+
+        // Skip if text is empty (can happen if there's a malformed message)
+        if (!text && msg.type !== 'system') continue;
+
         const message: ChatMessage = {
           id: Date.now() + Math.random(),
-          text: msg.text,
-          type: msg.type,
-          timestamp: new Date(msg.timestamp),
+          text: text,
+          type: type as 'user' | 'fluffy' | 'system',
+          timestamp: new Date(msg.timestamp * 1000 || msg.timestamp), // Handle unix timestamp or ISO
           status: msg.status,
           inputMode: msg.inputMode
         };

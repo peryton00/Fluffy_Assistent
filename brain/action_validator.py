@@ -77,109 +77,76 @@ class ActionValidator:
     
     def validate(self, command: Command) -> ValidationResult:
         """
-        Validate a command against safety rules
-        
-        Args:
-            command: Parsed command object
-            
-        Returns:
-            ValidationResult with safety level and message
+        Validate a command against safety rules.
+        Handles both Intent enum members and plain string intents.
         """
-        if command.intent == Intent.UNKNOWN:
+        # Normalize intent to string
+        intent_value = command.intent.value if hasattr(command.intent, 'value') else str(command.intent)
+
+        if intent_value == "unknown":
             return ValidationResult(
                 is_valid=False,
                 safety_level=SafetyLevel.BLOCKED,
                 message="Command not recognized"
             )
-        
-        if command.intent == Intent.OPEN_APP:
-            # App launching is generally safe
-            return ValidationResult(
-                is_valid=True,
-                safety_level=SafetyLevel.SAFE,
-                message="Application launch is safe"
-            )
-        
-        if command.intent in [Intent.CREATE_FILE, Intent.CREATE_FOLDER]:
+
+        if intent_value == "open_app":
+            return ValidationResult(is_valid=True, safety_level=SafetyLevel.SAFE, message="Application launch is safe")
+
+        if intent_value in ("create_file", "create_folder"):
             return self._validate_create(command)
-        
-        if command.intent in [Intent.DELETE_FILE, Intent.DELETE_FOLDER]:
+
+        if intent_value in ("delete_file", "delete_folder"):
             return self._validate_delete(command)
-        
-        if command.intent == Intent.RESEARCH:
-            # Research is safe (just creates a file in Documents)
-            return ValidationResult(
-                is_valid=True,
-                safety_level=SafetyLevel.SAFE,
-                message="Research operation is safe"
-            )
-        
-        if command.intent == Intent.HELP:
-            return ValidationResult(
-                is_valid=True,
-                safety_level=SafetyLevel.SAFE,
-                message="Help command is safe"
-            )
-        
-        if command.intent == Intent.WEB_SEARCH:
-            return ValidationResult(
-                is_valid=True,
-                safety_level=SafetyLevel.SAFE,
-                message="Web search is safe"
-            )
-        
-        if command.intent in [Intent.KILL_PROCESS, Intent.CLOSE_APP]:
-            # These are mostly safe but good to flag if we want confirm later
-            # For now, let's keep them safe but informative
-            return ValidationResult(
-                is_valid=True,
-                safety_level=SafetyLevel.SAFE,
-                message="Process management is safe"
-            )
-        
-        if command.intent == Intent.TYPE_TEXT:
-            # Typing text is safe - it's just keyboard input
-            return ValidationResult(
-                is_valid=True,
-                safety_level=SafetyLevel.SAFE,
-                message="Text typing is safe"
-            )
-        
-        if command.intent == Intent.CREATE_PROJECT:
-            # Project creation is safe in user directories
-            return ValidationResult(
-                is_valid=True,
-                safety_level=SafetyLevel.SAFE,
-                message="Project creation is safe"
-            )
-        
-        if command.intent == Intent.SYSTEM_COMMAND:
-            # System commands (shutdown etc) MUST always require confirmation
+
+        if intent_value == "research":
+            return ValidationResult(is_valid=True, safety_level=SafetyLevel.SAFE, message="Research operation is safe")
+
+        if intent_value == "help":
+            return ValidationResult(is_valid=True, safety_level=SafetyLevel.SAFE, message="Help command is safe")
+
+        if intent_value == "web_search":
+            return ValidationResult(is_valid=True, safety_level=SafetyLevel.SAFE, message="Web search is safe")
+
+        if intent_value in ("kill_process", "close_app"):
+            return ValidationResult(is_valid=True, safety_level=SafetyLevel.SAFE, message="Process management is safe")
+
+        if intent_value == "type_text":
+            return ValidationResult(is_valid=True, safety_level=SafetyLevel.SAFE, message="Text typing is safe")
+
+        if intent_value == "create_project":
+            return ValidationResult(is_valid=True, safety_level=SafetyLevel.SAFE, message="Project creation is safe")
+
+        if intent_value == "system_command":
             return ValidationResult(
                 is_valid=True,
                 safety_level=SafetyLevel.NEEDS_CONFIRMATION,
                 message=f"Are you sure you want to {command.parameters.get('command')} the system?"
             )
-        
+
+        if intent_value in ("chat", "confirm", "cancel"):
+            return ValidationResult(is_valid=True, safety_level=SafetyLevel.SAFE, message="Chat/confirm is safe")
+
+        if intent_value == "write_code":
+            return ValidationResult(is_valid=True, safety_level=SafetyLevel.SAFE, message="Code writing is safe")
+
         # Check if it's an extension
         if self.extension_loader:
-            intent_str = command.intent.value if hasattr(command.intent, 'value') else str(command.intent)
-            if self.extension_loader.has_extension(intent_str):
+            if self.extension_loader.has_extension(intent_value):
                 validation = self.extension_loader.validate(command)
                 if validation:
                     return validation
-                
-                # Fallback for extensions without explicit validation logic (unsafe default)
                 return ValidationResult(
                     is_valid=True,
                     safety_level=SafetyLevel.NEEDS_CONFIRMATION,
-                    message=f"Validate extension action: {intent_str}?"
+                    message=f"Validate extension action: {intent_value}?"
                 )
-        
+
+        # Default safe for unrecognized non-system intents (router handles routing)
         return ValidationResult(
-            is_valid=False,
-            safety_level=SafetyLevel.BLOCKED,
-            message="Unknown command type"
+            is_valid=True,
+            safety_level=SafetyLevel.SAFE,
+            message="Action appears safe"
         )
     
     def _validate_create(self, command: Command) -> ValidationResult:

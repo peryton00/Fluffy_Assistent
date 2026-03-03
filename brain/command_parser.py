@@ -41,7 +41,8 @@ class Command:
         self.raw_text = raw_text
     
     def __repr__(self):
-        return f"Command(intent={self.intent.value}, params={self.parameters})"
+        intent_str = self.intent.value if hasattr(self.intent, 'value') else str(self.intent)
+        return f"Command(intent={intent_str}, params={self.parameters})"
 
 
 class CommandParser:

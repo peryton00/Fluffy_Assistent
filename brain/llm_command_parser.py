@@ -1,23 +1,25 @@
 """
-LLM-Based Command Parser
-Understands any user command using LLM and converts to structured format
+LLM-Based Command Parser — Two-Stage Architecture
+Stage 1 (Fast Classify): Cheap LLM call, returns: command | chat | new_feature | confirmation
+Stage 2 (Extract Params): Targeted LLM call only when Stage 1 returns "command"
 """
 
 import sys
 import json
 from pathlib import Path
-from typing import Dict, Any, Optional
-from enum import Enum
+from typing import Dict, Any, Optional, List
 
-# Add ai module to path
-sys.path.insert(0, str(Path(__file__).parent.parent / "ai" / "src"))
+# Add ai module to path so we can import from ai/src directly
+_ai_src = str(Path(__file__).parent.parent / "ai" / "src")
+if _ai_src not in sys.path:
+    sys.path.insert(0, _ai_src)
 
 from command_parser import Intent
 
 
 class CommandUnderstanding:
-    """Result of LLM command understanding matching MarkX schema"""
-    
+    """Result of LLM command understanding."""
+
     def __init__(self, data: Dict[str, Any]):
         self.intent = data.get("intent", "chat")
         self.parameters = data.get("parameters", {})
@@ -25,19 +27,14 @@ class CommandUnderstanding:
         self.text = data.get("text", "")
         self.memory_update = data.get("memory_update")
         self.original_text = data.get("original_text", "")
-        
-        # Self-improvement fields
         self.requires_new_functionality = data.get("requires_new_functionality", False)
         self.suggested_implementation = data.get("suggested_implementation", "")
-        
-        # Multi-step command support
         self.steps = data.get("steps", [])
-    
+
     def __repr__(self):
         return f"CommandUnderstanding(intent={self.intent}, clarify={self.needs_clarification})"
-    
+
     def to_dict(self) -> Dict[str, Any]:
-        """Convert to plain dictionary for JSON serialization"""
         return {
             "intent": self.intent,
             "parameters": self.parameters,
@@ -47,347 +44,360 @@ class CommandUnderstanding:
             "original_text": self.original_text,
             "requires_new_functionality": self.requires_new_functionality,
             "suggested_implementation": self.suggested_implementation,
-            "steps": self.steps
+            "steps": self.steps,
         }
-    
+
     @classmethod
-    def from_dict(cls, data: Dict[str, Any]) -> 'CommandUnderstanding':
-        """Create from a dictionary"""
+    def from_dict(cls, data: Dict[str, Any]) -> "CommandUnderstanding":
         return cls(data)
 
 
 class LLMCommandParser:
-    """Parse commands using LLM for maximum flexibility (MarkX style)"""
-    
+    """Parse commands using a two-stage LLM approach for maximum reliability."""
+
     def __init__(self):
-        self.llm = None  # Lazy load
-        self.extension_loader = None  # Lazy load
+        self.llm_client = None   # Direct LLM client (avoids circular import with LLMService)
+        self.extension_loader = None
+        self.system_prompt = (
+            "You are Fluffy, a helpful and friendly AI assistant created by peryton. "
+            "Be concise, clear, and warm."
+        )
         self._load_available_intents()
-    
+
     def _get_extension_loader(self):
-        """Lazy load extension loader"""
         if self.extension_loader is None:
             try:
                 from extension_loader import get_extension_loader
                 self.extension_loader = get_extension_loader()
             except Exception as e:
                 print(f"[LLMCommandParser] Failed to load ExtensionLoader: {e}")
-                self.extension_loader = None
         return self.extension_loader
-    
+
     def _load_available_intents(self):
-        """Load list of currently available intents with descriptions and parameters"""
-        # Define detailed intent schema for LLM
+        """Load intent schema for Stage 2 extraction."""
         self.intent_schema = {
-            "open_app": {
-                "description": "Open an application or program",
-                "parameters": {"app_name": "Name of the app to launch"}
-            },
-            "close_app": {
-                "description": "Close a running application",
-                "parameters": {"app_name": "Name of the app to close"}
-            },
-            "create_file": {
-                "description": "Create a new file with optional content",
-                "parameters": {
-                    "name": "Filename (e.g., 'notes.txt')",
-                    "location": "Folder name (e.g., 'Desktop', 'Downloads', 'Documents')",
-                    "content": "Optional text to write into the file"
-                }
-            },
-            "create_folder": {
-                "description": "Create a new folder/directory",
-                "parameters": {
-                    "name": "Folder name",
-                    "location": "Parent folder (e.g., 'Desktop')"
-                }
-            },
-            "delete_file": {
-                "description": "Delete a file",
-                "parameters": {
-                    "name": "Filename",
-                    "location": "Folder containing the file"
-                }
-            },
-            "web_search": {
-                "description": "Search the web for information",
-                "parameters": {"query": "Search query text"}
-            },
-            "system_command": {
-                "description": "System actions like shutdown or restart",
-                "parameters": {"command": "shutdown, restart, etc."}
-            },
-            "type_text": {
-                "description": "Type text into the currently active window",
-                "parameters": {"text": "The text to type"}
-            }
+            "open_app": {"description": "Open an application or program", "parameters": {"app_name": "Name of the app"}},
+            "close_app": {"description": "Close a running application", "parameters": {"app_name": "Name of the app"}},
+            "create_file": {"description": "Create a new file with optional content", "parameters": {"name": "Filename", "location": "Folder", "content": "Optional content"}},
+            "create_folder": {"description": "Create a new folder/directory", "parameters": {"name": "Folder name", "location": "Parent folder"}},
+            "delete_file": {"description": "Delete a file", "parameters": {"name": "Filename", "location": "Folder"}},
+            "delete_folder": {"description": "Delete a folder", "parameters": {"name": "Folder name", "location": "Parent folder"}},
+            "web_search": {"description": "Search the web for information", "parameters": {"query": "Search query"}},
+            "system_command": {"description": "System actions: shutdown, restart, lock", "parameters": {"command": "shutdown|restart|lock"}},
+            "type_text": {"description": "Type text into active window", "parameters": {"text": "Text to type"}},
+            "kill_process": {"description": "Kill a running process by name", "parameters": {"process_name": "Process name"}},
+            "create_project": {"description": "Create a code/website project", "parameters": {"project_type": "Type", "description": "Description", "location": "Folder"}},
+            "research": {"description": "Research a topic and save notes", "parameters": {"topic": "Topic to research"}},
+            "help": {"description": "Show available commands", "parameters": {}},
+            "write_code": {"description": "Write code/script/program and SAVE it to a file (not just explain it in chat)", "parameters": {"language": "Programming language (python, js, etc)", "description": "What the code should do", "filename": "Optional filename", "location": "Optional save folder"}},
         }
         self.available_intents = list(self.intent_schema.keys())
-        
+
         # Load extension intents
         loader = self._get_extension_loader()
         if loader:
             for ext in loader.list_extensions():
-                self.intent_schema[ext['intent']] = {
-                    "description": ext['description'],
-                    "parameters": ext.get('metadata', {}).get('parameters', {}),
-                    "patterns": ext.get('patterns', [])
+                self.intent_schema[ext["intent"]] = {
+                    "description": ext["description"],
+                    "parameters": ext.get("metadata", {}).get("parameters", {}),
+                    "patterns": ext.get("patterns", []),
                 }
-                self.available_intents.append(ext['intent'])
-    
-    def _get_llm(self):
-        """Lazy load LLM service"""
-        if self.llm is None:
+                if ext["intent"] not in self.available_intents:
+                    self.available_intents.append(ext["intent"])
+
+    def _get_llm_client(self):
+        """Get the raw LLM client (avoids circular import with LLMService)."""
+        if self.llm_client is None:
             try:
-                from llm_service import get_service
-                self.llm = get_service()
+                from llm_client import get_client
+                self.llm_client = get_client()
             except Exception as e:
-                print(f"[LLMCommandParser] Failed to load LLM service: {e}")
-                self.llm = None
-        return self.llm
-    
-    def parse_with_llm(self, user_command: str) -> CommandUnderstanding:
+                print(f"[LLMCommandParser] Failed to load LLM client: {e}")
+        return self.llm_client
+
+    def _query_llm(self, prompt: str) -> str:
+        """Run a single prompt through the LLM and return the full response string."""
+        client = self._get_llm_client()
+        if not client:
+            return ""
+        messages = [
+            {"role": "system", "content": self.system_prompt},
+            {"role": "user", "content": prompt}
+        ]
+        try:
+            stream = client.chat(messages)
+            chunks = [str(c) for c in stream]
+            return "".join(chunks)
+        except Exception as e:
+            print(f"[LLMCommandParser] LLM query error: {e}")
+            return ""
+
+    def parse_with_llm(
+        self,
+        user_command: str,
+        context: Optional[Dict[str, Any]] = None
+    ) -> CommandUnderstanding:
         """
-        Use LLM to understand command and convert to structured format
-        Uses MarkX approach: Unified intent, response text, and memory update.
+        Two-stage parsing:
+          Stage 1 — Fast classify: command | chat | new_feature | confirmation
+          Stage 2 — Parameter extraction (only for "command")
         """
-        
-        # Hot-reload any new extensions from registry
+        # Hot-reload extensions
         loader = self._get_extension_loader()
         if loader:
-            newly_loaded = loader.refresh_extensions()
-            if newly_loaded:
-                print(f"[LLMCommandParser] Hot-loaded extensions: {newly_loaded}")
-                # Reload intents to include new extensions
+            newly = loader.refresh_extensions()
+            if newly:
                 self._load_available_intents()
-        
-        llm = self._get_llm()
-        if not llm:
-            return CommandUnderstanding({
-                "intent": "chat",
-                "text": "I'm having trouble connecting to my brain right now.",
-                "original_text": user_command
-            })
-        
-        # Get memory context
-        try:
-            from memory.long_term_memory import get_minimal_memory_for_llm
-            memory_block = get_minimal_memory_for_llm()
-        except:
-            memory_block = {}
-            
-        # Build prompt for LLM
-        prompt = self._build_understanding_prompt(user_command, memory_block)
-        
-        try:
-            # Query LLM
-            result = llm.query_llm(prompt)
-            
-            # Collect streaming response
-            full_response = ""
-            for chunk in result["stream"]:
-                full_response += chunk
-            
-            # Parse JSON response
-            understanding = self._parse_llm_response(full_response, user_command)
-            
-            return understanding
-            
-        except Exception as e:
-            print(f"[LLMCommandParser] Error: {e}")
-            return CommandUnderstanding({
-                "intent": "chat",
-                "text": f"I encountered an error while thinking: {e}",
-                "original_text": user_command
-            })
-    
-    def _build_understanding_prompt(self, user_command: str, memory_block: dict) -> str:
-        """Build prompt for LLM to understand command using MarkX style"""
-        
-        memory_str = json.dumps(memory_block, indent=2) if memory_block else "No memory available"
-        
-        prompt = f"""You are Fluffy, a friendly and optimized AI Computer Assistant.
-You were created by peryton specifically to learn things on your own and expand your capabilities through self-improvement.
-User Command: "{user_command}"
 
-Known user memory:
+        client = self._get_llm_client()
+        if not client:
+            return CommandUnderstanding({"intent": "chat", "text": "I can't connect to my brain right now.", "original_text": user_command})
+
+        # Build context parts
+        context = context or {}
+        user_profile = context.get("user_profile", {})
+        conversation_turns = context.get("conversation_turns", [])
+
+        # ── Stage 1: Fast Classification ─────────────────────────────────
+        classification = self._stage1_classify(user_command, conversation_turns, user_profile)
+        print(f"[LLMCommandParser] Stage 1 classification: {classification}")
+
+        if classification == "chat":
+            return self._stage_chat_response(client, user_command, conversation_turns, user_profile)
+
+        if classification == "new_feature":
+            return self._stage_new_feature(user_command)
+
+        if classification == "confirmation":
+            return CommandUnderstanding({"intent": "chat", "text": "", "original_text": user_command})
+
+        # classification == "command"
+        # ── Stage 2: Parameter Extraction ────────────────────────────────
+        return self._stage2_extract(user_command, conversation_turns, user_profile)
+
+    # ── Stage 1 ───────────────────────────────────────────────────────────────
+
+    def _stage1_classify(self, user_command: str, turns: list, user_profile: dict) -> str:
+        """
+        Fast, cheap classification. Returns one of:
+          command | chat | new_feature | confirmation
+        """
+        recent_turns = ""
+        if turns:
+            last2 = turns[-2:] if len(turns) >= 2 else turns
+            lines = [f"{'User' if t['role'] == 'user' else 'Fluffy'}: {t['content']}" for t in last2]
+            recent_turns = "\n".join(lines)
+
+        available_str = ", ".join(self.available_intents)
+
+        prompt = f"""You are a routing classifier for an AI assistant called Fluffy.
+Classify the message into exactly ONE of these categories:
+- command       → User wants Fluffy to PERFORM an action on the computer:
+                   open/close apps, create/delete files or folders, search the web,
+                   system commands (shutdown/restart), type text, create a project,
+                   or WRITE AND SAVE a program/script/code to a file.
+- chat          → User wants information, explanation, or general knowledge
+                   (e.g. "how does X work?", "what is X?", "explain X", "tell me about X")
+- new_feature   → User wants Fluffy to do something it clearly cannot do yet
+- confirmation  → User is saying yes/no to a previous question from Fluffy
+
+IMPORTANT: Requests like "write a program to X", "write a script to X", "write code for X",
+"create a python file that X", "make a program that X" are COMMANDS (they must create and save files).
+NOT chat.
+
+Available system commands: {available_str}
+
+Recent conversation (last 2 turns):
+{recent_turns or "(none)"}
+
+User's message: "{user_command}"
+
+Reply with ONLY one word: command, chat, new_feature, or confirmation."""
+
+        try:
+            response = self._query_llm(prompt).strip().lower()
+            first_word = response.split()[0] if response.split() else "chat"
+            if first_word in ("command", "chat", "new_feature", "confirmation"):
+                return first_word
+            return "chat"
+        except Exception as e:
+            print(f"[LLMCommandParser] Stage 1 error: {e}")
+            return "chat"
+
+    # ── Stage 2 ───────────────────────────────────────────────────────────────
+
+    def _stage2_extract(self, user_command: str, turns: list, user_profile: dict) -> CommandUnderstanding:
+        """
+        Targeted parameter extraction. Only called when Stage 1 returns "command".
+        """
+        memory_str = json.dumps(user_profile, indent=2) if user_profile else "None"
+        schema_str = json.dumps(self.intent_schema, indent=2)
+
+        recent_turns = ""
+        if turns:
+            last2 = turns[-2:] if len(turns) >= 2 else turns
+            lines = [f"{'User' if t['role'] == 'user' else 'Fluffy'}: {t['content']}" for t in last2]
+            recent_turns = "\n".join(lines)
+
+        prompt = f"""You are Fluffy, an AI Computer Assistant. Extract the intent and parameters from the user's command.
+
+User memory context:
 {memory_str}
 
-Available Intents and Parameters:
-{json.dumps(self.intent_schema, indent=2)}
+Recent conversation:
+{recent_turns or "(none)"}
 
-Your task:
-1. If the user gives a MULTI-STEP command (e.g., "open notepad and write hello world"):
-   - Set intent: "multi_step"
-   - Set steps: array of step objects, each with intent, parameters, and text
-   - Set text: Overall response describing what you'll do
-2. If the user asks for a feature you don't have:
-   - Set intent: a_descriptive_underscored_name
-   - Set requires_new_functionality: true
-   - Set suggested_implementation: Technical description
-3. If it's just chat, set intent: "chat" and provide a warm 1-2 sentence response.
-4. If the user shares something personal, include it in 'memory_update'.
+User command: "{user_command}"
 
-IMPORTANT: When the user requests new functionality you don't have:
-- Generate a descriptive intent name using underscores (e.g., "scan_wifi", "compress_folder", "take_screenshot")
-- DO NOT use "unknown" as the intent name
-- The intent name should clearly describe the action
+Available intents and their parameters:
+{schema_str}
 
-Return ONLY a JSON object (no markdown, no blocks):
+Rules:
+- If it is a MULTI-STEP command (e.g., "open notepad and type hello"), use intent "multi_step" with a "steps" array.
+- Each step in "steps" must have: intent, parameters, text.
+- Use "text" for a friendly human response describing what you will do.
+- If command needs a feature NOT in the list above, set requires_new_functionality to true.
+- Set memory_update only if user shared personal info (name, location, preferences).
+
+Return ONLY valid JSON (no markdown, no extra text):
 {{
-    "intent": "specific_intent_name (e.g., 'open_app', 'scan_wifi', 'chat')",
-    "parameters": {{}},
-    "steps": [],
-    "needs_clarification": false,
-    "requires_new_functionality": false,
-    "suggested_implementation": "",
-    "text": "Your direct response to the user",
-    "memory_update": {{
-        "user_profile": {{
-            "identity": {{}},
-            "preferences": {{}}
-        }}
-    }}
-}}
+  "intent": "intent_name",
+  "parameters": {{}},
+  "steps": [],
+  "needs_clarification": false,
+  "requires_new_functionality": false,
+  "suggested_implementation": "",
+  "text": "Friendly response describing what you will do",
+  "memory_update": null
+}}"""
 
-Examples:
-User: "open chrome"
-{{
-    "intent": "open_app",
-    "parameters": {{"app_name": "chrome"}},
-    "needs_clarification": false,
-    "text": "Sure! I'm opening Chrome for you now."
-}}
-
-User: "open notepad and write hello world program in it"
-{{
-    "intent": "multi_step",
-    "steps": [
-        {{
-            "intent": "open_app",
-            "parameters": {{"app_name": "notepad"}},
-            "text": "Opening Notepad..."
-        }},
-        {{
-            "intent": "type_text",
-            "parameters": {{"text": "print('Hello, World!')"}},
-            "text": "Writing the hello world program..."
-        }}
-    ],
-    "text": "Sure! I'll open Notepad and write a hello world program for you."
-}}
-
-User: "my name is Alex"
-{{
-    "intent": "chat",
-    "parameters": {{}},
-    "needs_clarification": false,
-    "text": "Nice to meet you, Alex! I've remembered your name.",
-    "memory_update": {{
-        "user_profile": {{
-            "identity": {{"name": "Alex"}}
-        }}
-    }}
-}}
-
-User: "I want a feature to compress folders"
-{{
-    "intent": "unknown",
-    "requires_new_functionality": true,
-    "suggested_implementation": "A tool that uses the zipfile library to compress a given path.",
-    "text": "I don't have that yet, but I can learn it!"
-}}
-
-Now analyze: "{user_command}"
-"""
-        return prompt
-    
-    def _parse_llm_response(self, response: str, original_text: str) -> CommandUnderstanding:
-        """Parse LLM's JSON response using MarkX's safe_json_parse logic"""
-        
         try:
-            text = response.strip()
-            # Clean markdown if present
-            if "```json" in text:
-                start = text.index("```json") + 7
-                end = text.index("```", start)
-                text = text[start:end].strip()
-            elif "```" in text:
-                start = text.index("```") + 3
-                end = text.index("```", start)
-                text = text[start:end].strip()
-            
-            # Find JSON boundaries
-            if "{" in text:
-                start = text.index("{")
-                end = text.rindex("}") + 1
-                json_str = text[start:end]
-                data = json.loads(json_str)
-            else:
-                # Fallback if no JSON found
-                data = {
-                    "intent": "chat",
-                    "text": response.strip(),
-                    "needs_clarification": False
-                }
-            
-            data["original_text"] = original_text
-            return CommandUnderstanding(data)
-            
+            full_response = self._query_llm(prompt)
+            return self._parse_json_response(full_response, user_command)
         except Exception as e:
-            print(f"[LLMCommandParser] Failed to parse: {e}")
+            print(f"[LLMCommandParser] Stage 2 error: {e}")
+            return CommandUnderstanding({"intent": "chat", "text": f"I had trouble understanding that: {e}", "original_text": user_command})
+
+    # ── Chat Stage ────────────────────────────────────────────────────────────
+
+    def _stage_chat_response(self, client, user_command: str, turns: list, user_profile: dict) -> CommandUnderstanding:
+        """Generate a full LLM chat response using the raw client directly."""
+        memory_str = json.dumps(user_profile, indent=2) if user_profile else "None"
+
+        messages = [
+            {"role": "system", "content": (
+                "You are Fluffy, a helpful and friendly AI assistant created by peryton. "
+                "Be concise, clear, and warm. "
+                "You have the ability to control the user's computer, but right now just answer helpfully."
+            )}
+        ]
+
+        if user_profile:
+            messages.append({"role": "system", "content": f"User context: {memory_str}"})
+
+        for turn in turns[-6:]:
+            messages.append({"role": turn["role"], "content": turn["content"]})
+
+        messages.append({"role": "user", "content": user_command})
+
+        try:
+            stream = client.chat(messages)
+            # Collect stream safely — handles both string chunks and generator items
+            text = "".join(str(c) for c in stream)
+
+            # Check for memory update hints
+            memory_update = None
+            if any(kw in user_command.lower() for kw in ["my name is", "i am", "i live in", "i prefer"]):
+                memory_update = self._extract_memory_update(user_command)
+
             return CommandUnderstanding({
                 "intent": "chat",
-                "text": response.strip() if response else "I didn't quite get that.",
-                "original_text": original_text
+                "text": text,
+                "original_text": user_command,
+                "memory_update": memory_update
             })
-    
+        except Exception as e:
+            print(f"[LLMCommandParser] Chat stage error: {e}")
+            return CommandUnderstanding({"intent": "chat", "text": "I'm having trouble thinking right now.", "original_text": user_command})
+
+    def _stage_new_feature(self, user_command: str) -> CommandUnderstanding:
+        """Handle new feature requests via a short extraction."""
+        prompt = f"""Fluffy needs new functionality. Extract a snake_case intent name and implementation description.
+
+User request: "{user_command}"
+
+Return ONLY valid JSON:
+{{
+  "intent": "descriptive_snake_case_intent",
+  "requires_new_functionality": true,
+  "suggested_implementation": "Technical description of how to implement this as a Python function",
+  "text": "I don't have that yet, but I can learn it! Would you like me to create this feature? (Say yes to proceed)",
+  "parameters": {{}}
+}}"""
+        try:
+            full = self._query_llm(prompt)
+            understanding = self._parse_json_response(full, user_command)
+            understanding.requires_new_functionality = True
+            return understanding
+        except Exception as e:
+            return CommandUnderstanding({
+                "intent": "new_feature",
+                "requires_new_functionality": True,
+                "text": "I don't have that capability yet, but I can learn it! Say 'yes' if you'd like me to add it.",
+                "original_text": user_command
+            })
+
+    def _extract_memory_update(self, user_command: str) -> Optional[dict]:
+        """Extract memory update from a chat message if it contains personal info."""
+        prompt = f"""Extract personal information from this message as a JSON memory_update, or return null.
+
+Message: "{user_command}"
+
+Return ONLY JSON like: {{"user_profile": {{"identity": {{"name": {{"value": "Alex"}}}}}}}}
+Or return: null"""
+        try:
+            text = self._query_llm(prompt).strip()
+            if "{" in text:
+                return json.loads(text[text.index("{"):text.rindex("}") + 1])
+        except Exception:
+            pass
+        return None
+
+    # ── JSON Parser ───────────────────────────────────────────────────────────
+
+    def _parse_json_response(self, response: str, original_text: str) -> CommandUnderstanding:
+        """Safely parse LLM JSON response."""
+        try:
+            text = response.strip()
+            # Strip markdown code fences
+            if "```json" in text:
+                text = text[text.index("```json") + 7:text.rindex("```")].strip()
+            elif "```" in text:
+                text = text[text.index("```") + 3:text.rindex("```")].strip()
+
+            if "{" in text:
+                json_str = text[text.index("{"):text.rindex("}") + 1]
+                data = json.loads(json_str)
+            else:
+                data = {"intent": "chat", "text": response.strip(), "needs_clarification": False}
+
+            data["original_text"] = original_text
+            return CommandUnderstanding(data)
+        except Exception as e:
+            print(f"[LLMCommandParser] JSON parse error: {e}")
+            return CommandUnderstanding({"intent": "chat", "text": response.strip() or "I didn't quite get that.", "original_text": original_text})
+
     def is_capability_available(self, intent: str) -> bool:
-        """Check if Fluffy currently has this capability"""
+        """Check if Fluffy currently has this capability."""
         return intent in self.available_intents
 
 
-# Global singleton
-_llm_parser = None
+# ── Singleton ─────────────────────────────────────────────────────────────────
+_llm_parser: Optional[LLMCommandParser] = None
+
 
 def get_llm_parser() -> LLMCommandParser:
-    """Get or create the global LLMCommandParser instance"""
     global _llm_parser
     if _llm_parser is None:
         _llm_parser = LLMCommandParser()
     return _llm_parser
-
-
-# Test function
-if __name__ == "__main__":
-    print("=" * 70)
-    print("LLM Command Parser - Test")
-    print("=" * 70)
-    
-    parser = get_llm_parser()
-    
-    test_commands = [
-        "open chrome",  # Existing functionality
-        "download the latest Python installer",  # New functionality
-        "compress my Documents folder to a zip file",  # New functionality
-        "create animated website for Sarah",  # Existing functionality
-    ]
-    
-    for cmd in test_commands:
-        print(f"\n{'='*70}")
-        print(f"Command: '{cmd}'")
-        print("=" * 70)
-        
-        understanding = parser.parse_with_llm(cmd)
-        
-        print(f"Intent: {understanding.intent}")
-        print(f"Parameters: {understanding.parameters}")
-        print(f"Requires New Functionality: {understanding.requires_new_functionality}")
-        print(f"Confidence: {understanding.confidence}")
-        
-        if understanding.requires_new_functionality:
-            print(f"Suggested Implementation: {understanding.suggested_implementation}")
-    
-    print("\n" + "=" * 70)
-    print("TEST COMPLETE")
-    print("=" * 70)
