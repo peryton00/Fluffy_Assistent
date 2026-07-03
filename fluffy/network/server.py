@@ -162,7 +162,7 @@ class _DataHandler(BaseHTTPRequestHandler):
 class AvailabilityServer:
     """Simple HTTP server that exposes system monitoring data on the LAN."""
 
-    def __init__(self, port: int = 8765, host: str = "0.0.0.0"):
+    def __init__(self, port: int = 9000, host: str = "0.0.0.0"):
         self.port = port
         self._port = port  # alias for status endpoint
         self.host = host
@@ -228,7 +228,7 @@ class AvailabilityServer:
 _availability_server: Optional[AvailabilityServer] = None
 
 
-def get_availability_server(port: int = 8765) -> AvailabilityServer:
+def get_availability_server(port: int = 9000) -> AvailabilityServer:
     """Get or create the global AvailabilityServer instance."""
     global _availability_server
     if _availability_server is None:

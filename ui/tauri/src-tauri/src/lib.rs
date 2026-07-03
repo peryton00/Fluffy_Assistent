@@ -8,6 +8,37 @@ struct AppState {
     python_child: Mutex<Option<Child>>,
 }
 
+fn get_env_path() -> Option<std::path::PathBuf> {
+    let paths = vec![
+        std::path::PathBuf::from(".env"),
+        std::path::PathBuf::from("../../.env"),
+        std::path::PathBuf::from("../../../.env"),
+    ];
+    for p in paths {
+        if p.exists() {
+            return Some(p);
+        }
+    }
+    None
+}
+
+fn read_env_key(key: &str) -> Option<String> {
+    let env_path = get_env_path()?;
+    let content = std::fs::read_to_string(env_path).ok()?;
+    for line in content.lines() {
+        let line = line.trim();
+        if line.starts_with('#') || line.is_empty() {
+            continue;
+        }
+        if let Some((k, v)) = line.split_once('=') {
+            if k.trim() == key {
+                return Some(v.trim().to_string());
+            }
+        }
+    }
+    None
+}
+
 async fn notify_python_ui_state(connected: bool) {
     let url = if connected {
         "http://127.0.0.1:5123/ui_connected"
@@ -15,8 +46,13 @@ async fn notify_python_ui_state(connected: bool) {
         "http://127.0.0.1:5123/ui_disconnected"
     };
 
+    let token = read_env_key("FLUFFY_TOKEN").unwrap_or_else(|| "fluffy_dev_token".to_string());
+
     let client = reqwest::Client::new();
-    let _ = client.post(url).send().await;
+    let _ = client.post(url)
+        .header("X-Fluffy-Token", token)
+        .send()
+        .await;
 }
 
 async fn notify_core_ui_state(active: bool) {
@@ -51,47 +87,55 @@ pub fn run() {
         })
         .setup(|app| {
             println!("[Fluffy Rust] Current working directory: {:?}", std::env::current_dir().unwrap_or_default());
-            // 1. Start Python backend
-            let python_script = "../../../brain/listener.py";
-            println!("[Fluffy Rust] Attempting to spawn Python backend with script: {}", python_script);
+            
+            // Check if running in production (installed) mode
+            let is_production = std::path::Path::new(".env").exists();
 
-            // 1a. Build list of potential python executables
-            let mut python_commands = Vec::new();
+            if is_production {
+                println!("[Fluffy Rust] Running in production mode. Skipping Python backend spawn (managed by Core).");
+            } else {
+                // 1. Start Python backend
+                let python_script = "../../../brain/listener.py";
+                println!("[Fluffy Rust] Attempting to spawn Python backend with script: {}", python_script);
 
-            // Try local venv first (Industry standard)
-            let venv_python = "../../../.venv/Scripts/python.exe";
-            if std::path::Path::new(venv_python).exists() {
-                println!("[Fluffy Rust] Found local virtual environment at: {}", venv_python);
-                python_commands.push(venv_python.to_string());
-            }
+                // 1a. Build list of potential python executables
+                let mut python_commands = Vec::new();
 
-            // Fallback to system commands
-            python_commands.extend(vec!["python".to_string(), "python3".to_string(), "py".to_string()]);
+                // Try local venv first (Industry standard)
+                let venv_python = "../../../.venv/Scripts/python.exe";
+                if std::path::Path::new(venv_python).exists() {
+                    println!("[Fluffy Rust] Found local virtual environment at: {}", venv_python);
+                    python_commands.push(venv_python.to_string());
+                }
 
-            let mut spawned = false;
-            for cmd in python_commands {
-                println!("[Fluffy Rust] Trying command: {}", cmd);
-                let child = Command::new(&cmd)
-                    .arg(python_script)
-                    .spawn();
+                // Fallback to system commands
+                python_commands.extend(vec!["python".to_string(), "python3".to_string(), "py".to_string()]);
 
-                match child {
-                    Ok(c) => {
-                        if let Ok(mut lock) = app.state::<AppState>().python_child.lock() {
-                            *lock = Some(c);
+                let mut spawned = false;
+                for cmd in python_commands {
+                    println!("[Fluffy Rust] Trying command: {}", cmd);
+                    let child = Command::new(&cmd)
+                        .arg(python_script)
+                        .spawn();
+
+                    match child {
+                        Ok(c) => {
+                            if let Ok(mut lock) = app.state::<AppState>().python_child.lock() {
+                                *lock = Some(c);
+                            }
+                            println!("[Fluffy Rust] Python backend spawned successfully using '{}'.", cmd);
+                            spawned = true;
+                            break;
                         }
-                        println!("[Fluffy Rust] Python backend spawned successfully using '{}'.", cmd);
-                        spawned = true;
-                        break;
-                    }
-                    Err(e) => {
-                        println!("[Fluffy Rust] Command '{}' failed to start: {}", cmd, e);
+                        Err(e) => {
+                            println!("[Fluffy Rust] Command '{}' failed to start: {}", cmd, e);
+                        }
                     }
                 }
-            }
 
-            if !spawned {
-                 eprintln!("[Fluffy Rust] CRITICAL: Failed to spawn Python backend with any command. Path attempted: {}", python_script);
+                if !spawned {
+                    eprintln!("[Fluffy Rust] CRITICAL: Failed to spawn Python backend with any command. Path attempted: {}", python_script);
+                }
             }
 
             // 2. Ensure main window is visible

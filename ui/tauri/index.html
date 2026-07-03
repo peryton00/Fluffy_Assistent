@@ -11,6 +11,7 @@
     <link rel="stylesheet" href="/src/ftp-styles.css" />
     <link rel="stylesheet" href="/src/network-styles.css" />
     <link rel="stylesheet" href="/src/extensions.css" />
+    <link rel="stylesheet" href="/src/terminal.css" />
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
     <link
@@ -70,6 +71,10 @@
           <a href="#" class="nav-item" id="nav-network">
             <span class="nav-icon"><i data-lucide="network"></i></span>
             <span class="nav-text">Network</span>
+          </a>
+          <a href="#" class="nav-item" id="nav-terminal">
+            <span class="nav-icon"><i data-lucide="terminal"></i></span>
+            <span class="nav-text">Terminal</span>
           </a>
           <a href="#" class="nav-item" id="nav-extensions">
             <span class="nav-icon"><i data-lucide="plug"></i></span>
@@ -989,6 +994,24 @@
               </div>
             </div>
 
+            <!-- Terminal Integration Card -->
+            <div class="network-terminal-card" style="margin-top: 1.5rem; padding-top: 1.5rem; border-top: 1px solid var(--border-color, rgba(255,255,255,0.1));">
+              <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 1rem;">
+                <div>
+                  <h4 style="margin: 0; display: flex; align-items: center; gap: 0.5rem;"><i data-lucide="terminal"></i> Fluffy Core Terminal</h4>
+                  <p class="section-desc" style="margin: 0.25rem 0 0 0; font-size: 0.85rem;">Execute reverse TCP shell commands on remote agents directly</p>
+                </div>
+                <div style="display: flex; gap: 0.75rem;">
+                  <button class="btn-primary" id="btn-open-terminal-from-net" style="padding: 0.5rem 1rem; font-size: 0.9rem; display: flex; align-items: center; gap: 0.35rem;">
+                    <i data-lucide="external-link"></i> Launch Terminal
+                  </button>
+                  <a href="http://127.0.0.1:5123/terminal/client-download" class="btn-outline btn-download" style="padding: 0.5rem 1rem; font-size: 0.9rem; display: flex; align-items: center; gap: 0.35rem;" download>
+                    <i data-lucide="download"></i> Download Client
+                  </a>
+                </div>
+              </div>
+            </div>
+
             <!-- Availability Mode Panel -->
             <div
               id="availability-panel"
@@ -1009,7 +1032,7 @@
                   <input
                     type="number"
                     id="availability-port"
-                    value="8765"
+                    value="9000"
                     min="1024"
                     max="65535"
                   />
@@ -1040,7 +1063,7 @@
                   <div class="info-row">
                     <span class="info-label">Port:</span>
                     <span class="info-value" id="availability-running-port"
-                      >8765</span
+                      >9000</span
                     >
                   </div>
                   <div class="info-row">
@@ -1092,8 +1115,8 @@
                     <input
                       type="number"
                       id="admin-port"
-                      placeholder="8765"
-                      value="8765"
+                      placeholder="9000"
+                      value="9000"
                       min="1024"
                       max="65535"
                     />
@@ -1172,6 +1195,60 @@
                   <div id="remote-processes-list" class="remote-processes-list">
                     <!-- Populated via JS -->
                   </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </section>
+
+        <!-- VIEW: TERMINAL -->
+        <section id="section-terminal" class="view-section">
+          <div class="terminal-layout card full-width" style="display: flex; flex-direction: column; height: calc(100vh - 120px); min-height: 500px; padding: 0;">
+            <div class="card-header terminal-header" style="display: flex; justify-content: space-between; align-items: center; padding: 1rem 1.5rem; border-bottom: 1px solid var(--border-color, rgba(255,255,255,0.1)); background: var(--card-bg, rgba(20,20,30,0.4)); border-radius: 12px 12px 0 0;">
+              <div class="header-left" style="display: flex; align-items: center; gap: 0.75rem;">
+                <h3 style="margin: 0; display: flex; align-items: center; gap: 0.5rem;"><i data-lucide="terminal"></i> Fluffy Core Admin Terminal</h3>
+                <span id="terminal-connection-indicator" class="status-dot offline" style="width: 10px; height: 10px; border-radius: 50%; display: inline-block;"></span>
+                <span id="terminal-connection-text" style="font-size: 0.85rem; opacity: 0.8;">Connecting WebSocket...</span>
+              </div>
+              <div class="header-right" style="display: flex; align-items: center; gap: 1.5rem;">
+                <div class="terminal-stats" style="font-size: 0.9rem; display: flex; gap: 1rem;">
+                  <span>Port: <strong id="terminal-port-text">9000</strong></span>
+                  <span>Agents: <strong id="terminal-agents-text">0</strong></span>
+                </div>
+                <button class="btn-outline" id="btn-clear-terminal" style="padding: 0.4rem 0.8rem; font-size: 0.85rem; display: flex; align-items: center; gap: 0.35rem;">
+                  <i data-lucide="trash-2" style="width: 14px; height: 14px;"></i> Clear Console
+                </button>
+              </div>
+            </div>
+            
+            <div class="terminal-body-container" style="display: flex; flex: 1; min-height: 0; background: var(--bg-color, #0f0f15);">
+              <!-- Left Sidebar: Active Agents -->
+              <aside class="terminal-agents-sidebar" style="width: 260px; border-right: 1px solid var(--border-color, rgba(255,255,255,0.1)); padding: 1.25rem; display: flex; flex-direction: column; gap: 1rem; background: rgba(0,0,0,0.15);">
+                <h4 style="margin: 0; font-size: 0.95rem; text-transform: uppercase; letter-spacing: 0.05em; opacity: 0.8;">Connected Agents</h4>
+                <div id="terminal-agents-list" class="terminal-agents-list" style="flex: 1; overflow-y: auto; display: flex; flex-direction: column; gap: 0.75rem;">
+                  <div class="empty-agents-text" style="font-size: 0.85rem; opacity: 0.5; font-style: italic; text-align: center; margin-top: 2rem;">No active agents connected.</div>
+                </div>
+                
+                <div class="sidebar-help-box" style="padding: 0.85rem; background: rgba(255,255,255,0.03); border: 1px solid rgba(255,255,255,0.06); border-radius: 8px;">
+                  <h5 style="margin: 0 0 0.5rem 0; font-size: 0.85rem;">Quick Tips</h5>
+                  <ul style="margin: 0; padding-left: 1.2rem; font-size: 0.75rem; line-height: 1.4; display: flex; flex-direction: column; gap: 0.35rem; opacity: 0.8;">
+                    <li>Type <code>help</code> to list commands.</li>
+                    <li>Type <code>use &lt;tag&gt;</code> to control a client.</li>
+                    <li>Type <code>use local</code> to go back to local.</li>
+                    <li>Type <code>sysinfo</code> or <code>ls</code> to query stats.</li>
+                  </ul>
+                </div>
+              </aside>
+
+              <!-- Main Terminal Console -->
+              <div class="terminal-console-wrapper" style="flex: 1; display: flex; flex-direction: column; min-height: 0; background: #08080c;">
+                <div id="terminal-output-console" class="terminal-output-console" style="flex: 1; overflow-y: auto; padding: 1.5rem; font-family: 'Consolas', 'Courier New', Courier, monospace; font-size: 0.9rem; line-height: 1.5; color: #e0e0e0; display: flex; flex-direction: column; gap: 0.25rem;">
+                  <!-- Realtime streaming lines go here -->
+                </div>
+                <div class="terminal-input-bar" style="display: flex; align-items: center; gap: 0.5rem; padding: 1rem 1.5rem; background: rgba(0,0,0,0.3); border-top: 1px solid var(--border-color, rgba(255,255,255,0.1)); font-family: 'Consolas', 'Courier New', Courier, monospace;">
+                  <span id="terminal-prompt-symbol" class="prompt-symbol" style="color: #64dfdf; font-weight: bold;">fluffy&gt;</span>
+                  <input type="text" id="terminal-cmd-input" placeholder="Type a command (e.g., help, sysinfo, ls)..." style="flex: 1; background: transparent; border: none; outline: none; color: #fff; font-family: inherit; font-size: 0.95rem; padding: 0.25rem 0;" autocomplete="off" />
+                  <button id="btn-send-terminal-cmd" class="btn-primary" style="padding: 0.4rem 1rem; font-size: 0.85rem; border-radius: 4px;">Send</button>
                 </div>
               </div>
             </div>

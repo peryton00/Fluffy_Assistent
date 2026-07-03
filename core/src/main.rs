@@ -1,7 +1,10 @@
+#![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
+
 mod etw;
 mod ipc;
 mod permissions;
 mod actions;
+use fluffy_core::terminal;
 
 use etw::NetworkMonitor;
 
@@ -396,18 +399,22 @@ fn read_env_key(env_path: &str, key: &str) -> Option<String> {
     None
 }
 
-fn spawn_listener() {
+fn spawn_listener(is_production: bool) {
     println!("[Fluffy Core] Spawning Brain...");
 
-    let brain_dir = "../brain";
-
-    // Resolve PYTHON_PATH from ../.env (one level up from core/)
-    let env_file = "../.env";
-
-    #[cfg(target_os = "windows")]
-    let default_python = "../.venv/Scripts/python.exe".to_string();
-    #[cfg(not(target_os = "windows"))]
-    let default_python = "../.venv/bin/python".to_string();
+    let (brain_dir, env_file, default_python) = if is_production {
+        (
+            "brain",
+            ".env",
+            "./python/python.exe".to_string()
+        )
+    } else {
+        (
+            "../brain",
+            "../.env",
+            if cfg!(target_os = "windows") { "../.venv/Scripts/python.exe".to_string() } else { "../.venv/bin/python".to_string() }
+        )
+    };
 
     let python_path = read_env_key(env_file, "PYTHON_PATH").unwrap_or_else(|| {
         println!(
@@ -419,10 +426,19 @@ fn spawn_listener() {
 
     println!("[Fluffy Core] Using Python: {}", python_path);
 
-    let res = std::process::Command::new(&python_path)
-        .args(["listener.py"])
+    let mut cmd = std::process::Command::new(&python_path);
+    cmd.args(["listener.py"])
         .current_dir(brain_dir)
-        .spawn();
+        .env("PYTHONUTF8", "1")
+        .env("PYTHONIOENCODING", "utf-8");
+
+    #[cfg(target_os = "windows")]
+    {
+        use std::os::windows::process::CommandExt;
+        cmd.creation_flags(0x08000000); // CREATE_NO_WINDOW
+    }
+
+    let res = cmd.spawn();
 
     if let Err(e) = res {
         eprintln!(
@@ -469,13 +485,33 @@ fn main() {
         let ipc = IpcServer::start(9001);
         start_command_server(9002);
 
+        // Start Fluffy Terminal services
+        let terminal_state = terminal::app_state::new_shared_state();
+
+        // 1. WebSocket Bridge (port 9003)
+        let ws_state = Arc::clone(&terminal_state);
+        tokio::spawn(async move {
+            terminal::ws_bridge::start_ws_bridge(ws_state).await;
+        });
+
+        // 2. TCP Server (port 9000 for agent connections)
+        let tcp_state = Arc::clone(&terminal_state);
+        tokio::spawn(async move {
+            terminal::net::start_server(tcp_state).await;
+        });
+
     // 🌐 Start ETW Network Monitor (Requires Admin)
     NetworkMonitor::start();
     
+    // Detect if we are running in production layout (e.g. installed app)
+    let is_production = std::path::Path::new(".env").exists();
+
     // 👂 Start Brain Listener
-    spawn_listener();
-    // 🚀 Launch UI Dashboard automatically
-    spawn_ui();
+    spawn_listener(is_production);
+    // 🚀 Launch UI Dashboard automatically (only in dev mode)
+    if !is_production {
+        spawn_ui();
+    }
 
     let running = Arc::new(AtomicBool::new(true));
     let r = running.clone();

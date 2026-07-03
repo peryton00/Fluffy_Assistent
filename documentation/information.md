@@ -151,11 +151,13 @@ All OS-specific operations are centralized in one module:
 
 ## 8. Networking & Remote Monitoring
 
-### Admin-Client Architecture
-- **Available Mode**: Machine broadcasts availability on a configurable port.
-- **Admin Mode**: Admin connects to available machines, polls their system data.
-- **Client Notifications**: Clients are notified when an admin connects and monitors them.
-- **Full Process View**: Admin sees complete process list from connected clients.
+### Admin-Client Architecture & Core Terminal
+- **Standardized LAN Port**: Nodes communicate over Port 9000 for LAN management.
+- **Reverse TCP Shell (Core Terminal)**: Admin listening terminal in Rust Core accepts connections from `fluffy-client` executables running on remote endpoints.
+- **WebSocket Bridge**: Port 9003 hosts a WebSocket endpoint allowing Tauri UI to stream interactive commands (`sysinfo`, `ls`, `cd`, `kill`) and receive real-time stdout terminal lines.
+- **Tauri Dashboard view**: Includes an active console screen, listing connected machines sidebar, prompt symbols (`fluffy>`), and a download agent button.
+- **Standalone TUI Utility**: The `terminal_for_fluffy/` crate provides a command line `ratatui` alternative (`fluffy-admin`) for local network terminal orchestration.
+- **Full Process & Security View**: Admins can fetch, filter, and run diagnostics or terminate processes on connected TCP terminals.
 
 ### FTP File Sharing
 - Built-in FTP server with secure numeric password generation.
@@ -169,11 +171,12 @@ All OS-specific operations are centralized in one module:
 
 ```text
 /
-├── core/                  # Rust Core (telemetry, IPC, commands)
+├── core/                  # Rust Core (telemetry, IPC, terminal, commands)
 │   └── src/
 │       ├── main.rs        # Entry point, system stats, spawn helpers
 │       ├── ipc/receiver.rs # KillProcess, Startup, Normalize
-│       └── etw.rs         # Network monitoring (Windows ETW)
+│       ├── etw.rs         # Network monitoring (Windows ETW)
+│       └── terminal/      # REPL, ws_bridge, client_manager, net protocol
 ├── brain/                 # Python Intelligence Layer
 │   ├── listener.py        # IPC client, main entry
 │   ├── web_api.py         # Flask API (port 5123)
@@ -183,11 +186,13 @@ All OS-specific operations are centralized in one module:
 │   ├── security_monitor.py # Behavioral threat scoring
 │   ├── guardian/          # Baseline, anomaly, chain, scorer
 │   ├── memory/            # Long-term + session memory
-│   └── extensions/        # Dynamic plugins (bluetooth, wifi)
+│   ├── extensions/        # Dynamic plugins (bluetooth, wifi)
+│   └── routes/            # Blueprint endpoints (voice, ftp, cluster, network, terminal)
 ├── ai/                    # LLM service, intent classification
 ├── voice/                 # Vosk STT + Piper TTS
-├── ui/tauri/              # Tauri frontend (TypeScript + Vite)
+├── ui/tauri/              # Tauri frontend (TypeScript + Vite, terminal.css, index.html)
 ├── fluffy/network/        # Admin-client & FTP services
+├── terminal_for_fluffy/    # Standalone TUI dashboard & client crate
 ├── services/              # Background services
 ├── setup_env.bat          # Windows setup (batch)
 ├── setup_env.ps1          # Windows setup (PowerShell)
@@ -230,6 +235,7 @@ Both scripts handle:
 - **Network Fortress**: Deep packet inspection and domain-level firewalling
 - **Collaborative Intelligence**: Peer-to-peer sharing of threat baselines
 - **Multi-Device Monitoring**: ✅ Admin-client architecture implemented
+- **Core Reverse TCP Terminal**: ✅ Implemented with WebSocket integration and standalone TUI dashboard
 - **AI-Driven Self-Improvement**: ✅ Auto-extension generation with syntax validation
 - **Voice & AI Integration**: ✅ Multi-step command execution
 - **System Normalization**: ✅ Enhanced with cache cleaning and RAM optimization
@@ -237,4 +243,4 @@ Both scripts handle:
 - **Becomes an OS**: Long-term vision — Fluffy Assistant as a full operating system
 
 ---
-*Last Updated: February 21, 2026 | Fluffy Assistant Documentation Project*
+*Last Updated: July 3, 2026 | Fluffy Assistant Documentation Project*

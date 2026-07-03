@@ -366,8 +366,8 @@ fn execute(cmd: IpcCommand) {
         IpcCommand::NormalizeSystem => {
             #[cfg(target_os = "windows")]
             {
-                let mut status = "success";
-                let mut details = "System normalization and optimization pulse complete.".to_string();
+                let status = "success";
+                let details = "System normalization and optimization pulse complete.".to_string();
 
                 // 1. A/V Normalization (Volume 50%, Brightness 70%)
                 let av_script = "

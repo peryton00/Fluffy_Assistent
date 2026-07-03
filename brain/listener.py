@@ -1,4 +1,14 @@
 import os
+import sys
+
+# Boost import paths when running under embedded python envs
+_script_dir = os.path.dirname(os.path.abspath(__file__))
+if _script_dir not in sys.path:
+    sys.path.insert(0, _script_dir)
+_app_dir = os.path.dirname(_script_dir)
+if _app_dir not in sys.path:
+    sys.path.insert(0, _app_dir)
+
 import secrets
 os.environ["FLASK_SKIP_DOTENV"] = "1"
 from state import update_state, add_execution_log

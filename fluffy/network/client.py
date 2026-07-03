@@ -56,7 +56,7 @@ class AdminClient:
     # Public API
     # ------------------------------------------------------------------
 
-    def add_machine(self, ip: str, port: int = 8765) -> tuple:
+    def add_machine(self, ip: str, port: int = 9000) -> tuple:
         """
         Ping a machine and add it to the known list.
 

@@ -1,0 +1,199 @@
+/* ==========================================================================
+   FLUFFY CORE ADMIN TERMINAL STYLING (Premium Retro-Modern Theme)
+   ========================================================================== */
+
+#section-terminal {
+    background: transparent;
+}
+
+.terminal-layout {
+    display: flex;
+    flex-direction: column;
+    height: calc(100vh - 120px);
+    min-height: 500px;
+    padding: 0;
+    overflow: hidden;
+    background: rgba(10, 10, 15, 0.7) !important;
+    backdrop-filter: blur(16px);
+    -webkit-backdrop-filter: blur(16px);
+    border: 1px solid rgba(255, 255, 255, 0.08) !important;
+    box-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.4) !important;
+}
+
+/* Header */
+.terminal-header {
+    border-bottom: 1px solid rgba(255, 255, 255, 0.08) !important;
+    background: rgba(15, 15, 25, 0.5) !important;
+}
+
+.status-dot {
+    display: inline-block;
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    transition: all 0.3s ease;
+}
+
+.status-dot.online {
+    background-color: #64dfdf;
+    box-shadow: 0 0 8px #64dfdf;
+}
+
+.status-dot.offline {
+    background-color: #ff5555;
+    box-shadow: 0 0 8px #ff5555;
+}
+
+/* Sidebar Active Agents */
+.terminal-agents-sidebar {
+    background: rgba(0, 0, 0, 0.2);
+}
+
+.terminal-agents-list {
+    margin-top: 0.5rem;
+}
+
+.agent-card {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 0.75rem 1rem;
+    background: rgba(255, 255, 255, 0.03);
+    border: 1px solid rgba(255, 255, 255, 0.05);
+    border-radius: 8px;
+    cursor: pointer;
+    transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.agent-card:hover {
+    background: rgba(255, 255, 255, 0.08);
+    border-color: rgba(100, 223, 223, 0.3);
+    transform: translateY(-1px);
+}
+
+.agent-card.active {
+    background: rgba(100, 223, 223, 0.1);
+    border-color: #64dfdf;
+    box-shadow: 0 0 10px rgba(100, 223, 223, 0.15);
+}
+
+.agent-info {
+    display: flex;
+    flex-direction: column;
+    gap: 0.15rem;
+}
+
+.agent-hostname {
+    font-size: 0.85rem;
+    font-weight: 500;
+    color: #ffffff;
+}
+
+.agent-ip {
+    font-size: 0.75rem;
+    color: rgba(255, 255, 255, 0.5);
+    font-family: 'Consolas', monospace;
+}
+
+.agent-badge {
+    font-size: 0.7rem;
+    padding: 0.15rem 0.4rem;
+    border-radius: 4px;
+    font-weight: bold;
+    text-transform: uppercase;
+    background: rgba(255, 255, 255, 0.1);
+    color: #e0e0e0;
+}
+
+.agent-badge.windows {
+    background: rgba(0, 120, 215, 0.2);
+    color: #00bfff;
+    border: 1px solid rgba(0, 120, 215, 0.3);
+}
+
+.agent-badge.linux {
+    background: rgba(240, 180, 0, 0.2);
+    color: #ffd700;
+    border: 1px solid rgba(240, 180, 0, 0.3);
+}
+
+.agent-badge.macos {
+    background: rgba(255, 255, 255, 0.15);
+    color: #ffffff;
+    border: 1px solid rgba(255, 255, 255, 0.25);
+}
+
+/* Console Output */
+.terminal-output-console {
+    scrollbar-width: thin;
+    scrollbar-color: rgba(255, 255, 255, 0.1) transparent;
+}
+
+.terminal-output-console::-webkit-scrollbar {
+    width: 6px;
+}
+
+.terminal-output-console::-webkit-scrollbar-track {
+    background: transparent;
+}
+
+.terminal-output-console::-webkit-scrollbar-thumb {
+    background: rgba(255, 255, 255, 0.1);
+    border-radius: 3px;
+}
+
+.terminal-output-console::-webkit-scrollbar-thumb:hover {
+    background: rgba(255, 255, 255, 0.25);
+}
+
+.terminal-line {
+    word-break: break-all;
+    white-space: pre-wrap;
+}
+
+.terminal-line .timestamp {
+    color: rgba(255, 255, 255, 0.3);
+    font-size: 0.8rem;
+    margin-right: 0.5rem;
+}
+
+/* Line Colors matching Output color tags */
+.terminal-line.color-dim {
+    color: #88888b;
+}
+
+.terminal-line.color-success {
+    color: #50fa7b;
+    text-shadow: 0 0 4px rgba(80, 250, 123, 0.25);
+}
+
+.terminal-line.color-error {
+    color: #ff5555;
+    text-shadow: 0 0 4px rgba(255, 85, 85, 0.25);
+}
+
+.terminal-line.color-blue {
+    color: #8be9fd;
+}
+
+.terminal-line.color-yellow {
+    color: #f1fa8c;
+}
+
+.terminal-line.color-purple {
+    color: #bd93f9;
+}
+
+/* Input Bar */
+.terminal-input-bar input {
+    background: transparent;
+    border: none;
+    outline: none;
+    color: #ffffff;
+    font-size: 0.95rem;
+    width: 100%;
+}
+
+.terminal-input-bar input::placeholder {
+    color: rgba(255, 255, 255, 0.25);
+}

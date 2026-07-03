@@ -1,0 +1,13 @@
+pub mod battery;
+pub mod clipboard;
+pub mod disk;
+pub mod files;
+pub mod locate;
+pub mod network;
+pub mod notify;
+pub mod power;
+pub mod processes;
+pub mod screen;
+pub mod sysinfo;
+pub mod transfer;
+pub mod users;

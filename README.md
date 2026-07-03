@@ -117,11 +117,18 @@ _Launches the desktop application window._
 - Rust core uses `#[cfg(target_os)]` for conditional compilation
 - One-click setup scripts for both platforms
 
+### Core Reverse TCP Terminal (New!)
+
+- **Tauri Terminal View:** Launch an interactive, real-time command terminal directly from the UI dashboard.
+- **WebSocket Bridge:** Low-latency communication bridge (Port 9003) connecting the frontend with the Rust REPL.
+- **Remote Client Administration:** Compile and deploy `fluffy-client` to other local machines on the LAN (communicates over default Port 9000). Control and query them (e.g. `sysinfo`, `ls`, `kill`) from the admin interface.
+- **Standalone TUI Dashboard:** A separate terminal-based controller (`terminal_for_fluffy/fluffy-admin`) built in Rust using `ratatui` for direct keyboard-driven LAN administration.
+
 ### Admin-Client Remote Monitoring
 
 - Connect to and monitor multiple machines over LAN
-- Full process list view from remote machines
-- Client notification when admin connects
+- Full process list view and system metrics from remote machines
+- Standardized port configuration: uses Port 9000 for LAN communication
 
 ### FTP File Sharing
 

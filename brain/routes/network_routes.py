@@ -54,6 +54,22 @@ def set_network_role():
         
         if success:
             state.add_execution_log(f"Network role changed to: {role}", "system")
+            
+            # Sync with Rust Core Terminal
+            import asyncio
+            from routes.terminal_routes import send_ws_command
+            loop = asyncio.new_event_loop()
+            asyncio.set_event_loop(loop)
+            try:
+                if role == "admin":
+                    loop.run_until_complete(send_ws_command("to --admin"))
+                elif role == "standalone":
+                    loop.run_until_complete(send_ws_command("client --stop"))
+            except Exception as err:
+                print(f"[Network Route] Failed to sync role to Core: {err}")
+            finally:
+                loop.close()
+
             return jsonify({"ok": True, "message": message})
         else:
             return jsonify({"error": message}), 400
@@ -69,7 +85,7 @@ def start_availability():
     """Start availability mode (HTTP server, no auth required)"""
     try:
         data = request.get_json(silent=True) or {}
-        port = int(data.get("port", 8765))
+        port = int(data.get("port", 9000))
 
         _ensure_network_path()
         from server import get_availability_server
@@ -129,7 +145,7 @@ def get_availability_status():
             "ok": True,
             "running": running,
             "ip": local_ip,
-            "port": server._port if hasattr(server, "_port") else 8765
+            "port": server._port if hasattr(server, "_port") else 9000
         })
     except Exception as e:
         return jsonify({"error": str(e)}), 500
@@ -162,7 +178,7 @@ def admin_add_machine():
             return jsonify({"error": "Missing ip"}), 400
 
         ip = data["ip"]
-        port = int(data.get("port", 8765))
+        port = int(data.get("port", 9000))
 
         _ensure_network_path()
         from client import get_admin_client
@@ -222,11 +238,36 @@ def get_admin_machines():
     try:
         _ensure_network_path()
         from client import get_admin_client
+        import asyncio
+        from routes.terminal_routes import fetch_ws_clients
 
         client = get_admin_client()
+        machines = client.get_all_machines()
+
+        # Query active TCP clients from Core Terminal bridge
+        loop = asyncio.new_event_loop()
+        asyncio.set_event_loop(loop)
+        try:
+            tcp_clients = loop.run_until_complete(fetch_ws_clients())
+        except Exception as err:
+            print(f"[Network Route] Failed to query Core TCP clients: {err}")
+            tcp_clients = []
+        finally:
+            loop.close()
+
+        # Merge them
+        for tc in tcp_clients:
+            machines.append({
+                "machine_id": f"tcp_{tc['tag']}",
+                "ip": tc["ip"],
+                "port": 9000,
+                "name": f"{tc['hostname']} (TCP Terminal)",
+                "online": True
+            })
+
         return jsonify({
             "ok": True,
-            "machines": client.get_all_machines(),
+            "machines": machines,
             "active_machine": client.get_active_machine_id()
         })
     except Exception as e:
@@ -242,11 +283,16 @@ def admin_switch_machine():
         if not data or "machine_id" not in data:
             return jsonify({"error": "Missing machine_id"}), 400
 
+        machine_id = data["machine_id"]
+        if machine_id.startswith("tcp_"):
+            # Simply report OK for switching to TCP machine in UI
+            return jsonify({"ok": True})
+
         _ensure_network_path()
         from client import get_admin_client
 
         client = get_admin_client()
-        if client.switch_active(data["machine_id"]):
+        if client.switch_active(machine_id):
             return jsonify({"ok": True})
         else:
             return jsonify({"error": "Machine not found"}), 404
@@ -259,6 +305,42 @@ def admin_switch_machine():
 def get_machine_data(machine_id):
     """Get the latest polled data for a specific machine."""
     try:
+        if machine_id.startswith("tcp_"):
+            tag = machine_id.replace("tcp_", "")
+            import asyncio
+            from routes.terminal_routes import fetch_ws_clients
+
+            loop = asyncio.new_event_loop()
+            asyncio.set_event_loop(loop)
+            try:
+                tcp_clients = loop.run_until_complete(fetch_ws_clients())
+            except Exception:
+                tcp_clients = []
+            finally:
+                loop.close()
+
+            client_info = next((c for c in tcp_clients if c["tag"] == tag), None)
+            if client_info:
+                # Return standardized metrics dictionary matching Network section
+                return jsonify({
+                    "ok": True,
+                    "data": {
+                        "system": {
+                            "hostname": client_info["hostname"],
+                            "os": client_info["os"],
+                            "os_version": client_info["os_version"],
+                            "arch": client_info["arch"],
+                            "uptime": "Connected via TCP",
+                        },
+                        "cpu": {"usage_percent": 0.0},
+                        "ram": {"total_mb": 0, "used_mb": 0, "free_mb": 0},
+                        "network": {"status": "online"},
+                        "processes": {"top_ram": []}
+                    }
+                })
+            else:
+                return jsonify({"error": "TCP client not found or disconnected"}), 404
+
         _ensure_network_path()
         from client import get_admin_client
 
@@ -271,6 +353,8 @@ def get_machine_data(machine_id):
             return jsonify({"error": "No data available yet"}), 404
     except Exception as e:
         return jsonify({"error": str(e)}), 500
+
+
 @network_bp.route("/network/admin/action", methods=["POST"])
 @token_required
 def admin_machine_action():
@@ -283,6 +367,30 @@ def admin_machine_action():
         machine_id = data["machine_id"]
         action_payload = data.get("payload", {})
         action_name = data["action"]
+
+        if machine_id.startswith("tcp_"):
+            tag = machine_id.replace("tcp_", "")
+            import asyncio
+            from routes.terminal_routes import send_ws_command
+
+            # Route actions directly over WS connection to the terminal
+            cmd_text = f"{tag} {action_name}"
+            
+            loop = asyncio.new_event_loop()
+            asyncio.set_event_loop(loop)
+            try:
+                success = loop.run_until_complete(send_ws_command(cmd_text))
+            except Exception as err:
+                print(f"[Network Route] Action routing failed: {err}")
+                success = False
+            finally:
+                loop.close()
+            
+            if success:
+                state.add_execution_log(f"Admin: executed '{action_name}' on TCP machine {tag}", "system")
+                return jsonify({"ok": True, "result": f"Command '{cmd_text}' sent successfully"})
+            else:
+                return jsonify({"error": "Failed to send command to TCP agent"}), 500
 
         _ensure_network_path()
         from client import get_admin_client

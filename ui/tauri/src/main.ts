@@ -8,7 +8,7 @@ let FLUFFY_TOKEN = "";
 
 async function initToken() {
   try {
-    const res = await fetch("http://localhost:5123/config/token");
+    const res = await fetch("http://127.0.0.1:5123/config/token");
     if (res.ok) {
       const data = await res.json();
       if (data.token) FLUFFY_TOKEN = data.token;
@@ -18,7 +18,7 @@ async function initToken() {
   }
 }
 
-const API_BASE = "http://localhost:5123";
+const API_BASE = "http://127.0.0.1:5123";
 
 const expandedPids = new Set<number>();
 const pendingKills = new Set<number>();
@@ -45,21 +45,26 @@ DEFAULT_LAYOUT_ORDER.forEach(id => {
   if (!dashboardOrder.includes(id)) dashboardOrder.push(id);
 });
 
-const NAV_ITEMS = ["dashboard", "processes", "guardian", "apps", "extensions", "analytics", "startup", "network", "settings"];
+const NAV_ITEMS = ["dashboard", "processes", "guardian", "apps", "extensions", "analytics", "startup", "network", "settings", "terminal"];
 
 /* =========================
    UTILITIES
 ========================= */
 async function apiRequest(url: string, options: any = {}, retries = 3): Promise<any> {
-  const headers = {
-    "Content-Type": "application/json",
-    "X-Fluffy-Token": FLUFFY_TOKEN,
-    ...(options.headers || {})
-  };
-
   for (let i = 0; i < retries; i++) {
     const start = performance.now();
     try {
+      // If we don't have a token, try to fetch it first (especially on retries)
+      if (!FLUFFY_TOKEN && url !== "/config/token") {
+        await initToken();
+      }
+
+      const headers = {
+        "Content-Type": "application/json",
+        "X-Fluffy-Token": FLUFFY_TOKEN,
+        ...(options.headers || {})
+      };
+
       const fullUrl = url.startsWith("http") ? url : `${API_BASE}${url}`;
       const res = await fetch(fullUrl, { ...options, headers });
       const latency = performance.now() - start;
@@ -89,9 +94,9 @@ async function apiRequest(url: string, options: any = {}, retries = 3): Promise<
       if (isJson) return await res.json();
       return null;
     } catch (err: any) {
-      const isConnError = err.message.includes("Failed to fetch") || err.message.includes("ECONNREFUSED");
+      const isConnError = err.message.includes("Failed to fetch") || err.message.includes("ECONNREFUSED") || err.message.includes("Unauthorized") || err.message.includes("Server error: 401");
       if (isConnError && i < retries - 1) {
-        console.warn(`Connection refused for ${url}, retrying in 1s... (${i + 1}/${retries})`);
+        console.warn(`Connection or auth retry for ${url}, retrying in 1s... (${i + 1}/${retries})`);
         await new Promise(r => setTimeout(r, 1000));
         continue;
       }
@@ -427,7 +432,7 @@ function renderExtensions(extensions: any[]) {
         <div class="ext-card-header">
           <div class="ext-logo-container">
             <img src="${API_BASE}/extensions/${ext.intent}/logo?t=${Date.now()}" class="ext-logo" alt="logo" 
-                 onerror="this.src='${API_BASE}/fluffy-default-logo.svg'">
+                 onerror="this.onerror=null; this.src='logo.png'">
           </div>
           <span class="ext-status-badge ${ext.enabled ? 'active' : 'disabled'}">
             ${ext.enabled ? 'Enabled' : 'Disabled'}
@@ -638,6 +643,7 @@ function navigateToView(id: string) {
   if (id === "apps") fetchApps();
   if (id === "extensions") fetchExtensions();
   if (id === "network") initializeNetworkView();
+  if (id === "terminal") initializeTerminalView();
 }
 
 function setupShortcuts() {
@@ -3628,7 +3634,7 @@ async function setNetworkRole(role: string) {
 }
 
 async function startAvailabilityMode() {
-  const port = parseInt((document.getElementById("availability-port") as HTMLInputElement)?.value || "8765");
+  const port = parseInt((document.getElementById("availability-port") as HTMLInputElement)?.value || "9000");
 
   if (isNaN(port) || port < 1024 || port > 65535) {
     showToast("Port must be between 1024 and 65535", "warning");
@@ -3665,7 +3671,7 @@ async function fetchAvailabilityStatus() {
   const data = await apiRequest("/network/availability/status", { method: "GET" });
 
   if (data && data.ok) {
-    const port = data.port || 8765;
+    const port = data.port || 9000;
     updateAvailabilityUI(data.running, port);
 
     // Update IP address if available
@@ -3737,7 +3743,7 @@ async function connectToMachine() {
     return;
   }
 
-  const port = parseInt(portStr || "8765", 10);
+  const port = parseInt(portStr || "9000", 10);
   if (isNaN(port) || port < 1024 || port > 65535) {
     showToast("Port must be between 1024 and 65535", "warning");
     return;
@@ -4015,4 +4021,231 @@ console.log('✅ FTP control interface initialized');
 
 // initToken() is now called earlier in the initialization sequence
 // to ensure it's available for the first connection attempt.
+
+/* ==========================================================================
+   FLUFFY CORE ADMIN TERMINAL CONTROL (WebSocket Integration)
+   ========================================================================== */
+
+let terminalWs: WebSocket | null = null;
+let terminalReconnectTimeout: any = null;
+
+function initTerminalView() {
+  if (terminalWs) return;
+
+  const indicator = document.getElementById("terminal-connection-indicator");
+  const connectionText = document.getElementById("terminal-connection-text");
+  const wsBadge = document.getElementById("term-ws-status");
+
+  console.log("[Terminal] Connecting to WebSocket bridge on port 9003...");
+  terminalWs = new WebSocket("ws://127.0.0.1:9003");
+
+  terminalWs.onopen = () => {
+    console.log("[Terminal] Connected to core WebSocket bridge.");
+    if (indicator) {
+      indicator.className = "status-dot online";
+    }
+    if (connectionText) {
+      connectionText.innerText = "WebSocket Connected";
+    }
+    if (wsBadge) {
+      wsBadge.className = "badge badge-success";
+      wsBadge.innerText = "Connected";
+    }
+    if (terminalReconnectTimeout) {
+      clearTimeout(terminalReconnectTimeout);
+      terminalReconnectTimeout = null;
+    }
+  };
+
+  terminalWs.onmessage = (event) => {
+    try {
+      const data = JSON.parse(event.data);
+      handleTerminalWsMessage(data);
+    } catch (err) {
+      console.error("[Terminal] Failed to parse WebSocket message:", err);
+    }
+  };
+
+  terminalWs.onclose = () => {
+    console.warn("[Terminal] WebSocket bridge disconnected. Reconnecting in 3s...");
+    cleanupTerminalState();
+    terminalReconnectTimeout = setTimeout(() => {
+      terminalWs = null;
+      initTerminalView();
+    }, 3000);
+  };
+
+  terminalWs.onerror = (err) => {
+    console.error("[Terminal] WebSocket error:", err);
+    terminalWs?.close();
+  };
+}
+
+function cleanupTerminalState() {
+  const indicator = document.getElementById("terminal-connection-indicator");
+  const connectionText = document.getElementById("terminal-connection-text");
+  const wsBadge = document.getElementById("term-ws-status");
+
+  if (indicator) {
+    indicator.className = "status-dot offline";
+  }
+  if (connectionText) {
+    connectionText.innerText = "WebSocket Disconnected. Reconnecting...";
+  }
+  if (wsBadge) {
+    wsBadge.className = "badge badge-error";
+    wsBadge.innerText = "Disconnected";
+  }
+}
+
+function handleTerminalWsMessage(data: any) {
+  if (!data) return;
+
+  switch (data.type) {
+    case "status":
+      const portEl = document.getElementById("terminal-port-text");
+      const agentsCountEl = document.getElementById("terminal-agents-text");
+      const netAgentsCountEl = document.getElementById("term-client-count");
+      
+      if (portEl) portEl.innerText = data.admin_port;
+      if (agentsCountEl) agentsCountEl.innerText = data.client_count;
+      if (netAgentsCountEl) netAgentsCountEl.innerText = data.client_count;
+      
+      if (data.mode) {
+        const expectedRole = data.mode === "Admin" ? "admin" : "standalone";
+        if (currentNetworkRole !== expectedRole) {
+          currentNetworkRole = expectedRole;
+          updateRoleUI(expectedRole);
+          apiRequest("/network/role", {
+            method: "POST",
+            body: JSON.stringify({ role: expectedRole })
+          }).catch(err => console.error("Failed to sync role to backend:", err));
+        }
+      }
+      break;
+
+    case "prompt":
+      const promptEl = document.getElementById("terminal-prompt-symbol");
+      if (promptEl) promptEl.innerText = data.text;
+      break;
+
+    case "output":
+      appendTerminalLine(data);
+      break;
+
+    case "client_list":
+      renderTerminalAgents(data.clients);
+      break;
+  }
+}
+
+function appendTerminalLine(data: any) {
+  const consoleEl = document.getElementById("terminal-output-console");
+  if (!consoleEl) return;
+
+  const lineDiv = document.createElement("div");
+  lineDiv.className = `terminal-line color-${data.color_tag || "dim"}`;
+  
+  const timeSpan = document.createElement("span");
+  timeSpan.className = "timestamp";
+  timeSpan.innerText = data.timestamp || new Date().toLocaleTimeString();
+
+  const textNode = document.createTextNode(` [${data.tag || "system"}] ${data.text}`);
+  
+  lineDiv.appendChild(timeSpan);
+  lineDiv.appendChild(textNode);
+  consoleEl.appendChild(lineDiv);
+
+  // Auto-scroll to bottom
+  consoleEl.scrollTop = consoleEl.scrollHeight;
+}
+
+function renderTerminalAgents(clients: any[]) {
+  const listEl = document.getElementById("terminal-agents-list");
+  if (!listEl) return;
+
+  if (!clients || clients.length === 0) {
+    listEl.innerHTML = `<div class="empty-agents-text" style="font-size: 0.85rem; opacity: 0.5; font-style: italic; text-align: center; margin-top: 2rem;">No active agents connected.</div>`;
+    return;
+  }
+
+  listEl.innerHTML = clients.map(agent => {
+    const osClass = (agent.os || "").toLowerCase();
+    return `
+      <div class="agent-card" id="agent-${agent.tag}" style="display: flex; justify-content: space-between; align-items: center; padding: 0.75rem 1rem; background: rgba(255, 255, 255, 0.03); border: 1px solid rgba(255, 255, 255, 0.05); border-radius: 8px; cursor: pointer; transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1); margin-bottom: 0.5rem;">
+        <div class="agent-info" style="display: flex; flex-direction: column; gap: 0.15rem;">
+          <span class="agent-hostname" style="font-size: 0.85rem; font-weight: 500; color: #ffffff;">${agent.hostname || "unknown"}</span>
+          <span class="agent-ip" style="font-size: 0.75rem; color: rgba(255, 255, 255, 0.5); font-family: 'Consolas', monospace;">${agent.ip || "0.0.0.0"}</span>
+        </div>
+        <div class="agent-badge ${osClass}">${agent.tag}</div>
+      </div>
+    `;
+  }).join("");
+
+  // Add click listeners to cards
+  clients.forEach(agent => {
+    const card = document.getElementById(`agent-${agent.tag}`);
+    if (card) {
+      card.onclick = () => {
+        const inputEl = document.getElementById("terminal-cmd-input") as HTMLInputElement;
+        if (inputEl) {
+          inputEl.value = `use ${agent.tag}`;
+          inputEl.focus();
+        }
+      };
+    }
+  });
+}
+
+function sendTerminalCommand() {
+  const inputEl = document.getElementById("terminal-cmd-input") as HTMLInputElement;
+  if (!inputEl || !terminalWs || terminalWs.readyState !== WebSocket.OPEN) return;
+
+  const text = inputEl.value.trim();
+  if (!text) return;
+
+  terminalWs.send(JSON.stringify({
+    type: "command",
+    text: text
+  }));
+
+  inputEl.value = "";
+}
+
+function initializeTerminalView() {
+  initTerminalView();
+}
+
+// Bind terminal event listeners
+const cmdInput = document.getElementById("terminal-cmd-input");
+if (cmdInput) {
+  cmdInput.addEventListener("keypress", (e: any) => {
+    if (e.key === "Enter") {
+      sendTerminalCommand();
+    }
+  });
+}
+
+const sendCmdBtn = document.getElementById("btn-send-terminal-cmd");
+if (sendCmdBtn) {
+  sendCmdBtn.onclick = () => sendTerminalCommand();
+}
+
+const clearTerminalBtn = document.getElementById("btn-clear-terminal");
+if (clearTerminalBtn) {
+  clearTerminalBtn.onclick = () => {
+    const consoleEl = document.getElementById("terminal-output-console");
+    if (consoleEl) consoleEl.innerHTML = "";
+  };
+}
+
+const openTermFromNetBtn = document.getElementById("btn-open-terminal-from-net");
+if (openTermFromNetBtn) {
+  openTermFromNetBtn.onclick = () => {
+    navigateToView("terminal");
+  };
+}
+
+// Connect immediately on app startup
+initTerminalView();
 

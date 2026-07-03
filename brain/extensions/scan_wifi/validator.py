@@ -11,7 +11,7 @@ except ImportError:
 class ScanWifiValidator:
     """Validate scan_wifi operations"""
     
-    def validate(self, command: Command):
+    def validate(self, command):
         """Validate the scan_wifi intent"""
         if command.intent.value == "SCAN_WIFI":
             return ValidationResult(is_valid=True, safety_level=SafetyLevel.SAFE, message="Safe")

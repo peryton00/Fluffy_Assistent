@@ -345,6 +345,30 @@ Users can now **cancel pending actions** with natural interrupt commands.
 
 ---
 
+### 9. Core Reverse TCP Admin Terminal (NEW)
+
+Allows interactive remote shell management and system commands execution on endpoint machines inside the local network.
+
+#### Key Functions
+- **WebSocket Streaming**: Stream command output lines in real-time to the dashboard interface.
+- **Client Targeting (`use / alter`)**: Focus command routing on specific client tags (e.g. `f1`, `f2`) or return back to `local` console.
+- **Tauri Console View**: High-fidelity terminal emulator layout with active agent cards sidebar, prompt symbols, and standard error color tags.
+- **Precompiled Agent Distribution**: Direct download of `fluffy-client.exe` from the server dashboard.
+- **Separate TUI Dashboard**: Standalone `ratatui` command dashboard (`terminal_for_fluffy/`) for pure keyboard-driven terminal network management.
+
+#### Supported Commands
+- `rolecall` - Lists active connected agent machines with hostnames, OS version, and LAN IPs.
+- `broadcast "msg"` - Triggers a system notifications toast across all connected nodes.
+- `f alter <tag>` - Route all future commands to targeted remote machine.
+- `sysinfo` / `processes` / `disk --info` / `kill <pid>` - Fetch stats or terminate processes on the remote agent.
+
+#### API Endpoints
+- `GET /terminal/clients` - Retrieve registered terminal client nodes.
+- `POST /terminal/command` - Post console command string to reverse TCP router.
+- `GET /terminal/client-download` - Download agent executable binary.
+
+---
+
 ## How It Works
 
 ### Startup Sequence
@@ -354,6 +378,8 @@ Users can now **cancel pending actions** with natural interrupt commands.
    - Start ETW network monitor (requires admin)
    - Open IPC server on port 9001
    - Open command server on port 9002
+   - Open WebSocket Bridge on port 9003 for frontend console piping
+   - Open TCP Admin Listener on port 9000 for reverse agent connections
    - Auto-spawn Brain and UI
 
 2. **Brain Launch** (`python listener.py` in `/brain`)
@@ -367,6 +393,7 @@ Users can now **cancel pending actions** with natural interrupt commands.
    - Build Vite frontend
    - Launch Tauri window
    - Connect to Brain API
+   - Open WebSocket client connection to Core Terminal Bridge (port 9003)
    - Signal UI_ACTIVE to Brain
    - Start polling for status
 

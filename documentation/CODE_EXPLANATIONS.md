@@ -1076,6 +1076,39 @@ def get_cancellable_actions() -> list:
 
 ---
 
+## Reverse TCP Shell & Core Terminal Module (Rust)
+
+**Purpose**: High-performance LAN administration terminal. Core spawns a TCP server listening for client agent nodes on port 9000, managing commands/sessions inside a custom REPL, while hosting a WebSocket server on port 9003 to connect to the Tauri frontend.
+
+### ws_bridge.rs - WebSocket Server Bridge
+Exposes a WebSocket endpoint at `127.0.0.1:9003`. Receives commands from the Tauri UI and broadcasts system/client status lists or outputs to all connected UI channels.
+
+```rust
+pub async fn start_ws_bridge(state: SharedState) {
+    let addr = "127.0.0.1:9003";
+    let listener = TcpListener::bind(addr).await.unwrap();
+    // Spawns connection handlers and listens for incoming command packets...
+}
+```
+
+### repl.rs - Interactive CLI Command Processor
+Parses raw inputs (`f alter <tag>`, `rolecall`, `broadcast`, `clear`, etc.) and determines if they should execute locally or target a connected client agent.
+
+```rust
+pub async fn process_input(state: &SharedState, raw_input: &str) {
+    let input = raw_input.trim();
+    // Evaluates local vs remote client routes...
+    if input.starts_with("f alter ") {
+        // Targets specific f1/f2 client
+    }
+}
+```
+
+### client_manager.rs - TCP Connection Registry
+Manages registration, routing, and heartbeats of TCP client agent connections on port 9000. It routes targeted commands to specific sockets and parses response buffers to stream back to the UI.
+
+---
+
 ## Conclusion
 
 This code walkthrough demonstrates the sophisticated architecture of Fluffy Assistant:
@@ -1084,6 +1117,7 @@ This code walkthrough demonstrates the sophisticated architecture of Fluffy Assi
 - **Python Brain**: Intelligent analysis with Guardian behavioral engine
 - **Memory System**: Persistent preferences and conversational intelligence
 - **Interrupt Handler**: User control over pending actions
+- **Core Terminal**: Reverse TCP shell administration console over WebSockets
 - **TypeScript UI**: Modern, responsive interface with real-time updates
 - **AI Integration**: Seamless LLM and voice command support
 

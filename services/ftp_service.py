@@ -495,8 +495,8 @@ def start_ftp_server(shared_dir: Optional[str] = None) -> Dict[str, Any]:
             handler.authorizer = authorizer
             handler.passive_ports = range(*PASSIVE_PORTS)
             
-            # Create server
-            _server = FTPServer((_current_ip, FTP_PORT), handler)
+            # Create server (bind to 0.0.0.0 for maximum reliability on all interfaces)
+            _server = FTPServer(("0.0.0.0", FTP_PORT), handler)
             _server.max_cons = 10  # Max 10 simultaneous connections
             _server.max_cons_per_ip = 3  # Max 3 connections per IP
             

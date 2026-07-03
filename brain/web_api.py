@@ -18,12 +18,14 @@ from routes.ftp_routes import ftp_bp
 from routes.cluster_routes import cluster_bp
 from routes.network_routes import network_bp
 from routes.extension_routes import extension_bp
+from routes.terminal_routes import terminal_bp
 
 app.register_blueprint(voice_bp)
 app.register_blueprint(ftp_bp)
 app.register_blueprint(cluster_bp)
 app.register_blueprint(network_bp)
 app.register_blueprint(extension_bp)
+app.register_blueprint(terminal_bp)
 
 
 @app.after_request
