@@ -45,6 +45,9 @@ class VoiceController:
         """Speak welcome message when Fluffy starts."""
         if not self.enabled:
             return
+        import state
+        if getattr(state, "TTS_MUTED", False):
+            return
         
         message = "Welcome back master peryton. Fluffy is getting ready to serve you"
         message_key = "welcome"
@@ -108,6 +111,9 @@ class VoiceController:
         """
         if not self.enabled:
             return
+        import state
+        if getattr(state, "TTS_MUTED", False):
+            return
         
         level = verdict.get("level", "")
         if level not in ["Warn", "Recommend", "Request Confirmation"]:
@@ -163,6 +169,9 @@ class VoiceController:
         priority: "NORMAL" (interruptible) or "HIGH" (protected)
         """
         if not self.enabled: return
+        import state
+        if getattr(state, "TTS_MUTED", False):
+            return
         
         if message_key is not None and not self._should_speak(message_key):
             return
@@ -183,6 +192,9 @@ class VoiceController:
         LLM-Ready Streaming Interface.
         """
         if not self.enabled: return
+        import state
+        if getattr(state, "TTS_MUTED", False):
+            return
         self.current_priority = priority
         self.speaker.speak_stream(chunks_iterable)
 

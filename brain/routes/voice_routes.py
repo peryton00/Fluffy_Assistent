@@ -131,3 +131,34 @@ def stt_status():
         return jsonify({"error": f"Voice module not found: {e}"}), 500
     except Exception as e:
         return jsonify({"error": f"STT Failure: {str(e)}"}), 500
+
+
+@voice_bp.route("/tts/mute", methods=["POST"])
+@token_required
+def toggle_tts_mute():
+    """Toggle or set the TTS mute state."""
+    data = request.get_json(silent=True) or {}
+    import state
+    from voice import stop_speech
+    
+    current_muted = getattr(state, "TTS_MUTED", False)
+    new_muted = data.get("muted", not current_muted)
+    
+    state.TTS_MUTED = new_muted
+    if new_muted:
+        # Stop any currently playing speech immediately
+        try:
+            stop_speech(force=True)
+        except Exception as e:
+            print(f"[Voice] Error stopping speech on mute: {e}")
+            
+    state.add_execution_log(f"TTS service {'muted' if new_muted else 'unmuted'}", "system")
+    return jsonify({"ok": True, "muted": new_muted})
+
+
+@voice_bp.route("/tts/mute/status", methods=["GET"])
+@token_required
+def get_tts_mute_status():
+    """Get the current TTS mute status."""
+    import state
+    return jsonify({"ok": True, "muted": getattr(state, "TTS_MUTED", False)})

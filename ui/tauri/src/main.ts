@@ -299,6 +299,20 @@ function setupNavigation() {
     };
   }
 
+  // TTS Mute/Unmute Toggle
+  const ttsMuteBtn = document.getElementById("btn-tts-mute");
+  if (ttsMuteBtn) {
+    ttsMuteBtn.onclick = async () => {
+      ttsMuteBtn.style.opacity = '0.5';
+      const data = await apiRequest("/tts/mute", { method: "POST" });
+      if (data && data.ok) {
+        showToast(data.muted ? "Voice muted" : "Voice unmuted", "info");
+        updateMuteUI(data.muted);
+      }
+      ttsMuteBtn.style.opacity = '1';
+    };
+  }
+
   // Extensions Refresh
   const refreshExtBtn = document.getElementById("btn-refresh-extensions");
   if (refreshExtBtn) {
@@ -1520,6 +1534,11 @@ async function removeStartupApp(name: string) {
 function renderUI(data: any) {
   if (!data) return;
   lastData = data;
+
+  // Sync TTS Mute status
+  if (data._tts_muted !== undefined) {
+    updateMuteUI(data._tts_muted);
+  }
 
   // Cleanup pendingKills (if process is no longer in the list, backend sync is complete)
   if (data.system && data.system.processes.top_ram) {
@@ -4112,7 +4131,32 @@ function handleTerminalWsMessage(data: any) {
       if (netAgentsCountEl) netAgentsCountEl.innerText = data.client_count;
       
       if (data.mode) {
-        const expectedRole = data.mode === "Admin" ? "admin" : "standalone";
+        const modeEl = document.getElementById("terminal-mode-indicator");
+        if (modeEl) {
+          modeEl.innerText = data.mode;
+          if (data.mode === "Standalone") {
+            modeEl.style.background = "rgba(100, 100, 100, 0.15)";
+            modeEl.style.color = "#bbb";
+            modeEl.style.border = "1px solid rgba(100, 100, 100, 0.3)";
+          } else if (data.mode === "Client") {
+            modeEl.style.background = "rgba(100, 223, 223, 0.12)";
+            modeEl.style.color = "#64dfdf";
+            modeEl.style.border = "1px solid rgba(100, 223, 223, 0.25)";
+          } else if (data.mode === "Admin") {
+            modeEl.style.background = "rgba(162, 89, 255, 0.12)";
+            modeEl.style.color = "#a259ff";
+            modeEl.style.border = "1px solid rgba(162, 89, 255, 0.25)";
+          }
+        }
+
+        // Map terminal mode to UI network role
+        let expectedRole = "standalone";
+        if (data.mode === "Admin") {
+          expectedRole = "admin";
+        } else if (data.mode === "Client") {
+          expectedRole = "available"; // available role = Client Mode (exposes machine stats)
+        }
+
         if (currentNetworkRole !== expectedRole) {
           currentNetworkRole = expectedRole;
           updateRoleUI(expectedRole);
@@ -4248,4 +4292,25 @@ if (openTermFromNetBtn) {
 
 // Connect immediately on app startup
 initTerminalView();
+
+
+function updateMuteUI(muted: boolean) {
+  const btn = document.getElementById("btn-tts-mute");
+  const icon = document.getElementById("tts-mute-icon");
+  if (!btn || !icon) return;
+
+  if (muted) {
+    btn.classList.add("muted");
+    btn.setAttribute("title", "Unmute Voice");
+    icon.setAttribute("data-lucide", "volume-x");
+  } else {
+    btn.classList.remove("muted");
+    btn.setAttribute("title", "Mute Voice");
+    icon.setAttribute("data-lucide", "volume-2");
+  }
+  
+  if ((window as any).lucide) {
+    (window as any).lucide.createIcons();
+  }
+}
 

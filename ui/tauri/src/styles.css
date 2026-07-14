@@ -504,6 +504,16 @@ body.light-mode .nav-item.active {
   border-color: var(--accent-light);
 }
 
+.mute-btn:hover {
+  background: var(--card-bg, rgba(255,255,255,0.06)) !important;
+  color: var(--primary, #64dfdf) !important;
+}
+
+.mute-btn.muted {
+  color: var(--error, #ff5555) !important;
+  background: rgba(255, 85, 85, 0.1) !important;
+}
+
 .top-nav {
   display: flex;
   align-items: center;

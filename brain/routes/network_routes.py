@@ -63,8 +63,10 @@ def set_network_role():
             try:
                 if role == "admin":
                     loop.run_until_complete(send_ws_command("to --admin"))
+                elif role == "available":
+                    loop.run_until_complete(send_ws_command("to --client"))
                 elif role == "standalone":
-                    loop.run_until_complete(send_ws_command("client --stop"))
+                    loop.run_until_complete(send_ws_command("to --standalone"))
             except Exception as err:
                 print(f"[Network Route] Failed to sync role to Core: {err}")
             finally:

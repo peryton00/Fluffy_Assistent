@@ -19,7 +19,7 @@ pub async fn process_input(state: &SharedState, raw_input: &str) {
         }
     }
 
-    // to --client / to --admin
+    // to --client / to --admin / to --standalone
     if input == "to --client" {
         let mut st = state.lock().await;
         st.mode = TerminalMode::Client;
@@ -30,6 +30,13 @@ pub async fn process_input(state: &SharedState, raw_input: &str) {
         let mut st = state.lock().await;
         st.mode = TerminalMode::Admin;
         st.add_output("system", "Switched to Admin View.", "success");
+        return;
+    }
+    if input == "to --standalone" {
+        let mut st = state.lock().await;
+        st.mode = TerminalMode::Standalone;
+        st.client_service_status = ClientServiceStatus::Stopped;
+        st.add_output("system", "Switched to Standalone mode.", "success");
         return;
     }
 
@@ -327,6 +334,7 @@ pub fn get_admin_commands() -> Vec<crate::terminal::commands::CommandMetadata> {
     vec![
         CommandMetadata { name: "rolecall", usage: "rolecall", description: "List all connected clients" },
         CommandMetadata { name: "fluffy --help", usage: "fluffy --help", description: "Show this help overlay" },
+        CommandMetadata { name: "to --standalone", usage: "to --standalone", description: "Switch to Standalone mode" },
         CommandMetadata { name: "to --client", usage: "to --client", description: "Switch to Client View" },
         CommandMetadata { name: "to --admin", usage: "to --admin", description: "Switch back to Admin View" },
         CommandMetadata { name: "client --start", usage: "client --start <ip> --port <port>", description: "Connect to an admin" },

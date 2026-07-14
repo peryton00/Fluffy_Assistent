@@ -4,6 +4,7 @@ use tokio::sync::{mpsc, Mutex, broadcast};
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
 pub enum TerminalMode {
+    Standalone,
     Admin,
     Client,
 }
@@ -73,7 +74,7 @@ impl AppState {
             saved_input: String::new(),
             client_counter: 0,
             command_id_counter: 0,
-            mode: TerminalMode::Admin,
+            mode: TerminalMode::Standalone,
             client_service_status: ClientServiceStatus::Stopped,
             client_output: Vec::new(),
             admin_port: 9000,

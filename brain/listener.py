@@ -311,14 +311,20 @@ def handle_message(raw_msg, monitor):
         level = GUARDIAN_SCORER.get_level(risk_score)
         
         # Verdict Generation (Suppressed during initial 5-min Learning Mode)
+        verdicts = []
         if not is_learning:
             # Skip verdict generation for trusted processes
             if baseline and baseline.get("trusted", False):
-                # Process is trusted - no alerts needed
+                state.ACTIVE_VERDICTS.pop(pid, None)
                 continue
             
             verdicts = generate_verdicts(name, pid, risk_score, anomalies, level, 0.8)
-            all_guardian_verdicts.extend(verdicts)
+            if verdicts:
+                state.ACTIVE_VERDICTS[pid] = verdicts[0]
+            else:
+                state.ACTIVE_VERDICTS.pop(pid, None)
+        else:
+            state.ACTIVE_VERDICTS.pop(pid, None)
             
             # Voice alert for serious verdicts with metrics (lazy loaded)
             if _ensure_voice() and verdicts:
@@ -357,6 +363,13 @@ def handle_message(raw_msg, monitor):
     GUARDIAN_FINGERPRINTS.cleanup(active_pids)
     GUARDIAN_CHAINS.cleanup(active_pids)
     GUARDIAN_SCORER.cleanup(active_pids)
+
+    # Cleanup dead PIDs from active verdicts cache
+    for pid in list(state.ACTIVE_VERDICTS.keys()):
+        if pid not in active_pids:
+            state.ACTIVE_VERDICTS.pop(pid, None)
+
+    all_guardian_verdicts = list(state.ACTIVE_VERDICTS.values())
 
     # Periodic baseline save (every 50 telemetry messages)
     PROCESS_MSG_COUNTER += 1

@@ -18,7 +18,7 @@
       href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700&display=swap"
       rel="stylesheet"
     />
-    <script src="https://unpkg.com/lucide@latest"></script>
+    <script src="/lucide.min.js"></script>
   </head>
 
   <body>
@@ -137,6 +137,14 @@
             >
               <button class="bluetooth-btn" id="btn-bluetooth-toggle">
                 <i data-lucide="bluetooth"></i>
+              </button>
+            </div>
+            <div
+              class="mute-container"
+              title="Mute/Unmute Voice"
+            >
+              <button class="mute-btn" id="btn-tts-mute" style="background: transparent; border: none; outline: none; color: var(--text-color, #e0e0e0); cursor: pointer; display: flex; align-items: center; justify-content: center; padding: 0.5rem; border-radius: 8px; transition: all 0.2s; width: 36px; height: 36px;">
+                <i data-lucide="volume-2" id="tts-mute-icon" style="width: 18px; height: 18px;"></i>
               </button>
             </div>
             <div class="user-profile">
@@ -1211,7 +1219,8 @@
                 <span id="terminal-connection-text" style="font-size: 0.85rem; opacity: 0.8;">Connecting WebSocket...</span>
               </div>
               <div class="header-right" style="display: flex; align-items: center; gap: 1.5rem;">
-                <div class="terminal-stats" style="font-size: 0.9rem; display: flex; gap: 1rem;">
+                <div class="terminal-stats" style="font-size: 0.9rem; display: flex; gap: 1rem; align-items: center;">
+                  <span>Mode: <strong id="terminal-mode-indicator" style="padding: 0.15rem 0.45rem; border-radius: 4px; font-size: 0.75rem; background: rgba(255,255,255,0.08); border: 1px solid rgba(255,255,255,0.15); color: #ccc; transition: all 0.2s;">Standalone</strong></span>
                   <span>Port: <strong id="terminal-port-text">9000</strong></span>
                   <span>Agents: <strong id="terminal-agents-text">0</strong></span>
                 </div>

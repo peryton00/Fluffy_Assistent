@@ -40,6 +40,7 @@ def reset_guardian():
     
     # 2. Reset in-memory tracking in state.py (if shared)
     state.SECURITY_ALERTS = []
+    state.ACTIVE_VERDICTS = {}
     # Use a thread-safe way to clear PENDING_CONFIRMATIONS if needed
     with state.LOCK:
         state.PENDING_CONFIRMATIONS = [c for c in state.PENDING_CONFIRMATIONS if not ("Guardian" in c["command_name"] or "suspicious" in c["details"].lower())]

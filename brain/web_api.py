@@ -65,6 +65,7 @@ def status():
     full_state["pending_confirmations"] = state.get_confirmations()
     full_state["security_alerts"] = state.SECURITY_ALERTS
     full_state["notifications"] = state.get_notifications()
+    full_state["_tts_muted"] = getattr(state, "TTS_MUTED", False)
     
     # Update Active Sessions count based on role
     try:
@@ -214,6 +215,12 @@ def trust_process():
         GUARDIAN_BASELINE.mark_trusted(process_name)
         state.add_execution_log(f"Manual trust: {process_name} behaviors are now whitelisted (saved to memory)", "info")
     
+    with state.LOCK:
+        # Immediately evict this process name from active verdicts cache
+        state.ACTIVE_VERDICTS = {pid: v for pid, v in state.ACTIVE_VERDICTS.items() if v["process"] != process_name}
+        if state.LATEST_STATE and "_guardian_verdicts" in state.LATEST_STATE:
+            state.LATEST_STATE["_guardian_verdicts"] = [v for v in state.LATEST_STATE["_guardian_verdicts"] if v["process"] != process_name]
+            
     return jsonify({"ok": True, "message": f"Behavior for {process_name} marked as trusted."})
 
 
