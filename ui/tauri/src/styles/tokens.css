@@ -1,0 +1,179 @@
+/**
+ * Fluffy Desktop - Semantic Design Tokens
+ * 
+ * High-density, operational design system.
+ * Supports Fluffy Dark (default), Fluffy Light, and Fluffy High Contrast.
+ */
+
+:root {
+  /* ==========================================================================
+     Base Dimension & Spacing Scales (Desktop Density)
+     ========================================================================== */
+  --space-0: 0px;
+  --space-1: 2px;
+  --space-2: 4px;
+  --space-3: 6px;
+  --space-4: 8px;
+  --space-5: 12px;
+  --space-6: 16px;
+  --space-7: 20px;
+  --space-8: 24px;
+  --space-9: 32px;
+  --space-10: 48px;
+
+  /* Border Radii (Subtle, Restrained) */
+  --radius-xs: 2px;
+  --radius-sm: 4px;
+  --radius-md: 6px;
+  --radius-lg: 8px;
+  --radius-full: 9999px;
+
+  /* Transition Durations */
+  --transition-fast: 100ms cubic-bezier(0.4, 0, 0.2, 1);
+  --transition-normal: 180ms cubic-bezier(0.4, 0, 0.2, 1);
+  --transition-slow: 250ms cubic-bezier(0.4, 0, 0.2, 1);
+
+  /* Elevation / Shadows (Subtle, Crisp) */
+  --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.2);
+  --shadow-md: 0 4px 12px rgba(0, 0, 0, 0.35);
+  --shadow-lg: 0 12px 32px rgba(0, 0, 0, 0.5);
+
+  /* Layout Dimensions */
+  --topbar-height: 42px;
+  --activitybar-width: 48px;
+  --sidebar-width: 240px;
+  --statusbar-height: 26px;
+  --inspector-width: 300px;
+}
+
+/* ============================================================================
+   Theme: Fluffy Dark (Default Operational Theme)
+   ============================================================================ */
+:root,
+[data-theme="fluffyDark"] {
+  --color-bg: #0d1117;
+  --color-surface-subtle: #121720;
+  --color-surface: #161b24;
+  --color-surface-elevated: #1e2430;
+  --color-surface-hover: #262e3d;
+  --color-surface-active: #2f384a;
+
+  --color-border-subtle: #232a38;
+  --color-border: #2d3748;
+  --color-border-strong: #404e66;
+  --color-border-focus: #3b82f6;
+
+  --color-text: #f0f3f6;
+  --color-text-secondary: #c0cad6;
+  --color-text-muted: #7d8b9b;
+  --color-text-disabled: #4c5765;
+
+  --color-accent: #3b82f6;
+  --color-accent-hover: #2563eb;
+  --color-accent-muted: rgba(59, 130, 246, 0.15);
+
+  --color-success: #10b981;
+  --color-success-muted: rgba(16, 185, 129, 0.15);
+  --color-success-text: #34d399;
+
+  --color-warning: #f59e0b;
+  --color-warning-muted: rgba(245, 158, 11, 0.15);
+  --color-warning-text: #fbbf24;
+
+  --color-danger: #ef4444;
+  --color-danger-muted: rgba(239, 68, 68, 0.15);
+  --color-danger-text: #f87171;
+
+  --color-info: #06b6d4;
+  --color-info-muted: rgba(6, 182, 212, 0.15);
+}
+
+/* ============================================================================
+   Theme: Fluffy Light (Dense Professional Light)
+   ============================================================================ */
+[data-theme="fluffyLight"] {
+  --color-bg: #f3f4f6;
+  --color-surface-subtle: #ffffff;
+  --color-surface: #ffffff;
+  --color-surface-elevated: #f8fafc;
+  --color-surface-hover: #e2e8f0;
+  --color-surface-active: #cbd5e1;
+
+  --color-border-subtle: #e5e7eb;
+  --color-border: #d1d5db;
+  --color-border-strong: #9ca3af;
+  --color-border-focus: #2563eb;
+
+  --color-text: #111827;
+  --color-text-secondary: #374151;
+  --color-text-muted: #6b7280;
+  --color-text-disabled: #9ca3af;
+
+  --color-accent: #2563eb;
+  --color-accent-hover: #1d4ed8;
+  --color-accent-muted: rgba(37, 99, 235, 0.1);
+
+  --color-success: #059669;
+  --color-success-muted: rgba(5, 150, 105, 0.1);
+  --color-success-text: #047857;
+
+  --color-warning: #d97706;
+  --color-warning-muted: rgba(217, 119, 6, 0.1);
+  --color-warning-text: #b45309;
+
+  --color-danger: #dc2626;
+  --color-danger-muted: rgba(220, 38, 38, 0.1);
+  --color-danger-text: #b91c1c;
+
+  --color-info: #0891b2;
+  --color-info-muted: rgba(8, 145, 178, 0.1);
+
+  --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.06);
+  --shadow-md: 0 4px 10px rgba(0, 0, 0, 0.1);
+  --shadow-lg: 0 10px 24px rgba(0, 0, 0, 0.15);
+}
+
+/* ============================================================================
+   Theme: Fluffy High Contrast (Operational Accessibility)
+   ============================================================================ */
+[data-theme="highContrast"] {
+  --color-bg: #000000;
+  --color-surface-subtle: #0a0a0a;
+  --color-surface: #101010;
+  --color-surface-elevated: #1a1a1a;
+  --color-surface-hover: #262626;
+  --color-surface-active: #333333;
+
+  --color-border-subtle: #444444;
+  --color-border: #ffffff;
+  --color-border-strong: #ffffff;
+  --color-border-focus: #ffff00;
+
+  --color-text: #ffffff;
+  --color-text-secondary: #f0f0f0;
+  --color-text-muted: #d0d0d0;
+  --color-text-disabled: #808080;
+
+  --color-accent: #00ffff;
+  --color-accent-hover: #55ffff;
+  --color-accent-muted: rgba(0, 255, 255, 0.25);
+
+  --color-success: #00ff00;
+  --color-success-muted: rgba(0, 255, 0, 0.25);
+  --color-success-text: #00ff00;
+
+  --color-warning: #ffff00;
+  --color-warning-muted: rgba(255, 255, 0, 0.25);
+  --color-warning-text: #ffff00;
+
+  --color-danger: #ff3333;
+  --color-danger-muted: rgba(255, 51, 51, 0.25);
+  --color-danger-text: #ff3333;
+
+  --color-info: #00ffff;
+  --color-info-muted: rgba(0, 255, 255, 0.25);
+
+  --shadow-sm: none;
+  --shadow-md: none;
+  --shadow-lg: 0 0 0 2px #ffffff;
+}

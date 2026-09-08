@@ -1,12 +1,12 @@
-import socket
-import json
+"""
+Backward-compatibility shim for commands -> brain.runtime.commands
+"""
+import sys
+from brain.runtime import commands as _runtime_commands
 
-COMMAND_HOST = "127.0.0.1"
-COMMAND_PORT = 9002
+sys.modules["commands"] = _runtime_commands
+sys.modules["brain.commands"] = _runtime_commands
 
+from brain.runtime.commands import COMMAND_HOST, COMMAND_PORT, send_command
 
-def send_command(command: dict):
-    s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-    s.connect((COMMAND_HOST, COMMAND_PORT))
-    s.sendall((json.dumps(command) + "\n").encode())
-    s.close()
+__all__ = ["COMMAND_HOST", "COMMAND_PORT", "send_command"]

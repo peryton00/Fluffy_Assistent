@@ -1,4 +1,5 @@
 use serde::{Deserialize, Serialize};
+use crate::capabilities::types::CapabilityRequest;
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
 pub enum Command {
@@ -18,4 +19,8 @@ pub enum Command {
 
     // UI state sync
     SetUiActive { active: bool },
+
+    // First-Class Native Capability Protocol
+    Capability { request: CapabilityRequest },
+    DiscoverCapabilities,
 }

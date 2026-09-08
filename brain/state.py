@@ -1,71 +1,34 @@
-from threading import Lock
+"""
+Backward-compatibility shim and module alias for state -> brain.runtime.state
+Ensures state singleton identity is shared across all import paths.
+"""
+import sys
+from brain.runtime import state as _runtime_state
 
-LATEST_STATE = None
-EXECUTION_LOGS = []
-PENDING_CONFIRMATIONS = []
-SECURITY_ALERTS = []
-ACTIVE_VERDICTS = {}
-MONITOR = None
-UI_ACTIVE = False
-LOCK = Lock()
-SHUTDOWN_MODE = False
-PENDING_CHAT_COMMAND = None  # Stores (command, validation) tuple
-WELCOME_SPOKEN = False
-TTS_MUTED = False
+# Alias sys.modules entries to guarantee single instance
+sys.modules["state"] = _runtime_state
+sys.modules["brain.state"] = _runtime_state
 
-
-def update_state(state_update):
-    global LATEST_STATE
-    with LOCK:
-        if LATEST_STATE is None:
-            LATEST_STATE = state_update
-        else:
-            LATEST_STATE.update(state_update)
-
-
-def add_execution_log(message, level="info"):
-    with LOCK:
-        EXECUTION_LOGS.append({"message": message, "level": level})
-
-
-def add_confirmation(cmd_id, cmd_name, details):
-    with LOCK:
-        PENDING_CONFIRMATIONS.append({
-            "command_id": cmd_id,
-            "command_name": cmd_name,
-            "details": details
-        })
-
-
-def get_confirmations():
-    with LOCK:
-        return list(PENDING_CONFIRMATIONS)
-
-
-def remove_confirmation(cmd_id):
-    global PENDING_CONFIRMATIONS
-    with LOCK:
-        PENDING_CONFIRMATIONS = [c for c in PENDING_CONFIRMATIONS if c["command_id"] != cmd_id]
-
-
-def update_security_alerts(alerts):
-    global SECURITY_ALERTS
-    with LOCK:
-        SECURITY_ALERTS = alerts
-
-
-NOTIFICATIONS = []
-
-def add_notification(message, type="info"):
-    with LOCK:
-        NOTIFICATIONS.append({"message": message, "type": type})
-
-def get_notifications():
-    global NOTIFICATIONS
-    with LOCK:
-        if not NOTIFICATIONS:
-            return []
-        notifs = list(NOTIFICATIONS)
-        NOTIFICATIONS = []
-        return notifs
-
+from brain.runtime.state import (
+    LATEST_STATE,
+    EXECUTION_LOGS,
+    PENDING_CONFIRMATIONS,
+    SECURITY_ALERTS,
+    ACTIVE_VERDICTS,
+    MONITOR,
+    UI_ACTIVE,
+    LOCK,
+    SHUTDOWN_MODE,
+    PENDING_CHAT_COMMAND,
+    WELCOME_SPOKEN,
+    TTS_MUTED,
+    NOTIFICATIONS,
+    update_state,
+    add_execution_log,
+    add_confirmation,
+    get_confirmations,
+    remove_confirmation,
+    update_security_alerts,
+    add_notification,
+    get_notifications,
+)

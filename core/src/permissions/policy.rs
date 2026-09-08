@@ -1,5 +1,7 @@
 use crate::ipc::command::Command;
 use crate::permissions::decision::PermissionDecision;
+use crate::capabilities::registry::CapabilityRegistry;
+use crate::capabilities::types::SecurityTier;
 
 pub fn evaluate(cmd: &Command) -> PermissionDecision {
     match cmd {
@@ -7,6 +9,29 @@ pub fn evaluate(cmd: &Command) -> PermissionDecision {
         &Command::Confirm { .. } | &Command::Cancel { .. } => {
             PermissionDecision::Deny {
                 reason: "Confirmation commands are not executable actions".into(),
+            }
+        }
+
+        // Capability discovery is always read-only / allowed
+        &Command::DiscoverCapabilities => PermissionDecision::Allow,
+
+        // Native capability evaluation
+        Command::Capability { request } => {
+            let registry = CapabilityRegistry::default();
+            if let Some(meta) = registry.get_metadata(&request.id) {
+                if meta.security_tier == SecurityTier::Blocked {
+                    return PermissionDecision::Deny {
+                        reason: format!("Capability '{}' is blocked by security policy", request.id),
+                    };
+                }
+                if meta.requires_confirmation {
+                    return PermissionDecision::RequireConfirmation {
+                        reason: format!("Native capability '{}' modifies system state and requires confirmation", request.id),
+                    };
+                }
+                PermissionDecision::Allow
+            } else {
+                PermissionDecision::Allow // Will be rejected as unknown_capability during dispatch
             }
         }
 

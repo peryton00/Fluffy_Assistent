@@ -1,10 +1,12 @@
 import { defineConfig } from "vite";
+import react from "@vitejs/plugin-react";
 
 // @ts-expect-error process is a nodejs global
 const host = process.env.TAURI_DEV_HOST;
 
 // https://vite.dev/config/
 export default defineConfig(async () => ({
+  plugins: [react()],
 
   // Vite options tailored for Tauri development and only applied in `tauri dev` or `tauri build`
   //
@@ -27,6 +29,7 @@ export default defineConfig(async () => ({
       ignored: ["**/src-tauri/**"],
     },
     proxy: {
+      '/config/token': 'http://127.0.0.1:5123',
       '/status': 'http://127.0.0.1:5123',
       '/logs': 'http://127.0.0.1:5123',
       '/command': 'http://127.0.0.1:5123',
@@ -36,6 +39,7 @@ export default defineConfig(async () => ({
       '/security_action': 'http://127.0.0.1:5123',
       '/net-speed': 'http://127.0.0.1:5123',
       '/trust_process': 'http://127.0.0.1:5123',
+      '/clear_guardian': 'http://127.0.0.1:5123',
       '/clear_guardian_data': 'http://127.0.0.1:5123',
       '/tts_test': 'http://127.0.0.1:5123',
       '/test_stt': 'http://127.0.0.1:5123',
@@ -45,15 +49,15 @@ export default defineConfig(async () => ({
       '/chat': 'http://127.0.0.1:5123',
       '/stop_tts': 'http://127.0.0.1:5123',
       '/tts': 'http://127.0.0.1:5123',
-      '/ftp/start': 'http://127.0.0.1:5123',
-      '/ftp/stop': 'http://127.0.0.1:5123',
-      '/ftp/status': 'http://127.0.0.1:5123',
-      '/ftp/logs': 'http://127.0.0.1:5123',
-      '/ftp/clear_logs': 'http://127.0.0.1:5123',
-      '/ftp/qr': 'http://127.0.0.1:5123',
-      '/ftp/disconnect': 'http://127.0.0.1:5123',
+      '/memory': 'http://127.0.0.1:5123',
+      '/session': 'http://127.0.0.1:5123',
+      '/extensions': 'http://127.0.0.1:5123',
+      '/llm': 'http://127.0.0.1:5123',
+      '/ftp': 'http://127.0.0.1:5123',
       '/network': 'http://127.0.0.1:5123',
-      '/cluster': 'http://127.0.0.1:5123'
+      '/cluster': 'http://127.0.0.1:5123',
+      '/cancellable_actions': 'http://127.0.0.1:5123',
+      '/pending_confirmations': 'http://127.0.0.1:5123'
     }
   },
 }));

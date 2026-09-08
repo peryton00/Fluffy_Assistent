@@ -14,6 +14,15 @@ pub struct SafetyValidator {
     system_extensions: Vec<String>,
 }
 
+fn strip_unc_prefix(path: PathBuf) -> PathBuf {
+    let s = path.to_string_lossy();
+    if let Some(stripped) = s.strip_prefix(r"\\?\") {
+        PathBuf::from(stripped)
+    } else {
+        path
+    }
+}
+
 impl SafetyValidator {
     pub fn new() -> Self {
         let protected_paths = Self::get_protected_paths();
@@ -83,16 +92,23 @@ impl SafetyValidator {
 
     /// Check if a path is safe to operate on
     pub fn check_path(&self, path: &PathBuf) -> SafetyLevel {
-        // Normalize path
+        // Normalize path and strip UNC prefix on Windows
         let canonical = match path.canonicalize() {
-            Ok(p) => p,
+            Ok(p) => strip_unc_prefix(p),
             Err(_) => {
                 // Path doesn't exist yet (e.g., creating new file)
                 // Check parent directory
                 if let Some(parent) = path.parent() {
                     match parent.canonicalize() {
-                        Ok(p) => p,
-                        Err(_) => return SafetyLevel::Blocked,
+                        Ok(p) => strip_unc_prefix(p),
+                        Err(_) => {
+                            // If parent also doesn't exist, check raw path against protected
+                            let raw_clean = strip_unc_prefix(path.clone());
+                            if self.is_protected(&raw_clean) {
+                                return SafetyLevel::Blocked;
+                            }
+                            return SafetyLevel::NeedsConfirmation;
+                        }
                     }
                 } else {
                     return SafetyLevel::Blocked;
@@ -120,8 +136,10 @@ impl SafetyValidator {
 
     /// Check if path is in protected directories
     fn is_protected(&self, path: &PathBuf) -> bool {
+        let clean_path = strip_unc_prefix(path.clone());
         for protected in &self.protected_paths {
-            if path.starts_with(protected) {
+            let clean_protected = strip_unc_prefix(protected.clone());
+            if clean_path.starts_with(&clean_protected) {
                 return true;
             }
         }
@@ -130,8 +148,10 @@ impl SafetyValidator {
 
     /// Check if path is in allowed directories
     fn is_allowed(&self, path: &PathBuf) -> bool {
+        let clean_path = strip_unc_prefix(path.clone());
         for allowed in &self.allowed_paths {
-            if path.starts_with(allowed) {
+            let clean_allowed = strip_unc_prefix(allowed.clone());
+            if clean_path.starts_with(&clean_allowed) {
                 return true;
             }
         }

@@ -2,5 +2,14 @@
   {
     "timestamp": "2026-07-03T00:01:45.681179",
     "event": "server_stopped"
+  },
+  {
+    "timestamp": "2026-09-09T04:19:42.507589",
+    "event": "server_started",
+    "details": {
+      "ip": "192.168.1.38",
+      "port": 2121,
+      "shared_dir": "C:\\Users\\sudip\\OneDrive\\Desktop\\webProjects\\FluffyAssistent\\FluffyShared"
+    }
   }
 ]

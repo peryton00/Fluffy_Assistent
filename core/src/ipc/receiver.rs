@@ -19,13 +19,22 @@ pub fn start_command_server(port: u16) {
 
     std::thread::spawn(move || {
         for stream in listener.incoming() {
-            if let Ok(stream) = stream {
-                let reader = BufReader::new(stream);
-                for line in reader.lines().flatten() {
-                    println!("[Fluffy Core] Received command line: {}", line);
-                    match serde_json::from_str::<IpcCommand>(&line) {
-                        Ok(cmd) => handle_command(cmd),
-                        Err(e) => eprintln!("[Fluffy Core] Failed to parse command: {}", e),
+            if let Ok(mut stream) = stream {
+                if let Ok(cloned_stream) = stream.try_clone() {
+                    let reader = BufReader::new(cloned_stream);
+                    for line in reader.lines().flatten() {
+                        println!("[Fluffy Core] Received command line: {}", line);
+                        match serde_json::from_str::<IpcCommand>(&line) {
+                            Ok(cmd) => {
+                                let response = handle_command(cmd);
+                                if let Some(resp_str) = response {
+                                    use std::io::Write;
+                                    let _ = writeln!(stream, "{}", resp_str);
+                                    let _ = stream.flush();
+                                }
+                            }
+                            Err(e) => eprintln!("[Fluffy Core] Failed to parse command: {}", e),
+                        }
                     }
                 }
             }
@@ -40,25 +49,82 @@ const PROTECTED_PROCESSES: &[&str] = &["csrss.exe", "wininit.exe", "lsass.exe", 
 #[cfg(not(target_os = "windows"))]
 const PROTECTED_PROCESSES: &[&str] = &["init", "systemd", "kthreadd", "ksoftirqd", "rcu_sched", "sshd"];
 
-fn handle_command(cmd: IpcCommand) {
+fn handle_command(cmd: IpcCommand) -> Option<String> {
     match cmd {
+        IpcCommand::DiscoverCapabilities => {
+            let manifest = crate::capabilities::discover_capabilities();
+            Some(serde_json::to_string(&manifest).unwrap_or_default())
+        }
+
+        IpcCommand::Capability { request } => {
+            match evaluate(&IpcCommand::Capability { request: request.clone() }) {
+                PermissionDecision::Allow => {
+                    let resp = crate::capabilities::dispatch_capability(&request);
+                    Some(serde_json::to_string(&resp).unwrap_or_default())
+                }
+
+                PermissionDecision::RequireConfirmation { reason } => {
+                    let id = Uuid::new_v4().to_string();
+                    PENDING.lock().unwrap().insert(id.clone(), IpcCommand::Capability { request: request.clone() });
+
+                    // Broadcast confirmation request as JSON over IPC
+                    let payload = serde_json::json!({
+                        "type": "confirm_required",
+                        "command_id": id,
+                        "command_name": format!("{:?}", request.id),
+                        "details": reason
+                    });
+
+                    crate::ipc::server::IpcServer::broadcast_global(&crate::ipc::protocol::IpcMessage {
+                        schema_version: "1.0".to_string(),
+                        payload,
+                    });
+
+                    let err_resp = crate::capabilities::types::CapabilityResponse::err(
+                        request.request_id,
+                        crate::capabilities::types::CapabilityError::with_details(
+                            "confirmation_required",
+                            reason,
+                            serde_json::json!({"command_id": id}),
+                        ),
+                    );
+                    Some(serde_json::to_string(&err_resp).unwrap_or_default())
+                }
+
+                PermissionDecision::Deny { reason } => {
+                    println!("[DENIED] {}", reason);
+                    let err_resp = crate::capabilities::types::CapabilityResponse::err(
+                        request.request_id,
+                        crate::capabilities::types::CapabilityError::new("permission_denied", reason),
+                    );
+                    Some(serde_json::to_string(&err_resp).unwrap_or_default())
+                }
+            }
+        }
+
         IpcCommand::Confirm { command_id } => {
             if let Some(original) = PENDING.lock().unwrap().remove(&command_id) {
                 execute(original);
             }
+            None
         }
 
         IpcCommand::Cancel { command_id } => {
             PENDING.lock().unwrap().remove(&command_id);
+            None
         }
 
         IpcCommand::SetUiActive { active } => {
             println!("[Fluffy Core] Setting UI Active status to: {}", active);
             crate::IS_UI_ACTIVE.store(active, std::sync::atomic::Ordering::SeqCst);
+            None
         }
 
         other => match evaluate(&other) {
-            PermissionDecision::Allow => execute(other),
+            PermissionDecision::Allow => {
+                execute(other);
+                None
+            }
 
             PermissionDecision::RequireConfirmation { reason } => {
                 let id = Uuid::new_v4().to_string();
@@ -76,10 +142,12 @@ fn handle_command(cmd: IpcCommand) {
                     schema_version: "1.0".to_string(),
                     payload,
                 });
+                None
             }
 
             PermissionDecision::Deny { reason } => {
                 println!("[DENIED] {}", reason);
+                None
             }
         },
     }

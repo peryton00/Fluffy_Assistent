@@ -4,6 +4,7 @@ mod etw;
 mod ipc;
 mod permissions;
 mod actions;
+pub use fluffy_core::capabilities;
 use fluffy_core::terminal;
 
 use etw::NetworkMonitor;
