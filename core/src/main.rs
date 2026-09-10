@@ -410,33 +410,43 @@ fn read_env_key(env_path: &str, key: &str) -> Option<String> {
 fn spawn_listener(is_production: bool) -> Option<std::process::Child> {
     println!("[Fluffy Core] Spawning Brain...");
 
-    let (brain_dir, env_file, default_python) = if is_production {
+    let cwd = std::env::current_dir().unwrap_or_else(|_| std::path::PathBuf::from("."));
+
+    let (brain_path, env_file, default_python) = if is_production {
         (
-            "brain",
-            ".env",
-            "./python/python.exe".to_string()
+            cwd.join("brain"),
+            cwd.join(".env"),
+            cwd.join("python").join("python.exe")
         )
     } else {
         (
-            "../brain",
-            "../.env",
-            if cfg!(target_os = "windows") { "../.venv/Scripts/python.exe".to_string() } else { "../.venv/bin/python".to_string() }
+            cwd.join("..").join("brain"),
+            cwd.join("..").join(".env"),
+            if cfg!(target_os = "windows") {
+                cwd.join("..").join(".venv").join("Scripts").join("python.exe")
+            } else {
+                cwd.join("..").join(".venv").join("bin").join("python")
+            }
         )
     };
 
-    let python_path = read_env_key(env_file, "PYTHON_PATH").unwrap_or_else(|| {
-        println!(
-            "[Fluffy Core] PYTHON_PATH not set in .env — using default: {}",
-            default_python
-        );
-        default_python
-    });
+    let python_path = read_env_key(&env_file.to_string_lossy(), "PYTHON_PATH")
+        .map(|p| {
+            let pb = std::path::PathBuf::from(&p);
+            if pb.is_relative() {
+                cwd.join(pb)
+            } else {
+                pb
+            }
+        })
+        .unwrap_or(default_python);
 
-    println!("[Fluffy Core] Using Python: {}", python_path);
+    println!("[Fluffy Core] Using Python: {:?}", python_path);
+    println!("[Fluffy Core] Brain Directory: {:?}", brain_path);
 
     let mut cmd = std::process::Command::new(&python_path);
     cmd.args(["listener.py"])
-        .current_dir(brain_dir)
+        .current_dir(&brain_path)
         .env("PYTHONUTF8", "1")
         .env("PYTHONIOENCODING", "utf-8");
 
@@ -447,12 +457,15 @@ fn spawn_listener(is_production: bool) -> Option<std::process::Child> {
     }
 
     match cmd.spawn() {
-        Ok(child) => Some(child),
+        Ok(child) => {
+            println!("[Fluffy Core] Brain process spawned successfully.");
+            Some(child)
+        }
         Err(e) => {
             eprintln!(
                 "[Fluffy Core] Failed to spawn brain: {}. \
-                 Check PYTHON_PATH in .env (currently: {}) and that brain/listener.py exists.",
-                e, python_path
+                 Check that {:?} and {:?}/listener.py exist.",
+                e, python_path, brain_path
             );
             None
         }

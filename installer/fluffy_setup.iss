@@ -7,7 +7,7 @@
 ; ============================================================
 
 #define MyAppName      "Fluffy Assistant"
-#define MyAppVersion   "1.0"
+#define MyAppVersion   "0.2.0"
 #define MyAppPublisher "Fluffy AI"
 #define MyAppURL       "https://github.com/peryton00/Fluffy_Assistent"
 #define MyAppExeName   "fluffy-launcher.exe"
@@ -37,7 +37,7 @@ ArchitecturesInstallIn64BitMode=x64
 
 ; Output
 OutputDir=.
-OutputBaseFilename=FluffyAssistant_v1.0_Win64
+OutputBaseFilename=FluffyAssistant_v0.2.0_Win64
 SetupIconFile=assets\fluffy_icon.ico
 UninstallDisplayIcon={app}\launcher\fluffy-launcher.exe
 
@@ -69,7 +69,7 @@ LicenseFile=assets\LICENSE.rtf
 Name: "english"; MessagesFile: "compiler:Default.isl"
 
 [Tasks]
-Name: "desktopicon";    Description: "Create a &Desktop shortcut";             GroupDescription: "Additional shortcuts:"; Flags: unchecked
+Name: "desktopicon";    Description: "Create a &Desktop shortcut";             GroupDescription: "Additional shortcuts:"
 Name: "startupicon";    Description: "Start Fluffy Assistant when Windows starts"; GroupDescription: "Additional shortcuts:"; Flags: unchecked
 
 ; ── File Installation ─────────────────────────────────────────────────────────

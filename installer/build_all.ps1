@@ -1,5 +1,4 @@
-# Fluffy Assistant - Master Build Script
-# Output: installer/FluffyAssistant_v1.0_Win64.exe
+# Output: installer/FluffyAssistant_v0.2.0_Win64.exe
 #
 # PREREQUISITES:
 #   Rust toolchain: https://rustup.rs
@@ -11,14 +10,14 @@ $ErrorActionPreference = "Stop"
 
 $ScriptDir   = Split-Path -Parent $MyInvocation.MyCommand.Path
 $ProjectRoot = Split-Path -Parent $ScriptDir
-$OutputExe   = Join-Path $ScriptDir "FluffyAssistant_v1.0_Win64.exe"
+$OutputExe   = Join-Path $ScriptDir "FluffyAssistant_v0.2.0_Win64.exe"
 $DistDir     = Join-Path $ScriptDir "dist"
 $StartTime   = Get-Date
 
 Write-Host ""
 Write-Host "===========================================================" -ForegroundColor Cyan
 Write-Host "   FLUFFY ASSISTANT - INSTALLER BUILD" -ForegroundColor Cyan
-Write-Host "   FluffyAssistant_v1.0_Win64.exe" -ForegroundColor Cyan
+Write-Host "   FluffyAssistant_v0.2.0_Win64.exe" -ForegroundColor Cyan
 Write-Host "===========================================================" -ForegroundColor Cyan
 Write-Host ""
 
@@ -115,7 +114,7 @@ Write-Host "===========================================================" -Foregr
 Write-Host "  BUILD COMPLETE" -ForegroundColor Green
 if (Test-Path $OutputExe) {
     $MB = [math]::Round((Get-Item $OutputExe).Length / 1MB, 1)
-    Write-Host "  Output: FluffyAssistant_v1.0_Win64.exe ($MB MB)" -ForegroundColor Green
+    Write-Host "  Output: FluffyAssistant_v0.2.0_Win64.exe ($MB MB)" -ForegroundColor Green
 }
 Write-Host "  Time:   ${Min}m ${Sec}s" -ForegroundColor Green
 Write-Host "===========================================================" -ForegroundColor Green

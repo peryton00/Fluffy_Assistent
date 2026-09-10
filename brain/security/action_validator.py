@@ -1,7 +1,4 @@
-"""
-Action Validator - Safety checks and confirmation system for commands
-"""
-
+from __future__ import annotations
 from typing import Dict, Any, Tuple, Optional
 from pathlib import Path
 import os
