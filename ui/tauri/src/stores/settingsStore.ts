@@ -117,7 +117,7 @@ class SettingsStoreManager {
 
       if (prefsResult.status === "fulfilled" && prefsResult.value) {
         const p = prefsResult.value;
-        if (p.theme === "fluffyDark" || p.theme === "fluffyLight" || p.theme === "highContrast") {
+        if (p.theme === "fluffyDark" || p.theme === "fluffyLight" || p.theme === "transparent" || p.theme === "highContrast") {
           updatedGeneral.theme = p.theme;
         }
         if (typeof p.auto_normalize === "boolean") {

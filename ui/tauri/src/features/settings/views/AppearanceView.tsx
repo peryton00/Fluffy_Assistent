@@ -18,9 +18,10 @@ import {
   MoonIcon,
   ShieldIcon,
   CheckIcon,
+  SparklesIcon,
 } from "../../../components/common/Icons";
 
-type BuiltInTheme = "fluffyDark" | "fluffyLight" | "highContrast";
+type BuiltInTheme = "fluffyDark" | "fluffyLight" | "transparent" | "highContrast";
 
 const BUILT_IN_THEMES: Array<{
   id: BuiltInTheme;
@@ -37,6 +38,14 @@ const BUILT_IN_THEMES: Array<{
     icon: <MoonIcon size={16} />,
     bgPreview: "#12141c",
     borderPreview: "#2d3348",
+  },
+  {
+    id: "transparent",
+    name: "Aero Glass (Transparent)",
+    description: "Ultra-sleek frosted glassmorphism with dynamic ambient glow, crystal border speculars, and deep translucency.",
+    icon: <SparklesIcon size={16} />,
+    bgPreview: "linear-gradient(135deg, rgba(56,189,248,0.22) 0%, rgba(129,140,248,0.22) 100%)",
+    borderPreview: "#38bdf8",
   },
   {
     id: "fluffyLight",

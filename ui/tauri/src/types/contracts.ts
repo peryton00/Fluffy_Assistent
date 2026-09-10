@@ -841,14 +841,21 @@ export interface LlmModelsResponse {
   error?: string;
 }
 
+export interface UserPreferencesPayload {
+  theme?: "fluffyDark" | "fluffyLight" | "transparent" | "highContrast" | string;
+  ui_mode?: "dense" | "comfortable";
+  autoNormalize?: boolean;
+  alertThreshold?: number;
+  voiceSpeed?: number;
+  ttsMuted?: boolean;
+  reducedMotion?: boolean;
+}
+
 export interface GeneralSettingsState {
-  theme: "fluffyDark" | "fluffyLight" | "highContrast";
+  theme: "fluffyDark" | "fluffyLight" | "transparent" | "highContrast";
   autoNormalize: boolean;
   alertThreshold: number;
   voiceSpeed: number;
   ttsMuted: boolean;
   reducedMotion: boolean;
 }
-
-
-

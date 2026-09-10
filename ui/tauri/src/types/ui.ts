@@ -236,7 +236,7 @@ export type ConnectionState =
   | "REQUEST_FAILED"
   | "STALE";
 
-export type ThemeMode = "fluffyDark" | "fluffyLight" | "highContrast" | "custom";
+export type ThemeMode = "fluffyDark" | "fluffyLight" | "transparent" | "highContrast" | "custom";
 
 export interface CommandPaletteState {
   open: boolean;

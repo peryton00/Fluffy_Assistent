@@ -1,16 +1,19 @@
 export * from "./fluffyDark";
 export * from "./fluffyLight";
+export * from "./transparent";
 export * from "./highContrast";
 export * from "./vscodeThemeImporter";
 
 import { fluffyDarkTheme } from "./fluffyDark";
 import { fluffyLightTheme } from "./fluffyLight";
+import { transparentTheme } from "./transparent";
 import { highContrastTheme } from "./highContrast";
 import type { ThemeMode } from "../types/ui";
 
 export const THEMES = {
   fluffyDark: fluffyDarkTheme,
   fluffyLight: fluffyLightTheme,
+  transparent: transparentTheme,
   highContrast: highContrastTheme,
 } as const;
 

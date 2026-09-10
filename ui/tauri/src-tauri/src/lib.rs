@@ -114,6 +114,177 @@ fn get_system_disks() -> Vec<DiskPayload> {
         .collect()
 }
 
+fn custom_base64_encode(input: &[u8]) -> String {
+    const CHARSET: &[u8; 64] = b"ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/";
+    let mut out = String::with_capacity((input.len() + 2) / 3 * 4);
+    for chunk in input.chunks(3) {
+        let b0 = chunk[0] as u32;
+        let b1 = if chunk.len() > 1 { chunk[1] as u32 } else { 0 };
+        let b2 = if chunk.len() > 2 { chunk[2] as u32 } else { 0 };
+        let triple = (b0 << 16) | (b1 << 8) | b2;
+        out.push(CHARSET[((triple >> 18) & 0x3F) as usize] as char);
+        out.push(CHARSET[((triple >> 12) & 0x3F) as usize] as char);
+        if chunk.len() > 1 {
+            out.push(CHARSET[((triple >> 6) & 0x3F) as usize] as char);
+        } else {
+            out.push('=');
+        }
+        if chunk.len() > 2 {
+            out.push(CHARSET[(triple & 0x3F) as usize] as char);
+        } else {
+            out.push('=');
+        }
+    }
+    out
+}
+
+fn detect_image_mime(bytes: &[u8]) -> &'static str {
+    if bytes.len() >= 3 && bytes[0] == 0xFF && bytes[1] == 0xD8 && bytes[2] == 0xFF {
+        "image/jpeg"
+    } else if bytes.len() >= 8 && &bytes[0..8] == b"\x89PNG\r\n\x1a\n" {
+        "image/png"
+    } else if bytes.len() >= 12 && &bytes[0..4] == b"RIFF" && &bytes[8..12] == b"WEBP" {
+        "image/webp"
+    } else {
+        "image/jpeg"
+    }
+}
+
+#[tauri::command]
+fn get_system_wallpaper() -> Option<String> {
+    // 1. Windows Platform Detection
+    #[cfg(target_os = "windows")]
+    {
+        if let Ok(appdata) = std::env::var("APPDATA") {
+            let transcoded = std::path::PathBuf::from(&appdata)
+                .join("Microsoft")
+                .join("Windows")
+                .join("Themes")
+                .join("TranscodedWallpaper");
+            if transcoded.exists() {
+                if let Ok(bytes) = std::fs::read(&transcoded) {
+                    let mime = detect_image_mime(&bytes);
+                    let b64 = custom_base64_encode(&bytes);
+                    return Some(format!("data:{};base64,{}", mime, b64));
+                }
+            }
+
+            // Fallback: search CachedFiles directory
+            let cached_dir = std::path::PathBuf::from(appdata)
+                .join("Microsoft")
+                .join("Windows")
+                .join("Themes")
+                .join("CachedFiles");
+            if let Ok(entries) = std::fs::read_dir(cached_dir) {
+                for entry in entries.flatten() {
+                    let path = entry.path();
+                    if path.is_file() {
+                        if let Ok(bytes) = std::fs::read(&path) {
+                            let mime = detect_image_mime(&bytes);
+                            let b64 = custom_base64_encode(&bytes);
+                            return Some(format!("data:{};base64,{}", mime, b64));
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    // 2. macOS Platform Detection
+    #[cfg(target_os = "macos")]
+    {
+        // Try querying macOS desktop picture via AppleScript
+        let script = r#"tell application "System Events" to get picture of current desktop"#;
+        if let Ok(output) = std::process::Command::new("osascript")
+            .arg("-e")
+            .arg(script)
+            .output()
+        {
+            if output.status.success() {
+                let path_str = String::from_utf8_lossy(&output.stdout).trim().to_string();
+                let path = std::path::PathBuf::from(&path_str);
+                if path.exists() {
+                    if let Ok(bytes) = std::fs::read(&path) {
+                        let mime = detect_image_mime(&bytes);
+                        let b64 = custom_base64_encode(&bytes);
+                        return Some(format!("data:{};base64,{}", mime, b64));
+                    }
+                }
+            }
+        }
+
+        // Fallback standard macOS desktop pictures
+        let default_paths = [
+            "/System/Library/CoreServices/DefaultDesktop.heic",
+            "/Library/Desktop Pictures/Solid Colors/Stone.png",
+        ];
+        for p in &default_paths {
+            let path = std::path::PathBuf::from(p);
+            if path.exists() {
+                if let Ok(bytes) = std::fs::read(&path) {
+                    let mime = detect_image_mime(&bytes);
+                    let b64 = custom_base64_encode(&bytes);
+                    return Some(format!("data:{};base64,{}", mime, b64));
+                }
+            }
+        }
+    }
+
+    // 3. Linux Platform Detection (GNOME, Cinnamon, MATE, XFCE, KDE)
+    #[cfg(target_os = "linux")]
+    {
+        // GNOME / Unity / Cinnamon
+        let gsettings_queries = [
+            ("org.gnome.desktop.background", "picture-uri-dark"),
+            ("org.gnome.desktop.background", "picture-uri"),
+            ("org.cinnamon.desktop.background", "picture-uri"),
+            ("org.mate.background", "picture-filename"),
+        ];
+
+        for (schema, key) in &gsettings_queries {
+            if let Ok(output) = std::process::Command::new("gsettings")
+                .args(["get", schema, key])
+                .output()
+            {
+                if output.status.success() {
+                    let raw = String::from_utf8_lossy(&output.stdout).trim().to_string();
+                    let cleaned = raw.trim_matches('\'').trim_matches('"');
+                    let file_path = cleaned.strip_prefix("file://").unwrap_or(cleaned);
+                    let path = std::path::PathBuf::from(file_path);
+                    if path.exists() {
+                        if let Ok(bytes) = std::fs::read(&path) {
+                            let mime = detect_image_mime(&bytes);
+                            let b64 = custom_base64_encode(&bytes);
+                            return Some(format!("data:{};base64,{}", mime, b64));
+                        }
+                    }
+                }
+            }
+        }
+
+        // XFCE query
+        if let Ok(output) = std::process::Command::new("xfconf-query")
+            .args(["-c", "xfce4-desktop", "-p", "/backdrop/screen0/monitor0/workspace0/last-image"])
+            .output()
+        {
+            if output.status.success() {
+                let path_str = String::from_utf8_lossy(&output.stdout).trim().to_string();
+                let path = std::path::PathBuf::from(&path_str);
+                if path.exists() {
+                    if let Ok(bytes) = std::fs::read(&path) {
+                        let mime = detect_image_mime(&bytes);
+                        let b64 = custom_base64_encode(&bytes);
+                        return Some(format!("data:{};base64,{}", mime, b64));
+                    }
+                }
+            }
+        }
+    }
+
+    None
+}
+
+
 #[tauri::command]
 fn graceful_shutdown(app: tauri::AppHandle) {
     println!("[Fluffy Rust] Graceful shutdown requested from Frontend");
@@ -127,7 +298,7 @@ pub fn run() {
         .plugin(tauri_plugin_opener::init())
         .plugin(tauri_plugin_shell::init())
         .plugin(tauri_plugin_dialog::init())
-        .invoke_handler(tauri::generate_handler![graceful_shutdown, get_system_disks])
+        .invoke_handler(tauri::generate_handler![graceful_shutdown, get_system_disks, get_system_wallpaper])
         .manage(AppState {
             python_child: Mutex::new(None),
         })

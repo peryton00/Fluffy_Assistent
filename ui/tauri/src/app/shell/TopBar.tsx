@@ -30,7 +30,8 @@ export const TopBar: React.FC = () => {
   const handleNextTheme = () => {
     const cycle: Record<ThemeMode, ThemeMode> = {
       fluffyDark: "fluffyLight",
-      fluffyLight: "highContrast",
+      fluffyLight: "transparent",
+      transparent: "highContrast",
       highContrast: "fluffyDark",
       custom: "fluffyDark",
     };
