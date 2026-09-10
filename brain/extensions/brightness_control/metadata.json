@@ -1,0 +1,22 @@
+{
+  "name": "brightness control",
+  "intent": "brightness_control",
+  "version": "1.0.0",
+  "description": "",
+  "author": "User",
+  "created": "2026-09-11T04:24:06.804370",
+  "updated": "2026-09-11T04:24:06.804394",
+  "language": "python",
+  "has_ui": false,
+  "patterns": [
+    "brightness"
+  ],
+  "triggers": [
+    "brightness",
+    "brightness control"
+  ],
+  "aliases": [],
+  "parameters": {},
+  "enabled": true,
+  "safety_level": "needs_confirmation"
+}

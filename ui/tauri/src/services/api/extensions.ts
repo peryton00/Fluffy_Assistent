@@ -20,7 +20,19 @@ import type {
   ExtensionRunPayload,
   ExtensionRunResponse,
   ExtensionOpenVscodeResponse,
+  ExtensionCreatePayload,
+  ExtensionCreateResponse,
 } from "../../types/contracts";
+
+/**
+ * Create a new custom extension from code and hot-register in Python Brain.
+ */
+export async function createExtension(
+  payload: ExtensionCreatePayload,
+  options?: RequestOptions
+): Promise<ExtensionCreateResponse> {
+  return apiClient.post<ExtensionCreateResponse>("/extensions", payload, options);
+}
 
 /**
  * Fetch list of all installed extensions.
@@ -39,8 +51,8 @@ export async function fetchExtensionDetail(
   intent: string,
   options?: RequestOptions
 ): Promise<ExtensionDetail | null> {
-  const res = await apiClient.get<ExtensionDetailResponse>(`/extensions/${encodeURIComponent(intent)}`, options);
-  return res.extension || null;
+  const res = await apiClient.get<ExtensionDetailResponse & ExtensionDetail>(`/extensions/${encodeURIComponent(intent)}`, options);
+  return res.extension || (res.intent ? (res as ExtensionDetail) : null);
 }
 
 /**

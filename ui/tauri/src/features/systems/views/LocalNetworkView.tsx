@@ -13,23 +13,13 @@
 
 import React, { useEffect, useState, useMemo } from "react";
 import { useLocalNetworkStore, localNetworkStoreManager } from "../../../stores/localNetworkStore";
-import { useUiStore } from "../../../stores/uiStore";
-import type {
-
-  LocalNetworkInterface,
-  LocalNetworkDevice,
-  LocalNetworkFlow,
-  LocalWifiProfile,
-} from "../../../types/contracts";
+import { uiStore } from "../../../stores/uiStore";
 import {
   ActivityIcon,
   RefreshIcon,
   WifiIcon,
-  ServerIcon,
   SearchIcon,
-  CheckCircleIcon,
   AlertTriangleIcon,
-  CheckIcon,
   ShieldCheckIcon,
 } from "../../../components/common/Icons";
 
@@ -231,7 +221,7 @@ export const LocalNetworkView: React.FC = () => {
         {/* Refresh & Polling Controls */}
         <div style={{ display: "flex", alignItems: "center", gap: "var(--space-2)" }}>
           <button
-            onClick={() => useUiStore.getState().setActiveSidebarView("network_intelligence")}
+            onClick={() => uiStore.setActiveSidebarView("network_intelligence")}
             style={{
               padding: "var(--space-1) var(--space-3)",
               fontSize: "11px",

@@ -1,0 +1,1 @@
+"""Extension: disable_location"""

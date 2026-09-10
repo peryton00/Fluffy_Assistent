@@ -1,1 +1,0 @@
-"""Extension: scan_wifi"""

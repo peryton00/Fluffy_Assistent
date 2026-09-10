@@ -216,8 +216,10 @@ class IntentRouter:
             class _MockIntent:
                 def __init__(self, v): self.value = v
 
-            cmd = Command(intent=_MockIntent(intent_value), parameters=understanding.parameters, raw_text=understanding.original_text)
-            cmd.llm_response = understanding.text
+            raw_text = getattr(understanding, "original_text", "") or getattr(understanding, "text", "")
+            parameters = getattr(understanding, "parameters", {}) or {}
+            cmd = Command(intent=_MockIntent(intent_value), parameters=parameters, raw_text=raw_text)
+            cmd.llm_response = getattr(understanding, "text", "")
 
             from brain.security.action_validator import ActionValidator
             validator = ActionValidator()
@@ -234,7 +236,7 @@ class IntentRouter:
             success = result.get("success", False)
             if success:
                 exec_msg = result.get("message")
-                llm_ack = understanding.text
+                llm_ack = getattr(understanding, "text", "")
                 
                 if exec_msg and len(exec_msg) > 5 and exec_msg != "Success":
                     response_text = exec_msg

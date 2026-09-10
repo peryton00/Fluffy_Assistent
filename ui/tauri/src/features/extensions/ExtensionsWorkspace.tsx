@@ -16,17 +16,41 @@ import { WebUiView } from "./views/WebUiView";
 export const ExtensionsWorkspace: React.FC = () => {
   const activeSidebarView = useUiStore((s) => s.activeSidebarView);
 
-  const renderContent = () => {
-    switch (activeSidebarView) {
-      case "code":
-        return <CodeView />;
-      case "web_ui":
-        return <WebUiView />;
-      case "installed":
-      default:
-        return <InstalledView />;
-    }
-  };
+  if (activeSidebarView === "code") {
+    return (
+      <div
+        style={{
+          flex: 1,
+          display: "flex",
+          flexDirection: "column",
+          height: "100%",
+          minHeight: 0,
+          overflow: "hidden",
+          backgroundColor: "var(--color-bg)",
+        }}
+      >
+        <CodeView />
+      </div>
+    );
+  }
+
+  if (activeSidebarView === "web_ui") {
+    return (
+      <div
+        style={{
+          flex: 1,
+          display: "flex",
+          flexDirection: "column",
+          height: "100%",
+          minHeight: 0,
+          overflow: "hidden",
+          backgroundColor: "var(--color-bg)",
+        }}
+      >
+        <WebUiView />
+      </div>
+    );
+  }
 
   return (
     <div
@@ -41,7 +65,7 @@ export const ExtensionsWorkspace: React.FC = () => {
       }}
     >
       <div style={{ maxWidth: "1280px", width: "100%", margin: "0 auto", display: "flex", flexDirection: "column", gap: "var(--space-4)" }}>
-        {renderContent()}
+        <InstalledView />
       </div>
     </div>
   );

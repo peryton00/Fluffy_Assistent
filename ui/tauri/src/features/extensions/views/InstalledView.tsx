@@ -6,16 +6,18 @@
  * Styled using Fluffy semantic design tokens.
  */
 
-import React, { useEffect, useMemo } from "react";
+import React, { useState, useEffect, useMemo } from "react";
 import { useExtensionsStore, extensionsStore } from "../../../stores/extensionsStore";
 import { useUiStore } from "../../../stores/uiStore";
 import { ExtensionCard } from "../components/ExtensionCard";
+import { CreateExtensionModal } from "../components/CreateExtensionModal";
 import {
   SearchIcon,
   RefreshCwIcon,
   PuzzleIcon,
   FilterIcon,
   AlertTriangleIcon,
+  PlusIcon,
 } from "../../../components/common/Icons";
 
 export const InstalledView: React.FC = () => {
@@ -28,6 +30,8 @@ export const InstalledView: React.FC = () => {
     searchQuery,
     filter,
   } = useExtensionsStore();
+
+  const [isCreateOpen, setIsCreateOpen] = useState<boolean>(false);
 
   const setSidebarView = useUiStore((s) => s.setSidebarView);
   const selectInspectorItem = useUiStore((s) => s.selectInspectorItem);
@@ -207,6 +211,30 @@ export const InstalledView: React.FC = () => {
 
           <button
             type="button"
+            onClick={() => setIsCreateOpen(true)}
+            title="Create a new custom extension"
+            style={{
+              display: "inline-flex",
+              alignItems: "center",
+              gap: "6px",
+              padding: "6px 14px",
+              borderRadius: "var(--radius-xs)",
+              fontSize: "var(--font-size-xs)",
+              fontWeight: "var(--font-weight-semibold)",
+              backgroundColor: "var(--color-accent)",
+              color: "#ffffff",
+              border: "none",
+              cursor: "pointer",
+              boxShadow: "var(--shadow-sm)",
+              whiteSpace: "nowrap",
+            }}
+          >
+            <PlusIcon size={13} />
+            <span>New Extension</span>
+          </button>
+
+          <button
+            type="button"
             onClick={() => extensionsStore.loadExtensions(true)}
             disabled={loading}
             title="Refresh extension registry"
@@ -333,8 +361,8 @@ export const InstalledView: React.FC = () => {
               flexDirection: "column",
               alignItems: "center",
               justifyContent: "center",
-              height: "220px",
-              gap: "var(--space-2)",
+              height: "240px",
+              gap: "var(--space-3)",
               textAlign: "center",
               color: "var(--color-text-muted)",
               border: "1px dashed var(--color-border)",
@@ -343,15 +371,36 @@ export const InstalledView: React.FC = () => {
               padding: "var(--space-6)",
             }}
           >
-            <PuzzleIcon size={28} style={{ opacity: 0.4 }} />
+            <PuzzleIcon size={32} style={{ opacity: 0.4 }} />
             <p style={{ fontSize: "var(--font-size-sm)", fontWeight: "var(--font-weight-semibold)", color: "var(--color-text)", margin: 0 }}>
               No extensions found
             </p>
             <p style={{ fontSize: "var(--font-size-xs)", maxWidth: "380px", margin: "4px 0 0" }}>
               {searchQuery
-                ? `No installed extension matches query "${searchQuery}".`
-                : "No extensions are currently installed in the Python Brain runtime directory."}
+                 ? `No installed extension matches query "${searchQuery}".`
+                 : "No custom extensions installed. Create your first operational skill for Fluffy AI."}
             </p>
+            <button
+              type="button"
+              onClick={() => setIsCreateOpen(true)}
+              style={{
+                display: "inline-flex",
+                alignItems: "center",
+                gap: "6px",
+                marginTop: "var(--space-2)",
+                padding: "6px 14px",
+                borderRadius: "var(--radius-xs)",
+                fontSize: "var(--font-size-xs)",
+                fontWeight: "var(--font-weight-medium)",
+                backgroundColor: "var(--color-accent-subtle)",
+                color: "var(--color-accent)",
+                border: "1px solid var(--color-accent-border)",
+                cursor: "pointer",
+              }}
+            >
+              <PlusIcon size={13} />
+              <span>Create Extension</span>
+            </button>
           </div>
         ) : (
           <div
@@ -379,6 +428,15 @@ export const InstalledView: React.FC = () => {
           </div>
         )}
       </div>
+
+      {/* Create Extension Modal */}
+      <CreateExtensionModal
+        isOpen={isCreateOpen}
+        onClose={() => setIsCreateOpen(false)}
+        onCreated={(intent) => {
+          handleViewCode(intent);
+        }}
+      />
     </div>
   );
 };

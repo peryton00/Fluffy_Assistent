@@ -20,17 +20,12 @@ import {
 } from "../../../stores/networkIntelligenceStore";
 import { useUiStore } from "../../../stores/uiStore";
 import type {
-  ClassifiedNetworkDevice,
-  ManagedLocalService,
-  NetworkChangeEvent,
   DeviceCategory,
 } from "../../../types/contracts";
 import {
   ActivityIcon,
   RefreshIcon,
   SearchIcon,
-  CheckCircleIcon,
-  AlertTriangleIcon,
   ServerIcon,
   LayersIcon,
   CpuIcon,

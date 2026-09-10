@@ -741,6 +741,27 @@ export interface ExtensionOpenVscodeResponse {
   error?: string;
 }
 
+export interface ExtensionCreatePayload {
+  intent: string;
+  name?: string;
+  description?: string;
+  language?: "python" | "javascript" | string;
+  code?: string;
+  patterns?: string[];
+  triggers?: string[];
+  parameters?: Record<string, unknown>;
+  author?: string;
+}
+
+export interface ExtensionCreateResponse {
+  ok: boolean;
+  success?: boolean;
+  intent?: string;
+  name?: string;
+  message?: string;
+  error?: string;
+}
+
 // ============================================================================
 // 9. FTP Domain Contracts (HTTP 5123 /ftp/*)
 // ============================================================================

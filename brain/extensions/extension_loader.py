@@ -239,7 +239,7 @@ class ExtensionLoader:
             return True
             
         except Exception as e:
-            print(f"[ExtensionLoader] \u2717 Failed to reload {intent}: {e}")
+            print(f"[ExtensionLoader] [ERROR] Failed to reload {intent}: {e}")
             return False
     
     def load_registry(self) -> dict:

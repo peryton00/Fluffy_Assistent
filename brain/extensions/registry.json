@@ -19,21 +19,6 @@
     "enabled": true,
     "author": "Fluffy AI"
   },
-  "scan_wifi": {
-    "name": "scan_wifi",
-    "intent": "scan_wifi",
-    "patterns": [
-      "scan\\s+wifi",
-      "list\\s+nearby\\s+wifi",
-      "wifi\\s+networks"
-    ],
-    "description": "A tool that utilizes the system's network scanning capabilities to list nearby WiFi networks, possibly using libraries such as scapy for Python or WiFi API for Windows.",
-    "directory": "scan_wifi",
-    "created": "2026-02-17T23:33:33.443501",
-    "version": "1.0.0",
-    "enabled": false,
-    "author": "Fluffy AI"
-  },
   "bluetooth_scan": {
     "name": "Bluetooth Scan",
     "intent": "bluetooth_scan",
@@ -65,6 +50,83 @@
     "logo": "logo.png",
     "author": "Fluffy AI"
   },
+  "list_desktop_files": {
+    "name": "list_desktop_files",
+    "intent": "list_desktop_files",
+    "patterns": [
+      "list desktop files",
+      "show desktop files"
+    ],
+    "description": "Create a Python function that utilizes the os module to fetch and return a list of files on the user's desktop. The function should handle file system operations, error handling, and provide the file list in a user-friendly format.",
+    "directory": "list_desktop_files",
+    "created": "2026-03-03T22:39:03.679262",
+    "version": "1.0.0",
+    "enabled": true,
+    "author": "Fluffy AI"
+  },
+  "list_top_processes": {
+    "name": "list_top_processes",
+    "intent": "list_top_processes",
+    "patterns": [
+      "^list top processes$",
+      "^show (?:me )?the top processes$",
+      "^what are the biggest processes\\?$"
+    ],
+    "triggers": [
+      "list top processes"
+    ],
+    "aliases": [],
+    "description": "Use a system monitoring library (e.g., psutil) to retrieve running processes, sort them by memory and CPU usage, and return the top entries in a readable format.",
+    "directory": "list_top_processes",
+    "created": "2026-09-11T03:44:00.094369",
+    "version": "1.0.0",
+    "enabled": true,
+    "language": "python",
+    "has_ui": false,
+    "logo": "logo.png",
+    "author": "Fluffy AI"
+  },
+  "wifi_scan": {
+    "name": "wifi_scan",
+    "intent": "wifi_scan",
+    "patterns": [
+      "\\bscan\\b.*\\bwifi\\b",
+      "\\bwifi\\b.*\\bscan\\b"
+    ],
+    "triggers": [
+      "wifi scan"
+    ],
+    "aliases": [],
+    "description": "Create a function that executes 'netsh wlan show networks mode=bssid' or uses the Windows Native Wi\u2011Fi API to enumerate nearby Wi\u2011Fi SSIDs, signal strength, and security type, then returns the list.",
+    "directory": "wifi_scan",
+    "created": "2026-09-11T03:45:36.267567",
+    "version": "1.0.0",
+    "enabled": true,
+    "language": "python",
+    "has_ui": false,
+    "logo": "logo.svg",
+    "author": "Fluffy AI"
+  },
+  "disable_location": {
+    "name": "disable_location",
+    "intent": "disable_location",
+    "patterns": [
+      "r'disable location'"
+    ],
+    "triggers": [
+      "disable location"
+    ],
+    "aliases": [],
+    "description": "",
+    "directory": "disable_location",
+    "created": "2026-09-11T03:47:30.544327",
+    "version": "1.0.0",
+    "enabled": true,
+    "language": "python",
+    "has_ui": false,
+    "logo": "logo.png",
+    "author": "Fluffy AI"
+  },
   "sample_tool": {
     "name": "sample_tool",
     "intent": "sample_tool",
@@ -77,12 +139,33 @@
     "aliases": [],
     "description": "Sample tool v2 updated",
     "directory": "sample_tool",
-    "created": "2026-09-11T03:28:24.309651",
+    "created": "2026-09-11T04:19:06.692993",
     "version": "1.0.1",
     "enabled": true,
     "language": "python",
     "has_ui": false,
     "logo": "logo.png",
     "author": "Fluffy AI"
+  },
+  "brightness_control": {
+    "name": "brightness control",
+    "intent": "brightness_control",
+    "patterns": [
+      "brightness"
+    ],
+    "triggers": [
+      "brightness",
+      "brightness control"
+    ],
+    "aliases": [],
+    "description": "",
+    "directory": "brightness_control",
+    "created": "2026-09-11T04:24:06.804370",
+    "version": "1.0.0",
+    "enabled": true,
+    "language": "python",
+    "has_ui": false,
+    "logo": "",
+    "author": "User"
   }
 }

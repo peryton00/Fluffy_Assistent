@@ -242,10 +242,10 @@ def get_validator():
             else:
                 full_code = new_handler_code
             (ext_dir / "handler.py").write_text(full_code, encoding="utf-8")
-            print(f"[ExtensionCreator] \u2713 Rewrote handler for: {intent_name}")
+            print(f"[ExtensionCreator] [OK] Rewrote handler for: {intent_name}")
             return True
         except Exception as e:
-            print(f"[ExtensionCreator] \u2717 Rewrite failed: {e}")
+            print(f"[ExtensionCreator] [ERROR] Rewrite failed: {e}")
             return False
 
     def _assign_logo(self, intent_name: str, ext_dir: Path) -> str:
@@ -319,10 +319,10 @@ def get_validator():
         
         try:
             shutil.rmtree(ext_dir)
-            print(f"[ExtensionCreator] \u2713 Deleted extension: {intent_name}")
+            print(f"[ExtensionCreator] [OK] Deleted extension: {intent_name}")
             return True
         except Exception as e:
-            print(f"[ExtensionCreator] \u2717 Failed to delete extension: {e}")
+            print(f"[ExtensionCreator] [ERROR] Failed to delete extension: {e}")
             return False
 
 

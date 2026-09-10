@@ -6,7 +6,7 @@
  * Styled using Fluffy semantic design tokens.
  */
 
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useCallback, useRef } from "react";
 import { useExtensionsStore, extensionsStore } from "../../../stores/extensionsStore";
 import {
   CodeIcon,
@@ -15,7 +15,10 @@ import {
   FolderIcon,
   CheckIcon,
   AlertTriangleIcon,
+  PlusIcon,
 } from "../../../components/common/Icons";
+import { JellyfishCodeEditor } from "../components/JellyfishCodeEditor";
+import { CreateExtensionModal } from "../components/CreateExtensionModal";
 
 export const CodeView: React.FC = () => {
   const {
@@ -31,6 +34,18 @@ export const CodeView: React.FC = () => {
   const [codeDraft, setCodeDraft] = useState<string>("");
   const [testPayloadStr, setTestPayloadStr] = useState<string>("{}");
   const [saveStatus, setSaveStatus] = useState<string | null>(null);
+  const [lastSavedTime, setLastSavedTime] = useState<string | null>(null);
+  const [isCreateOpen, setIsCreateOpen] = useState<boolean>(false);
+
+  // Dirty state tracker: compares current draft against loaded source code
+  const isDirty = currentCode ? codeDraft !== currentCode.code : false;
+
+  // Resizable panel state
+  const [sidePanelWidth, setSidePanelWidth] = useState<number>(340);
+  const [sidePanelCollapsed, setSidePanelCollapsed] = useState<boolean>(false);
+  const [isDragging, setIsDragging] = useState<boolean>(false);
+  const startXRef = useRef<number>(0);
+  const startWidthRef = useRef<number>(340);
 
   // Auto-select first extension if none selected
   useEffect(() => {
@@ -60,7 +75,7 @@ export const CodeView: React.FC = () => {
     setSaveStatus(null);
   };
 
-  const handleSave = async () => {
+  const handleSave = useCallback(async () => {
     if (!selectedIntent) return;
     const success = await extensionsStore.saveCode(
       selectedIntent,
@@ -68,12 +83,14 @@ export const CodeView: React.FC = () => {
       currentCode?.language || "python"
     );
     if (success) {
-      setSaveStatus("Saved and hot-reloaded successfully");
+      const timeStr = new Date().toLocaleTimeString();
+      setLastSavedTime(timeStr);
+      setSaveStatus("Saved & hot-reloaded successfully");
       setTimeout(() => setSaveStatus(null), 3500);
     }
-  };
+  }, [selectedIntent, codeDraft, currentCode]);
 
-  const handleRunTest = async () => {
+  const handleRunTest = useCallback(async () => {
     if (!selectedIntent) return;
     try {
       const parsed = JSON.parse(testPayloadStr);
@@ -81,9 +98,53 @@ export const CodeView: React.FC = () => {
     } catch {
       await extensionsStore.run(selectedIntent, { raw: testPayloadStr });
     }
-  };
+  }, [selectedIntent, testPayloadStr]);
 
-  const lineCount = codeDraft ? codeDraft.split("\n").length : 1;
+  // Global keybindings (Ctrl+S / Cmd+S, Ctrl+Enter / Cmd+Enter)
+  useEffect(() => {
+    const handleGlobalKeyDown = (e: KeyboardEvent) => {
+      const isMac = navigator.platform.toUpperCase().indexOf("MAC") >= 0;
+      const isCmdOrCtrl = isMac ? e.metaKey : e.ctrlKey;
+
+      if (isCmdOrCtrl && (e.key === "s" || e.key === "S")) {
+        e.preventDefault();
+        handleSave();
+      } else if (isCmdOrCtrl && e.key === "Enter") {
+        e.preventDefault();
+        handleRunTest();
+      }
+    };
+
+    window.addEventListener("keydown", handleGlobalKeyDown);
+    return () => window.removeEventListener("keydown", handleGlobalKeyDown);
+  }, [handleSave, handleRunTest]);
+
+  // Draggable Splitter Handler
+  const handleSplitterMouseDown = useCallback((e: React.MouseEvent) => {
+    e.preventDefault();
+    setIsDragging(true);
+    startXRef.current = e.clientX;
+    startWidthRef.current = sidePanelWidth;
+
+    const onMouseMove = (moveEvent: MouseEvent) => {
+      const delta = startXRef.current - moveEvent.clientX;
+      const newWidth = Math.max(200, Math.min(850, startWidthRef.current + delta));
+      setSidePanelWidth(newWidth);
+    };
+
+    const onMouseUp = () => {
+      setIsDragging(false);
+      window.removeEventListener("mousemove", onMouseMove);
+      window.removeEventListener("mouseup", onMouseUp);
+      document.body.style.userSelect = "";
+      document.body.style.cursor = "";
+    };
+
+    document.body.style.userSelect = "none";
+    document.body.style.cursor = "col-resize";
+    window.addEventListener("mousemove", onMouseMove);
+    window.addEventListener("mouseup", onMouseUp);
+  }, [sidePanelWidth]);
 
   return (
     <div
@@ -92,6 +153,7 @@ export const CodeView: React.FC = () => {
         display: "flex",
         flexDirection: "column",
         height: "100%",
+        minHeight: 0,
         overflow: "hidden",
         backgroundColor: "var(--color-bg)",
         color: "var(--color-text)",
@@ -108,6 +170,7 @@ export const CodeView: React.FC = () => {
           alignItems: "center",
           justifyContent: "space-between",
           gap: "var(--space-3)",
+          flexShrink: 0,
         }}
       >
         <div style={{ display: "flex", alignItems: "center", gap: "var(--space-3)" }}>
@@ -137,10 +200,61 @@ export const CodeView: React.FC = () => {
             ))}
           </select>
 
+          <button
+            type="button"
+            onClick={() => setIsCreateOpen(true)}
+            title="Create a new custom extension"
+            style={{
+              display: "inline-flex",
+              alignItems: "center",
+              gap: "4px",
+              padding: "4px 8px",
+              borderRadius: "var(--radius-xs)",
+              fontSize: "11px",
+              fontWeight: "var(--font-weight-medium)",
+              backgroundColor: "var(--color-accent-subtle)",
+              color: "var(--color-accent)",
+              border: "1px solid var(--color-accent-border)",
+              cursor: "pointer",
+            }}
+          >
+            <PlusIcon size={12} />
+            <span>New</span>
+          </button>
+
           {currentCode?.filename && (
-            <span style={{ fontSize: "11px", fontFamily: "var(--font-mono)", color: "var(--color-text-muted)" }}>
-              {currentCode.filename}
-            </span>
+            <div style={{ display: "flex", alignItems: "center", gap: "6px" }}>
+              <span style={{ fontSize: "11px", fontFamily: "var(--font-mono)", color: isDirty ? "#ff9e64" : "var(--color-text-muted)", fontWeight: isDirty ? 600 : 400 }}>
+                {currentCode.filename} {isDirty && "●"}
+              </span>
+              {isDirty ? (
+                <span
+                  style={{
+                    fontSize: "10px",
+                    fontFamily: "var(--font-mono)",
+                    color: "#ff9e64",
+                    backgroundColor: "rgba(255, 158, 100, 0.15)",
+                    border: "1px solid rgba(255, 158, 100, 0.3)",
+                    padding: "1px 6px",
+                    borderRadius: "3px",
+                    fontWeight: 500,
+                  }}
+                >
+                  Unsaved (Ctrl+S)
+                </span>
+              ) : (
+                <span
+                  style={{
+                    fontSize: "10px",
+                    fontFamily: "var(--font-mono)",
+                    color: "var(--color-success, #c3e88d)",
+                    opacity: 0.8,
+                  }}
+                >
+                  ✓ Synced
+                </span>
+              )}
+            </div>
           )}
         </div>
 
@@ -163,6 +277,28 @@ export const CodeView: React.FC = () => {
               {saveStatus}
             </span>
           )}
+
+          {/* Toggle Test Panel Button */}
+          <button
+            type="button"
+            onClick={() => setSidePanelCollapsed(!sidePanelCollapsed)}
+            title={sidePanelCollapsed ? "Show Test Runner Panel" : "Hide Test Runner Panel (Maximize Editor)"}
+            style={{
+              display: "inline-flex",
+              alignItems: "center",
+              gap: "6px",
+              padding: "5px 10px",
+              borderRadius: "var(--radius-xs)",
+              fontSize: "var(--font-size-xs)",
+              backgroundColor: sidePanelCollapsed ? "var(--color-surface-elevated)" : "var(--color-surface)",
+              border: "1px solid var(--color-border)",
+              color: sidePanelCollapsed ? "var(--color-accent)" : "var(--color-text-muted)",
+              cursor: "pointer",
+            }}
+          >
+            <PlayIcon size={12} />
+            <span>{sidePanelCollapsed ? "Show Test Panel" : "Maximize Editor"}</span>
+          </button>
 
           <button
             type="button"
@@ -191,6 +327,7 @@ export const CodeView: React.FC = () => {
             type="button"
             onClick={handleSave}
             disabled={!selectedIntent || actionLoading || codeLoading}
+            title="Save code changes and hot-reload runtime (Ctrl+S)"
             style={{
               display: "inline-flex",
               alignItems: "center",
@@ -199,23 +336,25 @@ export const CodeView: React.FC = () => {
               borderRadius: "var(--radius-xs)",
               fontSize: "var(--font-size-xs)",
               fontWeight: "var(--font-weight-medium)",
-              backgroundColor: "var(--color-accent)",
-              color: "#ffffff",
-              border: "none",
+              backgroundColor: isDirty ? "var(--color-accent)" : "var(--color-surface-elevated)",
+              color: isDirty ? "#ffffff" : "var(--color-text)",
+              border: isDirty ? "none" : "1px solid var(--color-border)",
               cursor: !selectedIntent || actionLoading || codeLoading ? "not-allowed" : "pointer",
               opacity: !selectedIntent || actionLoading || codeLoading ? 0.6 : 1,
+              boxShadow: isDirty ? "0 0 8px rgba(99, 102, 241, 0.4)" : "none",
+              transition: "all 0.15s ease",
             }}
           >
             <RefreshCwIcon size={12} style={{ animation: actionLoading ? "spin 1s linear infinite" : "none" }} />
-            <span>Save & Hot-Reload</span>
+            <span>{isDirty ? "Save & Hot-Reload (Ctrl+S) *" : "Save & Hot-Reload"}</span>
           </button>
         </div>
       </header>
 
       {/* Main split: Code Editor & Test Runner */}
-      <div style={{ flex: 1, display: "flex", flexDirection: "row", overflow: "hidden" }}>
-        {/* Left: Code Editor */}
-        <div style={{ flex: 1, display: "flex", flexDirection: "column", borderRight: "1px solid var(--color-border)", overflow: "hidden" }}>
+      <div style={{ flex: 1, display: "flex", flexDirection: "row", height: "100%", minHeight: 0, overflow: "hidden", position: "relative" }}>
+        {/* Left: Code Editor (Dynamically Expands & Resizes) */}
+        <div style={{ flex: 1, display: "flex", flexDirection: "column", minWidth: 0, height: "100%", minHeight: 0, overflow: "hidden" }}>
           {codeLoading ? (
             <div style={{ flex: 1, display: "flex", alignItems: "center", justifyContent: "center", gap: "8px", fontSize: "var(--font-size-xs)", color: "var(--color-text-muted)" }}>
               <RefreshCwIcon size={16} style={{ animation: "spin 1s linear infinite", color: "var(--color-accent)" }} />
@@ -226,182 +365,196 @@ export const CodeView: React.FC = () => {
               Select an extension above to inspect or edit code.
             </div>
           ) : (
-            <div style={{ flex: 1, display: "flex", overflow: "hidden", fontFamily: "var(--font-mono)", fontSize: "12px", backgroundColor: "var(--color-bg)" }}>
-              {/* Line Numbers */}
-              <div
-                style={{
-                  padding: "12px 8px",
-                  textAlign: "right",
-                  userSelect: "none",
-                  backgroundColor: "var(--color-surface)",
-                  borderRight: "1px solid var(--color-border)",
-                  color: "var(--color-text-muted)",
-                  opacity: 0.7,
-                  minWidth: "3rem",
-                }}
-              >
-                {Array.from({ length: Math.max(lineCount, 1) }, (_, i) => (
-                  <div key={i + 1} style={{ lineHeight: "20px", fontSize: "11px" }}>
-                    {i + 1}
-                  </div>
-                ))}
-              </div>
-
-              {/* Code TextArea */}
-              <textarea
-                value={codeDraft}
-                onChange={(e) => setCodeDraft(e.target.value)}
-                spellCheck={false}
-                placeholder="# Python extension handler code..."
-                style={{
-                  flex: 1,
-                  padding: "12px",
-                  backgroundColor: "transparent",
-                  color: "var(--color-text)",
-                  resize: "none",
-                  border: "none",
-                  outline: "none",
-                  lineHeight: "20px",
-                  fontFamily: "var(--font-mono)",
-                  fontSize: "12px",
-                  overflow: "auto",
-                }}
-              />
-            </div>
+            <JellyfishCodeEditor
+              value={codeDraft}
+              onChange={setCodeDraft}
+              language={currentCode?.language || "python"}
+              placeholder="# Python extension handler code..."
+              isDirty={isDirty}
+              lastSavedTime={lastSavedTime}
+              onSave={handleSave}
+              onRunTest={handleRunTest}
+            />
           )}
         </div>
 
-        {/* Right: Runtime Test Execution Panel */}
-        <div
-          style={{
-            width: "320px",
-            borderLeft: "1px solid var(--color-border)",
-            backgroundColor: "var(--color-surface)",
-            display: "flex",
-            flexDirection: "column",
-            overflow: "hidden",
-          }}
-        >
+        {/* Draggable Splitter Handle (VS Code Sash) */}
+        {!sidePanelCollapsed && (
           <div
+            onMouseDown={handleSplitterMouseDown}
+            onDoubleClick={() => setSidePanelWidth(340)}
+            title="Drag to resize editor & test panel (Double-click to reset)"
             style={{
-              padding: "var(--space-3) var(--space-4)",
-              borderBottom: "1px solid var(--color-border)",
+              width: "6px",
+              cursor: "col-resize",
+              backgroundColor: isDragging ? "var(--color-accent)" : "var(--color-border)",
+              transition: isDragging ? "none" : "background-color 0.15s ease",
+              position: "relative",
+              zIndex: 10,
+              flexShrink: 0,
               display: "flex",
               alignItems: "center",
-              justifyContent: "space-between",
+              justifyContent: "center",
             }}
           >
-            <h3
+            {/* Grip Dots */}
+            <div
               style={{
-                fontSize: "var(--font-size-xs)",
-                fontWeight: "var(--font-weight-semibold)",
-                color: "var(--color-text)",
-                margin: 0,
+                width: "2px",
+                height: "24px",
+                borderRadius: "1px",
+                backgroundColor: isDragging ? "#ffffff" : "var(--color-text-muted)",
+                opacity: 0.6,
+              }}
+            />
+          </div>
+        )}
+
+        {/* Right: Runtime Test Execution Panel (Resizable) */}
+        {!sidePanelCollapsed && (
+          <div
+            style={{
+              width: `${sidePanelWidth}px`,
+              minWidth: "200px",
+              backgroundColor: "var(--color-surface)",
+              display: "flex",
+              flexDirection: "column",
+              overflow: "hidden",
+              flexShrink: 0,
+            }}
+          >
+            <div
+              style={{
+                padding: "var(--space-3) var(--space-4)",
+                borderBottom: "1px solid var(--color-border)",
                 display: "flex",
                 alignItems: "center",
-                gap: "6px",
+                justifyContent: "space-between",
+                flexShrink: 0,
               }}
             >
-              <PlayIcon size={12} style={{ color: "var(--color-success)" }} />
-              Runtime Execution Test
-            </h3>
-            <button
-              type="button"
-              onClick={handleRunTest}
-              disabled={!selectedIntent || actionLoading}
-              style={{
-                padding: "3px 10px",
-                borderRadius: "var(--radius-xs)",
-                fontSize: "11px",
-                fontWeight: "var(--font-weight-medium)",
-                backgroundColor: "var(--color-success)",
-                color: "#ffffff",
-                border: "none",
-                cursor: !selectedIntent || actionLoading ? "not-allowed" : "pointer",
-                opacity: !selectedIntent || actionLoading ? 0.6 : 1,
-              }}
-            >
-              Run
-            </button>
-          </div>
-
-          <div style={{ padding: "var(--space-3) var(--space-4)", display: "flex", flexDirection: "column", gap: "var(--space-3)", flex: 1, overflowY: "auto" }}>
-            <div style={{ display: "flex", flexDirection: "column", gap: "4px" }}>
-              <label style={{ fontSize: "11px", fontWeight: "var(--font-weight-medium)", color: "var(--color-text-muted)" }}>
-                Input Payload (JSON)
-              </label>
-              <textarea
-                value={testPayloadStr}
-                onChange={(e) => setTestPayloadStr(e.target.value)}
-                rows={4}
-                placeholder='{"query": "test value"}'
+              <h3
                 style={{
-                  width: "100%",
-                  padding: "8px",
-                  borderRadius: "var(--radius-xs)",
-                  fontSize: "11px",
-                  fontFamily: "var(--font-mono)",
-                  backgroundColor: "var(--color-bg)",
-                  border: "1px solid var(--color-border)",
+                  fontSize: "var(--font-size-xs)",
+                  fontWeight: "var(--font-weight-semibold)",
                   color: "var(--color-text)",
-                  outline: "none",
-                  resize: "vertical",
-                }}
-              />
-            </div>
-
-            {/* Test Result Output */}
-            <div style={{ display: "flex", flexDirection: "column", gap: "4px", flex: 1 }}>
-              <label style={{ fontSize: "11px", fontWeight: "var(--font-weight-medium)", color: "var(--color-text-muted)" }}>
-                Execution Output
-              </label>
-              <div
-                style={{
-                  flex: 1,
-                  padding: "8px",
-                  borderRadius: "var(--radius-xs)",
-                  backgroundColor: "var(--color-bg)",
-                  border: "1px solid var(--color-border)",
-                  fontFamily: "var(--font-mono)",
-                  fontSize: "11px",
-                  color: "var(--color-text)",
-                  overflow: "auto",
-                  minHeight: "120px",
-                }}
-              >
-                {testResult ? (
-                  <pre style={{ margin: 0, whiteSpace: "pre-wrap", wordBreak: "break-all" }}>
-                    {JSON.stringify(testResult, null, 2)}
-                  </pre>
-                ) : (
-                  <span style={{ color: "var(--color-text-muted)", fontStyle: "italic" }}>
-                    Output will appear here after clicking Run.
-                  </span>
-                )}
-              </div>
-            </div>
-
-            {error && (
-              <div
-                style={{
-                  padding: "8px",
-                  borderRadius: "var(--radius-xs)",
-                  backgroundColor: "var(--color-danger-subtle)",
-                  border: "1px solid var(--color-danger-border)",
-                  fontSize: "11px",
-                  color: "var(--color-danger)",
+                  margin: 0,
                   display: "flex",
-                  alignItems: "flex-start",
+                  alignItems: "center",
                   gap: "6px",
                 }}
               >
-                <AlertTriangleIcon size={14} style={{ flexShrink: 0, marginTop: "1px" }} />
-                <span>{error.message}</span>
+                <PlayIcon size={12} style={{ color: "var(--color-success)" }} />
+                Runtime Execution Test
+              </h3>
+              <button
+                type="button"
+                onClick={handleRunTest}
+                disabled={!selectedIntent || actionLoading}
+                style={{
+                  padding: "3px 10px",
+                  borderRadius: "var(--radius-xs)",
+                  fontSize: "11px",
+                  fontWeight: "var(--font-weight-medium)",
+                  backgroundColor: "var(--color-success)",
+                  color: "#ffffff",
+                  border: "none",
+                  cursor: !selectedIntent || actionLoading ? "not-allowed" : "pointer",
+                  opacity: !selectedIntent || actionLoading ? 0.6 : 1,
+                }}
+              >
+                Run
+              </button>
+            </div>
+
+            <div style={{ padding: "var(--space-3) var(--space-4)", display: "flex", flexDirection: "column", gap: "var(--space-3)", flex: 1, overflowY: "auto" }}>
+              <div style={{ display: "flex", flexDirection: "column", gap: "4px" }}>
+                <label style={{ fontSize: "11px", fontWeight: "var(--font-weight-medium)", color: "var(--color-text-muted)" }}>
+                  Input Payload (JSON)
+                </label>
+                <textarea
+                  value={testPayloadStr}
+                  onChange={(e) => setTestPayloadStr(e.target.value)}
+                  rows={4}
+                  placeholder='{"query": "test value"}'
+                  style={{
+                    width: "100%",
+                    padding: "8px",
+                    borderRadius: "var(--radius-xs)",
+                    fontSize: "11px",
+                    fontFamily: "var(--font-mono)",
+                    backgroundColor: "var(--color-bg)",
+                    border: "1px solid var(--color-border)",
+                    color: "var(--color-text)",
+                    outline: "none",
+                    resize: "vertical",
+                    boxSizing: "border-box",
+                  }}
+                />
               </div>
-            )}
+
+              {/* Test Result Output */}
+              <div style={{ display: "flex", flexDirection: "column", gap: "4px", flex: 1 }}>
+                <label style={{ fontSize: "11px", fontWeight: "var(--font-weight-medium)", color: "var(--color-text-muted)" }}>
+                  Execution Output
+                </label>
+                <div
+                  style={{
+                    flex: 1,
+                    padding: "8px",
+                    borderRadius: "var(--radius-xs)",
+                    backgroundColor: "var(--color-bg)",
+                    border: "1px solid var(--color-border)",
+                    fontFamily: "var(--font-mono)",
+                    fontSize: "11px",
+                    color: "var(--color-text)",
+                    overflow: "auto",
+                    minHeight: "120px",
+                  }}
+                >
+                  {testResult ? (
+                    <pre style={{ margin: 0, whiteSpace: "pre-wrap", wordBreak: "break-all" }}>
+                      {JSON.stringify(testResult, null, 2)}
+                    </pre>
+                  ) : (
+                    <span style={{ color: "var(--color-text-muted)", fontStyle: "italic" }}>
+                      Output will appear here after clicking Run.
+                    </span>
+                  )}
+                </div>
+              </div>
+
+              {error && (
+                <div
+                  style={{
+                    padding: "8px",
+                    borderRadius: "var(--radius-xs)",
+                    backgroundColor: "var(--color-danger-subtle)",
+                    border: "1px solid var(--color-danger-border)",
+                    fontSize: "11px",
+                    color: "var(--color-danger)",
+                    display: "flex",
+                    alignItems: "flex-start",
+                    gap: "6px",
+                  }}
+                >
+                  <AlertTriangleIcon size={14} style={{ flexShrink: 0, marginTop: "1px" }} />
+                  <span>{error.message}</span>
+                </div>
+              )}
+            </div>
           </div>
-        </div>
+        )}
       </div>
+
+      {/* Create Extension Modal */}
+      <CreateExtensionModal
+        isOpen={isCreateOpen}
+        onClose={() => setIsCreateOpen(false)}
+        onCreated={(intent) => {
+          handleSelectExtension(intent);
+        }}
+      />
     </div>
   );
 };

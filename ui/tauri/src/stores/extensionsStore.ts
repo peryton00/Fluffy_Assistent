@@ -16,11 +16,13 @@ import {
   toggleExtension,
   runExtension,
   openExtensionInVsCode,
+  createExtension as apiCreateExtension,
 } from "../services/api/extensions";
 import type {
   ExtensionSummary,
   ExtensionDetail,
   ExtensionRunResponse,
+  ExtensionCreatePayload,
 } from "../types/contracts";
 
 export interface ExtensionCodeState {
@@ -179,7 +181,8 @@ class ExtensionsStoreManager {
     this.setState({ codeLoading: true, error: null });
     try {
       const res = await fetchExtensionCode(intent);
-      if (res.ok && res.code !== undefined) {
+      const isSuccess = res.ok ?? (res as any).success ?? (res.code !== undefined);
+      if (isSuccess && res.code !== undefined) {
         this.setState({
           currentCode: {
             intent: res.intent || intent,
@@ -214,7 +217,8 @@ class ExtensionsStoreManager {
     this.setState({ actionLoading: true, error: null });
     try {
       const res = await saveExtensionCode(intent, code, language);
-      if (res.ok) {
+      const isSuccess = res.ok ?? (res as any).success ?? false;
+      if (isSuccess) {
         this.setState({
           currentCode: {
             intent,
@@ -248,7 +252,8 @@ class ExtensionsStoreManager {
     this.setState({ actionLoading: true, error: null });
     try {
       const res = await toggleExtension(intent);
-      if (res.ok) {
+      const isSuccess = res.ok ?? (res as any).success ?? false;
+      if (isSuccess) {
         const updated = this.state.extensions.map((ext) =>
           ext.intent === intent ? { ...ext, enabled: res.enabled } : ext
         );
@@ -282,7 +287,7 @@ class ExtensionsStoreManager {
       const res = await reloadExtension(intent);
       this.setState({ actionLoading: false });
       await this.loadExtensions(true);
-      return res.ok;
+      return res.ok ?? (res as any).success ?? false;
     } catch (err) {
       this.setState({
         actionLoading: false,
@@ -299,7 +304,8 @@ class ExtensionsStoreManager {
     this.setState({ actionLoading: true, error: null });
     try {
       const res = await deleteExtension(intent);
-      if (res.ok) {
+      const isSuccess = res.ok ?? (res as any).success ?? false;
+      if (isSuccess) {
         const updated = this.state.extensions.filter((ext) => ext.intent !== intent);
         const isSelected = this.state.selectedIntent === intent;
         this.setState({
@@ -352,6 +358,40 @@ class ExtensionsStoreManager {
         error: err instanceof Error ? err : new Error(String(err)),
       });
       return errRes;
+    }
+  };
+
+  /**
+   * Creates a new extension, registers it, and loads it into the editor.
+   */
+  public createExtension = async (
+    payload: ExtensionCreatePayload
+  ): Promise<{ success: boolean; intent?: string; error?: string }> => {
+    this.setState({ actionLoading: true, error: null });
+    try {
+      const res = await apiCreateExtension(payload);
+      const isSuccess = res.ok ?? res.success ?? false;
+      if (isSuccess && res.intent) {
+        await this.loadExtensions(true);
+        await this.selectExtension(res.intent);
+        await this.loadCode(res.intent);
+        this.setState({ actionLoading: false });
+        return { success: true, intent: res.intent };
+      } else {
+        const errorMsg = res.error || res.message || "Failed to create extension";
+        this.setState({
+          actionLoading: false,
+          error: new Error(errorMsg),
+        });
+        return { success: false, error: errorMsg };
+      }
+    } catch (err) {
+      const errorMsg = err instanceof Error ? err.message : String(err);
+      this.setState({
+        actionLoading: false,
+        error: err instanceof Error ? err : new Error(errorMsg),
+      });
+      return { success: false, error: errorMsg };
     }
   };
 

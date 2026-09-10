@@ -1,0 +1,23 @@
+{
+  "name": "wifi_scan",
+  "version": "1.0.0",
+  "description": "Create a function that executes 'netsh wlan show networks mode=bssid' or uses the Windows Native Wi\u2011Fi API to enumerate nearby Wi\u2011Fi SSIDs, signal strength, and security type, then returns the list.",
+  "author": "Fluffy AI",
+  "created": "2026-09-11T03:45:36.267567",
+  "updated": "2026-09-11T03:45:36.267582",
+  "intent": "wifi_scan",
+  "language": "python",
+  "has_ui": false,
+  "logo": "logo.svg",
+  "patterns": [
+    "\\bscan\\b.*\\bwifi\\b",
+    "\\bwifi\\b.*\\bscan\\b"
+  ],
+  "triggers": [
+    "wifi scan"
+  ],
+  "aliases": [],
+  "parameters": {},
+  "enabled": true,
+  "safety_level": "needs_confirmation"
+}
