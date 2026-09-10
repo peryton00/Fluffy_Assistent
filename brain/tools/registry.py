@@ -235,6 +235,14 @@ class ToolRegistry:
         self.register_alias("document.generate", "artifact.generate")
         self.register_alias("report.generate", "artifact.generate")
 
+        # 6. Network Intelligence tools (N9.3)
+        try:
+            from brain.tools.network_intelligence import register_network_intelligence_tools
+            register_network_intelligence_tools(self)
+        except Exception as e:
+            print(f"[ToolRegistry] Warning initializing Network Intelligence tools: {e}")
+
+
     def register(
         self,
         tool: ToolDefinition,

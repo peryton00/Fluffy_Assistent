@@ -1,0 +1,32 @@
+{
+  "name": "Bluetooth Scan",
+  "version": "1.0.0",
+  "description": "Scans for nearby Bluetooth devices and returns their names, addresses, and status.",
+  "author": "Fluffy AI",
+  "created": "2026-09-11T03:03:56.367188",
+  "intent": "bluetooth_scan",
+  "language": "python",
+  "has_ui": false,
+  "logo": "logo.png",
+  "patterns": [
+    "(?i)\\bscan\\s+bluetooth\\b",
+    "(?i)\\bbluetooth\\s+scan\\b",
+    "(?i)\\bfind\\s+nearby\\s+bluetooth\\s+devices\\b",
+    "(?i)\\bdiscover\\s+bluetooth\\b"
+  ],
+  "triggers": [
+    "scan bluetooth",
+    "scan bluetooth devices",
+    "bluetooth scan",
+    "find nearby bluetooth devices",
+    "discover bluetooth"
+  ],
+  "aliases": [
+    "bluetooth discovery",
+    "find bluetooth devices",
+    "list bluetooth devices"
+  ],
+  "parameters": {},
+  "enabled": true,
+  "safety_level": "needs_confirmation"
+}

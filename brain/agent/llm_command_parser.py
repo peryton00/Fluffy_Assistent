@@ -127,13 +127,46 @@ class LLMCommandParser:
             print(f"[LLMCommandParser] LLM query error: {e}")
             return ""
 
+    @staticmethod
+    def _sanitize_intent_name(raw_intent: str, fallback_text: str = "") -> str:
+        """
+        Sanitize and validate an intent name to ensure it is a valid,
+        semantic snake_case identifier and not a generic placeholder.
+        """
+        import re
+        generic_blacklist = {
+            "new_feature", "feature", "new_functionality", "unknown",
+            "none", "null", "test", "capability", "new_capability",
+            "descriptive_snake_case_intent", "specific_snake_case_intent",
+            "custom_feature", "plugin", "action", "intent"
+        }
+        
+        cleaned = re.sub(r"[^a-zA-Z0-9_]", "_", str(raw_intent or "")).strip("_").lower()
+        cleaned = re.sub(r"_+", "_", cleaned)
+        
+        if cleaned and cleaned not in generic_blacklist and re.match(r"^[a-z][a-z0-9_]{1,35}$", cleaned):
+            return cleaned
+            
+        # Derive fallback from user command text
+        if fallback_text:
+            words = [w.lower() for w in re.findall(r"\b[a-zA-Z0-9]+\b", fallback_text)]
+            stop_words = {"please", "fluffy", "can", "you", "to", "a", "an", "the", "for", "me", "my", "make", "create", "new", "extension", "skill", "feature", "add", "how", "what", "is", "run", "do"}
+            meaningful = [w for w in words if w not in stop_words]
+            if meaningful:
+                derived = "_".join(meaningful[:4])
+                if derived and derived not in generic_blacklist and re.match(r"^[a-z][a-z0-9_]{1,35}$", derived):
+                    return derived
+        
+        return "custom_capability"
+
     def parse_with_llm(
         self,
         user_command: str,
         context: Optional[Dict[str, Any]] = None
     ) -> CommandUnderstanding:
         """
-        Two-stage parsing:
+        Two-stage parsing with extension pre-resolution:
+          Stage 0 — Check existing extensions
           Stage 1 — Fast classify: command | chat | new_feature | confirmation
           Stage 2 — Parameter extraction (only for "command")
         """
@@ -143,6 +176,19 @@ class LLMCommandParser:
             newly = loader.refresh_extensions()
             if newly:
                 self._load_available_intents()
+
+        # ── Step 0: Pre-check if command matches an existing active extension ──
+        if loader:
+            matched_ext = loader.find_extension_for_command(user_command)
+            if matched_ext:
+                print(f"[LLMCommandParser] Pre-resolved to existing extension: '{matched_ext}'")
+                return CommandUnderstanding({
+                    "intent": matched_ext,
+                    "parameters": {},
+                    "requires_new_functionality": False,
+                    "text": f"Executing {matched_ext}...",
+                    "original_text": user_command
+                })
 
         client = self._get_llm_client()
         if not client:
@@ -254,8 +300,9 @@ Rules:
 - Each step in "steps" must have: intent, parameters, text.
 - Use "text" for a friendly human response describing what you will do.
 - If the user wants you to LEARN a new skill, create an EXTENSION, or add a CAPABILITY (e.g., "make an extension to X"), 
-  set "requires_new_functionality" to true and set "intent" to "new_feature".
-- If the command needs a feature NOT in the list above, set requires_new_functionality to true.
+  extract a descriptive snake_case intent name (e.g. "bluetooth_scan", "weather_lookup") and set "requires_new_functionality" to true.
+- If the command needs a feature NOT in the list above, extract a descriptive snake_case intent name and set "requires_new_functionality" to true.
+- NEVER set intent to "new_feature" or "unknown".
 - Set memory_update only if user shared personal info (name, location, preferences).
 
 Return ONLY valid JSON (no markdown, no extra text):
@@ -272,7 +319,10 @@ Return ONLY valid JSON (no markdown, no extra text):
 
         try:
             full_response = self._query_llm(prompt)
-            return self._parse_json_response(full_response, user_command)
+            understanding = self._parse_json_response(full_response, user_command)
+            if understanding.requires_new_functionality:
+                understanding.intent = self._sanitize_intent_name(understanding.intent, user_command)
+            return understanding
         except Exception as e:
             print(f"[LLMCommandParser] Stage 2 error: {e}")
             return CommandUnderstanding({"intent": "chat", "text": f"I had trouble understanding that: {e}", "original_text": user_command})
@@ -320,13 +370,27 @@ Return ONLY valid JSON (no markdown, no extra text):
 
     def _stage_new_feature(self, user_command: str) -> CommandUnderstanding:
         """Handle new feature requests via a short extraction."""
-        prompt = f"""Fluffy needs new functionality. Extract a snake_case intent name and implementation description.
+        # 1. Pre-check if an existing extension matches
+        loader = self._get_extension_loader()
+        if loader:
+            matched_ext = loader.find_extension_for_command(user_command)
+            if matched_ext:
+                print(f"[LLMCommandParser] _stage_new_feature resolved to existing extension: '{matched_ext}'")
+                return CommandUnderstanding({
+                    "intent": matched_ext,
+                    "requires_new_functionality": False,
+                    "text": f"Executing {matched_ext}...",
+                    "original_text": user_command,
+                    "parameters": {}
+                })
 
-User request: "{user_command}"
+        prompt = f"""Fluffy needs new functionality for request: "{user_command}"
+Extract a concise, descriptive snake_case intent name (e.g. "bluetooth_scan", "weather_lookup", "pdf_compress") and a technical implementation description.
+NEVER use "new_feature" as the intent name.
 
 Return ONLY valid JSON:
 {{
-  "intent": "descriptive_snake_case_intent",
+  "intent": "specific_snake_case_intent",
   "requires_new_functionality": true,
   "suggested_implementation": "Technical description of how to implement this as a Python function",
   "text": "I don't have that yet, but I can learn it! Would you like me to create this feature? (Say yes to proceed)",
@@ -335,11 +399,13 @@ Return ONLY valid JSON:
         try:
             full = self._query_llm(prompt)
             understanding = self._parse_json_response(full, user_command)
+            understanding.intent = self._sanitize_intent_name(understanding.intent, user_command)
             understanding.requires_new_functionality = True
             return understanding
         except Exception as e:
+            intent_name = self._sanitize_intent_name("", user_command)
             return CommandUnderstanding({
-                "intent": "new_feature",
+                "intent": intent_name,
                 "requires_new_functionality": True,
                 "text": "I don't have that capability yet, but I can learn it! Say 'yes' if you'd like me to add it.",
                 "original_text": user_command

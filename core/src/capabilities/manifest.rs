@@ -47,7 +47,7 @@ mod tests {
     fn test_capability_manifest_from_registry() {
         let manifest = CapabilityManifest::current();
         assert!(!manifest.platform.is_empty());
-        assert_eq!(manifest.core_version, "0.1.0");
+        assert_eq!(manifest.core_version, env!("CARGO_PKG_VERSION"));
 
         // Verify Process.List is registered and read_only
         let proc_list = manifest.capabilities.get("Process.List").expect("Process.List missing");

@@ -1,6 +1,7 @@
 pub mod actions;
 pub mod capabilities;
 pub mod ipc;
+pub mod network;
 pub mod permissions;
 pub mod terminal;
 

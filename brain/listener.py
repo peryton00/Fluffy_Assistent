@@ -21,7 +21,7 @@ from guardian.verdict import generate_verdicts
 from guardian_manager import (
     GUARDIAN_MEMORY, GUARDIAN_BASELINE, GUARDIAN_DETECTOR, GUARDIAN_SCORER,
     GUARDIAN_FINGERPRINTS, GUARDIAN_CHAINS, GUARDIAN_STATE, GUARDIAN_INTERVENTION,
-    GUARDIAN_AUDIT, reset_guardian
+    GUARDIAN_AUDIT, GUARDIAN_NETWORK_CORRELATOR, reset_guardian
 )
 import state
 
@@ -301,14 +301,27 @@ def handle_message(raw_msg, monitor):
     processes = msg.get("system", {}).get("processes", {}).get("top_ram", [])
     active_pids = [p["pid"] for p in processes]
     
-    # Check if external reset signal was triggered from web API / UI
+        # Check if external reset signal was triggered from web API / UI
     if GUARDIAN_BASELINE.check_and_reload_if_reset():
         state.ACTIVE_VERDICTS.clear()
         state.SECURITY_ALERTS.clear()
         GUARDIAN_MEMORY.clear_all_data()
         GUARDIAN_AUDIT.clear_all_data()
         GUARDIAN_CHAINS.clear_all_data()
+        GUARDIAN_NETWORK_CORRELATOR.baselines.clear_all_data()
         print("[Guardian Listener] Detected reset signal: Reloaded fresh baselines and re-entered 5-minute learning phase.", file=sys.stderr)
+
+    # Guardian Network Correlation (N6)
+    local_net_snapshot = msg.get("local_network")
+    if local_net_snapshot:
+        net_anomalies = GUARDIAN_NETWORK_CORRELATOR.analyze(local_net_snapshot, processes)
+        if net_anomalies:
+            net_alerts = GUARDIAN_NETWORK_CORRELATOR.to_security_alerts(net_anomalies)
+            security_alerts.extend(net_alerts)
+            state.update_security_alerts(security_alerts)
+            net_verdicts = GUARDIAN_NETWORK_CORRELATOR.to_guardian_verdicts(net_anomalies)
+            for nv in net_verdicts:
+                state.ACTIVE_VERDICTS[nv["id"]] = nv
 
     # 5-Minute Learning Mode Check
     learning_progress = GUARDIAN_BASELINE.get_learning_progress()
@@ -402,10 +415,10 @@ def handle_message(raw_msg, monitor):
     GUARDIAN_CHAINS.cleanup(active_pids)
     GUARDIAN_SCORER.cleanup(active_pids)
 
-    # Cleanup dead PIDs from active verdicts cache
-    for pid in list(state.ACTIVE_VERDICTS.keys()):
-        if pid not in active_pids:
-            state.ACTIVE_VERDICTS.pop(pid, None)
+    # Cleanup dead PIDs from active verdicts cache (preserve non-PID network verdicts)
+    for k in list(state.ACTIVE_VERDICTS.keys()):
+        if isinstance(k, int) and k not in active_pids:
+            state.ACTIVE_VERDICTS.pop(k, None)
 
     all_guardian_verdicts = list(state.ACTIVE_VERDICTS.values())
 
@@ -413,6 +426,7 @@ def handle_message(raw_msg, monitor):
     PROCESS_MSG_COUNTER += 1
     if PROCESS_MSG_COUNTER >= 50:
         GUARDIAN_BASELINE.save()
+        GUARDIAN_NETWORK_CORRELATOR.baselines.save()
         PROCESS_MSG_COUNTER = 0
 
     # Inject Guardian insights and State into the pipeline

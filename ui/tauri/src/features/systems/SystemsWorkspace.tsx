@@ -17,6 +17,8 @@ import { ProcessesView } from "./views/ProcessesView";
 import { ApplicationsView } from "./views/ApplicationsView";
 import { StartupView } from "./views/StartupView";
 import { NetworkView } from "./views/NetworkView";
+import { LocalNetworkView } from "./views/LocalNetworkView";
+import { NetworkIntelligenceView } from "./views/NetworkIntelligenceView";
 import { HardwareView } from "./views/HardwareView";
 
 export const SystemsWorkspace: React.FC = () => {
@@ -30,6 +32,10 @@ export const SystemsWorkspace: React.FC = () => {
         return <ApplicationsView />;
       case "startup":
         return <StartupView />;
+      case "local_network":
+        return <LocalNetworkView />;
+      case "network_intelligence":
+        return <NetworkIntelligenceView />;
       case "network":
         return <NetworkView />;
       case "hardware":
@@ -39,6 +45,7 @@ export const SystemsWorkspace: React.FC = () => {
         return <SystemsOverview />;
     }
   };
+
 
   return (
     <div

@@ -38,6 +38,17 @@ class SelfImprover:
         Handle a pre-parsed improvement request from the unified parser.
         Skips the initial parsing step.
         """
+        # Pre-check: Does an existing extension already provide this capability?
+        matched_ext = self.extension_loader.find_extension_for_command(understanding.original_text or understanding.intent)
+        if matched_ext and self.extension_loader.has_extension(matched_ext):
+            print(f"[SelfImprover] Extension '{matched_ext}' already provides this capability!")
+            return {
+                "success": True,
+                "message": f"Using existing extension '{matched_ext}'.",
+                "action": "execute_existing",
+                "intent": matched_ext
+            }
+
         print(f"[SelfImprover] New functionality requested: {understanding.intent}")
         print(f"[SelfImprover] Description: {understanding.suggested_implementation}")
         

@@ -859,3 +859,279 @@ export interface GeneralSettingsState {
   ttsMuted: boolean;
   reducedMotion: boolean;
 }
+
+// ============================================================================
+// 12. Local Network Observability Contracts (N1-N4)
+// ============================================================================
+
+export interface LocalTrafficRates {
+  rx_bytes_per_sec: number;
+  tx_bytes_per_sec: number;
+  rx_bits_per_sec: number;
+  tx_bits_per_sec: number;
+}
+
+export interface LocalNetworkInterface {
+  id: string;
+  name: string;
+  description?: string | null;
+  mac_address?: string | null;
+  interface_type: "wifi" | "ethernet" | "loopback" | "virtual" | "vpn" | "bridge" | "other" | string;
+  status: "up" | "down" | "testing" | "dormant" | "not_present" | "lower_layer_down" | "unknown" | string;
+  is_physical: boolean;
+  is_loopback: boolean;
+  is_up: boolean;
+  ipv4_addresses: string[];
+  ipv6_addresses: string[];
+  total_received_bytes?: number | null;
+  total_transmitted_bytes?: number | null;
+  rates?: LocalTrafficRates | null;
+}
+
+export interface LocalNetworkDevice {
+  ip_address: string;
+  mac_address?: string | null;
+  hostname?: string | null;
+  interface_name?: string | null;
+  is_gateway: boolean;
+  is_self: boolean;
+  state: "reachable" | "stale" | "permanent" | "incomplete" | "delay" | "probe" | "unknown" | string;
+}
+
+export interface LocalNetworkFlow {
+  protocol: "tcp" | "udp" | string;
+  local_address: string;
+  local_port: number;
+  remote_address?: string | null;
+  remote_port?: number | null;
+  state: "listen" | "syn_sent" | "syn_received" | "established" | "fin_wait_1" | "fin_wait_2" | "close_wait" | "closing" | "last_ack" | "time_wait" | "closed" | "unknown" | string;
+  pid?: number | null;
+  process_name?: string | null;
+}
+
+export interface LocalWifiProfile {
+  ssid: string;
+  interface_name?: string | null;
+  connected: boolean;
+  signal_percent?: number | null;
+  security?: string | null;
+  cipher?: string | null;
+  auth_type?: string | null;
+  has_profile: boolean;
+}
+
+export interface LocalNetworkSnapshot {
+  timestamp: number;
+  interfaces: LocalNetworkInterface[];
+  devices: LocalNetworkDevice[];
+  active_flows: LocalNetworkFlow[];
+  wifi_profiles: LocalWifiProfile[];
+  errors?: Record<string, string>;
+  success: boolean;
+}
+
+// ============================================================================
+// 12. Network Flow & Traffic Aggregation Contracts (N7)
+// ============================================================================
+
+export interface ProcessTrafficSummary {
+  pid?: number | null;
+  process_name: string;
+  inbound_bytes_rate: number;
+  outbound_bytes_rate: number;
+  active_flows_count: number;
+  destinations_count: number;
+  protocols: string[];
+}
+
+export interface InterfaceTrafficSummary {
+  interface_name: string;
+  inbound_bytes_delta: number;
+  outbound_bytes_delta: number;
+  rx_bytes_per_sec: number;
+  tx_bytes_per_sec: number;
+  total_received_bytes: number;
+  total_transmitted_bytes: number;
+  active_flows_count: number;
+}
+
+export interface DestinationTrafficSummary {
+  remote_address: string;
+  remote_port?: number | null;
+  protocol: string;
+  active_flows_count: number;
+  associated_processes: string[];
+  first_seen: number;
+  last_seen: number;
+}
+
+export interface TrafficTimeBucket {
+  timestamp: number;
+  window_seconds: number;
+  inbound_bytes: number;
+  outbound_bytes: number;
+  rx_bytes_per_sec: number;
+  tx_bytes_per_sec: number;
+  active_flows_count: number;
+  active_processes_count: number;
+}
+
+export interface AggregatedTrafficSummary {
+  timestamp: number;
+  total_inbound_bytes_delta: number;
+  total_outbound_bytes_delta: number;
+  total_rx_bytes_per_sec: number;
+  total_tx_bytes_per_sec: number;
+  active_flows_count: number;
+  active_processes_count: number;
+  processes: ProcessTrafficSummary[];
+  interfaces: InterfaceTrafficSummary[];
+  destinations: DestinationTrafficSummary[];
+  protocols: Record<string, number>;
+  directions: Record<string, number>;
+}
+
+// ============================================================================
+// 13. Passive Packet Monitoring Contracts (N8 / SIH26117)
+// ============================================================================
+
+export interface PacketObservation {
+  id: string;
+  timestamp: string;
+  interface_name: string;
+  protocol: "tcp" | "udp" | "icmp" | "icmpv6" | "arp" | "other" | string;
+  direction: "inbound" | "outbound" | "local" | "unknown" | string;
+  source_ip: string;
+  source_port?: number | null;
+  destination_ip: string;
+  destination_port?: number | null;
+  packet_size_bytes: number;
+  tcp_flags?: {
+    syn: boolean;
+    ack: boolean;
+    fin: boolean;
+    rst: boolean;
+    psh: boolean;
+    urg: boolean;
+  } | null;
+  summary: string;
+}
+
+export interface PacketCaptureStatus {
+  is_active: boolean;
+  interface_name?: string | null;
+  started_at?: string | null;
+  duration_seconds: number;
+  max_duration_seconds: number;
+  packets_observed: number;
+  packets_dropped: number;
+  current_rate_pps: number;
+  observations: PacketObservation[];
+}
+
+// ============================================================================
+// 14. Advanced Network Intelligence Contracts (N9)
+// ============================================================================
+
+export type DeviceCategory =
+  | "GATEWAY"
+  | "ROUTER"
+  | "WORKSTATION"
+  | "LAPTOP"
+  | "PHONE"
+  | "TABLET"
+  | "IOT"
+  | "PRINTER"
+  | "SERVER"
+  | "NETWORK_INFRASTRUCTURE"
+  | "UNKNOWN"
+  | string;
+
+export interface ClassifiedNetworkDevice {
+  device_id: string;
+  ip_addresses: string[];
+  mac_address?: string | null;
+  hostname?: string | null;
+  vendor?: string | null;
+  classification: DeviceCategory;
+  confidence: number;
+  evidence: string[];
+  status: string;
+  user_alias?: string | null;
+  is_gateway: boolean;
+  first_seen?: number | null;
+  last_seen?: number | null;
+}
+
+export interface ManagedLocalService {
+  service_id: string;
+  process_name: string;
+  pid?: number | null;
+  local_address: string;
+  port: number;
+  protocol: string;
+  status: "ACTIVE" | "TRANSIENT" | "INACTIVE" | string;
+  lifetime_seconds: number;
+  well_known_name?: string | null;
+  missed_snapshots: number;
+  consecutive_observations: number;
+  first_seen: number;
+  last_seen: number;
+}
+
+export interface NetworkIdentitySummary {
+  network_id: string;
+  interface: string;
+  network_type: string;
+  ssid?: string | null;
+  gateway?: string | null;
+  local_addresses: string[];
+  confidence: number;
+  evidence: string[];
+  trust_level: string;
+  user_alias?: string | null;
+}
+
+export interface NetworkInsightSummary {
+  insight_type: string;
+  summary: string;
+  confidence: number;
+  evidence?: string[];
+}
+
+export interface NetworkIntelligenceFreshness {
+  collected_at: number;
+  age_seconds: number;
+  is_stale: boolean;
+  observation_count?: number;
+}
+
+export interface NetworkChangeEvent {
+  event_type: string;
+  timestamp: number;
+  details?: Record<string, unknown>;
+  entity_id?: string;
+  confidence?: number;
+}
+
+export interface NetworkIntelligenceSummary {
+  network_identity: NetworkIdentitySummary;
+  device_count: {
+    total: number;
+    online: number;
+    [key: string]: number;
+  };
+  service_count: {
+    total: number;
+    active: number;
+    [key: string]: number;
+  };
+  active_processes_count: number;
+  recent_events: NetworkChangeEvent[];
+  insights: NetworkInsightSummary[];
+  freshness: NetworkIntelligenceFreshness;
+}
+
+
+
+

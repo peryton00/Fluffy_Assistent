@@ -37,15 +37,27 @@ class ExtensionCreator:
         if parameters is None:
             parameters = {}
 
-        # ── Resolve directory ────────────────────────────────────────────────
+        # ── Resolve directory (Idempotent: canonical identity, no _v2 folders) ────
         ext_dir = self.extensions_dir / intent_name
+        current_version = "1.0.0"
+        existing_meta = {}
         if ext_dir.exists():
-            print(f"[ExtensionCreator] Warning: Extension '{intent_name}' already exists")
-            version = 2
-            while (self.extensions_dir / f"{intent_name}_v{version}").exists():
-                version += 1
-            intent_name = f"{intent_name}_v{version}"
-            ext_dir = self.extensions_dir / intent_name
+            print(f"[ExtensionCreator] Updating existing extension '{intent_name}' in-place")
+            meta_file = ext_dir / "metadata.json"
+            if meta_file.exists():
+                try:
+                    existing_meta = json.loads(meta_file.read_text(encoding='utf-8'))
+                    old_ver = existing_meta.get("version", "1.0.0")
+                    if isinstance(old_ver, int):
+                        current_version = old_ver + 1
+                    elif isinstance(old_ver, str) and "." in old_ver:
+                        parts = old_ver.split(".")
+                        parts[-1] = str(int(parts[-1]) + 1)
+                        current_version = ".".join(parts)
+                    else:
+                        current_version = "1.1.0"
+                except Exception:
+                    current_version = "1.1.0"
         ext_dir.mkdir(parents=True, exist_ok=True)
 
         # ── Assign logo ──────────────────────────────────────────────────
@@ -53,18 +65,27 @@ class ExtensionCreator:
 
         try:
             # ── Metadata ──────────────────────────────────────────────
+            new_patterns = generated_code.patterns if hasattr(generated_code, 'patterns') else []
+            combined_patterns = list(dict.fromkeys(existing_meta.get("patterns", []) + (new_patterns if isinstance(new_patterns, list) else [new_patterns])))
+            combined_triggers = list(dict.fromkeys(existing_meta.get("triggers", []) + [intent_name.replace("_", " ")]))
+            combined_aliases = list(dict.fromkeys(existing_meta.get("aliases", [])))
+
             metadata = {
-                "name": intent_name,
-                "version": "1.0.0",
-                "description": description,
+                "name": existing_meta.get("name", intent_name),
+                "version": current_version,
+                "description": description or existing_meta.get("description", ""),
                 "author": "Fluffy AI",
-                "created": datetime.now().isoformat(),
+                "created": existing_meta.get("created", datetime.now().isoformat()),
+                "updated": datetime.now().isoformat(),
                 "intent": intent_name,
                 "language": language,
                 "has_ui": has_ui,
                 "logo": logo_name,
-                "patterns": generated_code.patterns if hasattr(generated_code, 'patterns') else [],
+                "patterns": combined_patterns,
+                "triggers": combined_triggers,
+                "aliases": combined_aliases,
                 "parameters": parameters,
+                "enabled": True,
                 "safety_level": "needs_confirmation"
             }
             (ext_dir / "metadata.json").write_text(json.dumps(metadata, indent=2), encoding='utf-8')
@@ -133,9 +154,9 @@ def get_validator():
                 ui_dir.mkdir(exist_ok=True)
                 for filename, content in web_ui_files.items():
                     (ui_dir / filename).write_text(content, encoding='utf-8')
-                print(f"[ExtensionCreator] \u2713 Web UI created ({len(web_ui_files)} files)")
+                print(f"[ExtensionCreator] [OK] Web UI created ({len(web_ui_files)} files)")
             
-            print(f"[ExtensionCreator] \u2713 Created extension: {intent_name}")
+            print(f"[ExtensionCreator] [OK] Created extension: {intent_name}")
             print(f"[ExtensionCreator] Location: {ext_dir}")
 
             # ── Auto-register ──────────────────────────────────────────────────
@@ -161,6 +182,8 @@ def get_validator():
                     "name": metadata["name"],
                     "intent": intent_name,
                     "patterns": clean_patterns,
+                    "triggers": metadata.get("triggers", []),
+                    "aliases": metadata.get("aliases", []),
                     "description": description,
                     "directory": ext_dir.name,
                     "created": metadata["created"],
@@ -172,17 +195,17 @@ def get_validator():
                     "author": metadata.get("author", "Fluffy AI")
                 }
                 if loader.register_extension(intent_name, registry_metadata):
-                    print(f"[ExtensionCreator] \u2713 Registered — ready immediately!")
+                    print(f"[ExtensionCreator] [OK] Registered - ready immediately!")
                 else:
-                    print(f"[ExtensionCreator] \u26a0 Registration failed — restart may be needed")
+                    print(f"[ExtensionCreator] [WARN] Registration failed - restart may be needed")
             except Exception as e:
-                print(f"[ExtensionCreator] \u26a0 Auto-registration failed: {e}")
+                print(f"[ExtensionCreator] [WARN] Auto-registration failed: {e}")
 
             return intent_name
             
         except Exception as e:
             import traceback
-            print(f"[ExtensionCreator] \u2717 Failed to create extension: {e}")
+            print(f"[ExtensionCreator] [ERROR] Failed to create extension: {e}")
             print(traceback.format_exc())
             # Clean up on failure
             if ext_dir.exists():

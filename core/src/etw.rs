@@ -7,9 +7,7 @@ pub struct NetworkMonitor;
 
 impl NetworkMonitor {
     pub fn start() {
-        #[cfg(target_os = "windows")]
-        println!("[Fluffy Core] Network Monitor (Stub) initiated. Network stats will be zeroed.");
-        #[cfg(not(target_os = "windows"))]
-        println!("[Fluffy Core] Network Monitor (Linux stub) - ETW not available on this platform.");
+        // Native N1-N7 traffic rate telemetry (GetIfTable2 / TrafficRateCalculator) is the active engine.
     }
 }
+

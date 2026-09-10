@@ -6,6 +6,7 @@ Dynamically loads and manages Fluffy extensions
 import json
 import importlib
 import sys
+import re
 from pathlib import Path
 from typing import Dict, Any, Optional
 
@@ -143,20 +144,75 @@ class ExtensionLoader:
             return None
     
     def get_patterns(self, intent: str) -> list:
-        """Get regex patterns for intent"""
+        """Get regex patterns and triggers for intent"""
         if intent not in self.extensions:
             return []
-        
-        return self.extensions[intent]["metadata"].get("patterns", [])
+        meta = self.extensions[intent]["metadata"]
+        patterns = meta.get("patterns", [])
+        triggers = meta.get("triggers", [])
+        aliases = meta.get("aliases", [])
+        combined = []
+        for item in (patterns + triggers + aliases):
+            if item and item not in combined:
+                combined.append(item)
+        return combined
     
     def get_all_patterns(self) -> Dict[str, list]:
         """Get all patterns from all extensions"""
         all_patterns = {}
-        for intent, ext in self.extensions.items():
-            patterns = ext["metadata"].get("patterns", [])
-            if patterns:
-                all_patterns[intent] = patterns
+        for intent in self.extensions:
+            p = self.get_patterns(intent)
+            if p:
+                all_patterns[intent] = p
         return all_patterns
+
+    def find_extension_for_command(self, text: str) -> Optional[str]:
+        """
+        Find an existing extension that satisfies the user command.
+        Matches by:
+          1. Exact or normalized intent name
+          2. Regex triggers / patterns
+          3. Exact phrase match in triggers/aliases
+          4. Semantic keyword overlap
+        """
+        if not text:
+            return None
+        cleaned = text.strip().lower()
+        cleaned_words = set(re.findall(r"\b[a-zA-Z0-9]+\b", cleaned))
+
+        # 1. Exact intent match
+        for intent in self.extensions:
+            if intent.lower() == cleaned:
+                return intent
+
+        # 2. Pattern and Trigger matching
+        for intent, ext in self.extensions.items():
+            meta = ext.get("metadata", {})
+            triggers = meta.get("triggers", []) + meta.get("patterns", []) + meta.get("aliases", [])
+            for trig in triggers:
+                if not trig:
+                    continue
+                trig_clean = trig.strip().lower()
+                # Direct string equality or containment
+                if trig_clean == cleaned or trig_clean in cleaned or cleaned in trig_clean:
+                    return intent
+                # Try regex matching
+                try:
+                    pattern = trig
+                    if not pattern.startswith("(?i)"):
+                        pattern = f"(?i){pattern}"
+                    if re.search(pattern, cleaned):
+                        return intent
+                except re.error:
+                    pass
+
+        # 3. Intent token overlap (e.g. "scan bluetooth" matches "bluetooth_scan")
+        for intent in self.extensions:
+            intent_tokens = set(intent.lower().split("_"))
+            if intent_tokens and intent_tokens.issubset(cleaned_words):
+                return intent
+
+        return None
     
     def reload_extension(self, intent: str) -> bool:
         """Reload a specific extension"""

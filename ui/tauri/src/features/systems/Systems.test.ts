@@ -333,6 +333,14 @@ describe("Systems Domain Test Suite", () => {
     html = renderToStaticMarkup(React.createElement(SystemsWorkspace));
     expect(html).toContain("Startup &amp; Persistence Manager");
 
+    uiStore.setActiveSidebarView("local_network");
+    html = renderToStaticMarkup(React.createElement(SystemsWorkspace));
+    expect(html).toContain("Local Host Network Observability");
+
+    uiStore.setActiveSidebarView("network_intelligence");
+    html = renderToStaticMarkup(React.createElement(SystemsWorkspace));
+    expect(html).toContain("Network Intelligence (N9)");
+
     uiStore.setActiveSidebarView("network");
     html = renderToStaticMarkup(React.createElement(SystemsWorkspace));
     expect(html).toContain("Distributed LAN &amp; Peer Nodes");
@@ -342,3 +350,4 @@ describe("Systems Domain Test Suite", () => {
     expect(html).toContain("Hardware &amp; Device Telemetry");
   });
 });
+

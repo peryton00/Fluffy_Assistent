@@ -102,7 +102,7 @@ class CommandExecutor:
 
         # Try extensions (plugin system) — normalized intent_value
         try:
-            from brain.extension_loader import get_extension_loader
+            from brain.extensions.extension_loader import get_extension_loader
             loader = get_extension_loader()
             if loader.has_extension(intent_value):
                 return loader.execute(command, validation)

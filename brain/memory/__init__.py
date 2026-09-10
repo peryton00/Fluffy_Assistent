@@ -33,6 +33,15 @@ from brain.memory.user.long_term_memory import (
     get_minimal_memory_for_llm,
     record_command,
     get_frequent_intents,
+    get_known_networks,
+    get_known_network,
+    save_known_network,
+    get_device_aliases,
+    get_device_alias,
+    set_device_alias,
+    get_approved_services,
+    set_approved_service,
+    project_network_intelligence_to_memory,
 )
 
 __all__ = [
@@ -59,4 +68,13 @@ __all__ = [
     "get_minimal_memory_for_llm",
     "record_command",
     "get_frequent_intents",
+    "get_known_networks",
+    "get_known_network",
+    "save_known_network",
+    "get_device_aliases",
+    "get_device_alias",
+    "set_device_alias",
+    "get_approved_services",
+    "set_approved_service",
+    "project_network_intelligence_to_memory",
 ]

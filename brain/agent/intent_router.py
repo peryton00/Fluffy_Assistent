@@ -75,13 +75,30 @@ class IntentRouter:
                 session.clear_pending_improvement()
                 return self._chat_result("No problem, I won't add that feature.", success=True)
 
-        # ── Priority 3: New functionality request ──────────────────────────
-        if understanding.requires_new_functionality:
-            return self._handle_new_functionality(understanding, session)
-
-        # ── Priority 4: Agent task or Multi-step command ───────────────────
         intent_value = understanding.intent if isinstance(understanding.intent, str) else str(understanding.intent)
 
+        # ── Priority 3: Existing Extension Resolution (idempotent execution) ─
+        try:
+            from brain.extensions.extension_loader import get_extension_loader
+            loader = get_extension_loader()
+            if loader.has_extension(intent_value):
+                return self._execute_extension(understanding, loader)
+            
+            # Check semantic triggers / patterns against original message
+            matched_ext = loader.find_extension_for_command(original_message or intent_value)
+            if matched_ext and loader.has_extension(matched_ext):
+                print(f"[IntentRouter] Command resolved to existing extension '{matched_ext}'")
+                understanding.intent = matched_ext
+                understanding.requires_new_functionality = False
+                return self._execute_extension(understanding, loader)
+        except Exception as e:
+            print(f"[IntentRouter] Extension check error: {e}")
+
+        # ── Priority 4: Known system command ──────────────────────────────
+        if intent_value in _SYSTEM_COMMAND_INTENTS and intent_value not in ("chat", "confirm", "cancel"):
+            return self._execute_system_command(understanding)
+
+        # ── Priority 5: Agent task or Multi-step command ───────────────────
         if intent_value == "agent_task" or (intent_value == "multi_step" and getattr(understanding, "use_orchestrator", False)):
             from brain.agent.task import AgentTask
             task = AgentTask(
@@ -101,18 +118,9 @@ class IntentRouter:
         if intent_value == "multi_step" and understanding.steps:
             return self._execute_multi_step(understanding)
 
-        # ── Priority 5: Known system command ──────────────────────────────
-        if intent_value in _SYSTEM_COMMAND_INTENTS and intent_value not in ("chat", "confirm", "cancel"):
-            return self._execute_system_command(understanding)
-
-        # ── Priority 6: Known extension ───────────────────────────────────
-        try:
-            from brain.extensions.extension_loader import get_extension_loader
-            loader = get_extension_loader()
-            if loader.has_extension(intent_value):
-                return self._execute_extension(understanding, loader)
-        except Exception as e:
-            print(f"[IntentRouter] Extension check error: {e}")
+        # ── Priority 6: Genuinely New Functionality Request ───────────────
+        if understanding.requires_new_functionality:
+            return self._handle_new_functionality(understanding, session)
 
         # ── Priority 7: Fallback to chat ──────────────────────────────────
         print(f"[IntentRouter] Intent '{intent_value}' treated as chat.")

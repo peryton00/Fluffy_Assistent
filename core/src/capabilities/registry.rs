@@ -270,5 +270,90 @@ impl CapabilityRegistry {
             },
             Box::new(NetworkListInterfacesHandler),
         );
+
+        self.register(
+            CapabilityMetadata {
+                id: "Network.GetInterfaces".into(),
+                description: "Get detailed local network interfaces with classification, MAC, IP, and byte statistics".into(),
+                security_tier: SecurityTier::ReadOnly,
+                requires_confirmation: false,
+                supported_platforms: all_platforms.clone(),
+                is_implemented: true,
+            },
+            Box::new(NetworkGetInterfacesHandler),
+        );
+
+        self.register(
+            CapabilityMetadata {
+                id: "Network.GetLocalDevices".into(),
+                description: "Passive local network neighbor device discovery from OS ARP/neighbor cache".into(),
+                security_tier: SecurityTier::ReadOnly,
+                requires_confirmation: false,
+                supported_platforms: all_platforms.clone(),
+                is_implemented: true,
+            },
+            Box::new(NetworkGetLocalDevicesHandler),
+        );
+
+        self.register(
+            CapabilityMetadata {
+                id: "Network.GetActiveFlows".into(),
+                description: "Enumerate active TCP and UDP sockets mapped to process ownership".into(),
+                security_tier: SecurityTier::ReadOnly,
+                requires_confirmation: false,
+                supported_platforms: all_platforms.clone(),
+                is_implemented: true,
+            },
+            Box::new(NetworkGetActiveFlowsHandler),
+        );
+
+        self.register(
+            CapabilityMetadata {
+                id: "Network.ListWifiProfiles".into(),
+                description: "Enumerate known Wi-Fi network profiles and non-secret security metadata".into(),
+                security_tier: SecurityTier::ReadOnly,
+                requires_confirmation: false,
+                supported_platforms: all_platforms.clone(),
+                is_implemented: true,
+            },
+            Box::new(NetworkListWifiProfilesHandler),
+        );
+
+        self.register(
+            CapabilityMetadata {
+                id: "Network.StartPacketCapture".into(),
+                description: "Start a controlled, bounded, metadata-only packet monitoring session (N8/SIH26117)".into(),
+                security_tier: SecurityTier::Safe,
+                requires_confirmation: false,
+                supported_platforms: all_platforms.clone(),
+                is_implemented: true,
+            },
+            Box::new(NetworkStartPacketCaptureHandler),
+        );
+
+        self.register(
+            CapabilityMetadata {
+                id: "Network.StopPacketCapture".into(),
+                description: "Stop an active packet monitoring session".into(),
+                security_tier: SecurityTier::Safe,
+                requires_confirmation: false,
+                supported_platforms: all_platforms.clone(),
+                is_implemented: true,
+            },
+            Box::new(NetworkStopPacketCaptureHandler),
+        );
+
+        self.register(
+            CapabilityMetadata {
+                id: "Network.GetPacketCaptureStatus".into(),
+                description: "Get active packet monitoring session status and bounded metadata observations".into(),
+                security_tier: SecurityTier::ReadOnly,
+                requires_confirmation: false,
+                supported_platforms: all_platforms.clone(),
+                is_implemented: true,
+            },
+            Box::new(NetworkGetPacketCaptureStatusHandler),
+        );
     }
 }
+

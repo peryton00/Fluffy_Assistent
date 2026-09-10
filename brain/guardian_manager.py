@@ -9,6 +9,7 @@ try:
         GUARDIAN_STATE,
         GUARDIAN_INTERVENTION,
         GUARDIAN_AUDIT,
+        GUARDIAN_NETWORK_CORRELATOR,
         reset_guardian,
     )
 except ImportError:
@@ -22,6 +23,7 @@ except ImportError:
         GUARDIAN_STATE,
         GUARDIAN_INTERVENTION,
         GUARDIAN_AUDIT,
+        GUARDIAN_NETWORK_CORRELATOR,
         reset_guardian,
     )
 
@@ -35,5 +37,7 @@ __all__ = [
     "GUARDIAN_STATE",
     "GUARDIAN_INTERVENTION",
     "GUARDIAN_AUDIT",
+    "GUARDIAN_NETWORK_CORRELATOR",
     "reset_guardian",
 ]
+

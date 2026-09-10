@@ -13,6 +13,15 @@ from brain.runtime.state import (
     get_notifications,
 )
 from brain.runtime.commands import send_command
+from brain.runtime.local_network_service import (
+    LocalNetworkService,
+    get_local_network_service,
+    NetworkInterfaceInfo,
+    LocalNetworkDevice,
+    NetworkFlow,
+    WifiProfile,
+    NetworkObservationSnapshot,
+)
 
 __all__ = [
     "memory_pressure_message",
@@ -26,4 +35,11 @@ __all__ = [
     "add_notification",
     "get_notifications",
     "send_command",
+    "LocalNetworkService",
+    "get_local_network_service",
+    "NetworkInterfaceInfo",
+    "LocalNetworkDevice",
+    "NetworkFlow",
+    "WifiProfile",
+    "NetworkObservationSnapshot",
 ]

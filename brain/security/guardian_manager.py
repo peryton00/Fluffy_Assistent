@@ -12,6 +12,7 @@ from brain.guardian.anomaly import AnomalyDetector
 from brain.guardian.scorer import RiskScorer
 from brain.guardian.intervention import InterventionEngine
 from brain.guardian.fingerprint import FingerprintManager
+from brain.guardian.network_correlation import NetworkCorrelationEngine, get_network_correlation_engine
 import state
 import sys
 import os
@@ -28,6 +29,7 @@ GUARDIAN_CHAINS = ChainManager()
 GUARDIAN_STATE = GuardianState()
 GUARDIAN_INTERVENTION = InterventionEngine()
 GUARDIAN_AUDIT = AuditEngine(persistence_path="fluffy_data/guardian/audit.json")
+GUARDIAN_NETWORK_CORRELATOR = NetworkCorrelationEngine(memory=GUARDIAN_MEMORY)
 
 
 def reset_guardian():
@@ -38,11 +40,15 @@ def reset_guardian():
     print("[Guardian] Initiating comprehensive data reset...", file=sys.stderr)
     
     # 1. Clear components in memory
-    from brain.security.guardian_manager import GUARDIAN_BASELINE, GUARDIAN_MEMORY, GUARDIAN_AUDIT, GUARDIAN_CHAINS
+    from brain.security.guardian_manager import (
+        GUARDIAN_BASELINE, GUARDIAN_MEMORY, GUARDIAN_AUDIT, GUARDIAN_CHAINS,
+        GUARDIAN_NETWORK_CORRELATOR
+    )
     GUARDIAN_BASELINE.clear_all_data()
     GUARDIAN_MEMORY.clear_all_data()
     GUARDIAN_AUDIT.clear_all_data()
     GUARDIAN_CHAINS.clear_all_data()
+    GUARDIAN_NETWORK_CORRELATOR.baselines.clear_all_data()
     
     # 2. Clear whitelisted/trusted processes in long-term memory
     try:
@@ -77,7 +83,13 @@ def reset_guardian():
         "status.json": {},
         "fluffy_data/guardian/audit.json": [],
         "fluffy_data/guardian/memory.json": {},
-        "fluffy_data/guardian/baselines.json": {"_metadata": {"system_first_run": int(time.time())}}
+        "fluffy_data/guardian/baselines.json": {"_metadata": {"system_first_run": int(time.time())}},
+        "fluffy_data/guardian/network_baselines.json": {
+            "_metadata": {"system_first_run": int(time.time())},
+            "known_listeners": {},
+            "outbound_traffic": {},
+            "gateways": {},
+        },
     }
     
     for filepath, initial_structure in files_to_clear.items():

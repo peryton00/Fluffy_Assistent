@@ -34,21 +34,55 @@
     "enabled": false,
     "author": "Fluffy AI"
   },
-  "list_desktop_files": {
-    "name": "list_desktop_files",
-    "intent": "list_desktop_files",
+  "bluetooth_scan": {
+    "name": "Bluetooth Scan",
+    "intent": "bluetooth_scan",
     "patterns": [
-      "list desktop files",
-      "show desktop files"
+      "(?i)\\bscan\\s+bluetooth\\b",
+      "(?i)\\bbluetooth\\s+scan\\b",
+      "(?i)\\bfind\\s+nearby\\s+bluetooth\\s+devices\\b",
+      "(?i)\\bdiscover\\s+bluetooth\\b"
     ],
-    "description": "Create a Python function that utilizes the os module to fetch and return a list of files on the user's desktop. The function should handle file system operations, error handling, and provide the file list in a user-friendly format.",
-    "directory": "list_desktop_files",
-    "created": "2026-03-03T22:39:03.679262",
+    "triggers": [
+      "scan bluetooth",
+      "scan bluetooth devices",
+      "bluetooth scan",
+      "find nearby bluetooth devices",
+      "discover bluetooth"
+    ],
+    "aliases": [
+      "bluetooth discovery",
+      "find bluetooth devices",
+      "list bluetooth devices"
+    ],
+    "description": "Scans for nearby Bluetooth devices and returns their names, addresses, and status.",
+    "directory": "bluetooth_scan",
+    "created": "2026-09-11T03:03:56.367188",
     "version": "1.0.0",
-    "enabled": false,
+    "enabled": true,
     "language": "python",
     "has_ui": false,
-    "logo": "logo.svg",
+    "logo": "logo.png",
+    "author": "Fluffy AI"
+  },
+  "sample_tool": {
+    "name": "sample_tool",
+    "intent": "sample_tool",
+    "patterns": [
+      "(?i)test command"
+    ],
+    "triggers": [
+      "sample tool"
+    ],
+    "aliases": [],
+    "description": "Sample tool v2 updated",
+    "directory": "sample_tool",
+    "created": "2026-09-11T03:28:24.309651",
+    "version": "1.0.1",
+    "enabled": true,
+    "language": "python",
+    "has_ui": false,
+    "logo": "logo.png",
     "author": "Fluffy AI"
   }
 }

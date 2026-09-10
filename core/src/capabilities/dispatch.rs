@@ -21,7 +21,6 @@ pub fn discover_capabilities() -> CapabilityManifest {
 mod tests {
     use super::*;
     use serde_json::json;
-    use std::fs;
 
     #[test]
     fn test_dispatch_process_list() {
@@ -206,6 +205,122 @@ mod tests {
         let data = resp.data.expect("data missing");
         assert!(data.get("interfaces").is_some());
     }
+
+    #[test]
+    fn test_dispatch_network_get_interfaces() {
+        let req = CapabilityRequest {
+            id: "Network.GetInterfaces".into(),
+            parameters: json!({}),
+            request_id: Some("test-net-get-ifaces".into()),
+        };
+        let resp = dispatch_capability(&req);
+        assert!(resp.success);
+        let data = resp.data.expect("data missing");
+        let ifaces = data["interfaces"].as_array().expect("interfaces array");
+        assert!(!ifaces.is_empty());
+        assert!(ifaces[0].get("interface_type").is_some());
+        assert!(ifaces[0].get("status").is_some());
+    }
+
+    #[test]
+    fn test_dispatch_network_get_local_devices() {
+        let req = CapabilityRequest {
+            id: "Network.GetLocalDevices".into(),
+            parameters: json!({}),
+            request_id: Some("test-net-get-devices".into()),
+        };
+        let resp = dispatch_capability(&req);
+        assert!(resp.success);
+        let data = resp.data.expect("data missing");
+        assert!(data.get("devices").is_some());
+        assert!(data.get("count").is_some());
+    }
+
+    #[test]
+    fn test_dispatch_network_get_active_flows() {
+        let req = CapabilityRequest {
+            id: "Network.GetActiveFlows".into(),
+            parameters: json!({}),
+            request_id: Some("test-net-get-flows".into()),
+        };
+        let resp = dispatch_capability(&req);
+        assert!(resp.success);
+        let data = resp.data.expect("data missing");
+        assert!(data.get("flows").is_some());
+        assert!(data.get("count").is_some());
+        let flows = data["flows"].as_array().expect("flows array");
+        assert!(!flows.is_empty());
+        assert!(flows[0].get("protocol").is_some());
+        assert!(flows[0].get("local_port").is_some());
+    }
+
+
+
+    #[test]
+    fn test_dispatch_network_list_wifi_profiles() {
+        let req = CapabilityRequest {
+            id: "Network.ListWifiProfiles".into(),
+            parameters: json!({}),
+            request_id: Some("test-net-wifi-profiles".into()),
+        };
+        let resp = dispatch_capability(&req);
+        assert!(resp.success);
+        let data = resp.data.expect("data missing");
+        assert!(data.get("profiles").is_some());
+        assert!(data.get("count").is_some());
+
+        // Security check: verify no credentials in capability response
+        let json_str = serde_json::to_string(&data).unwrap();
+        assert!(!json_str.contains("password"));
+        assert!(!json_str.contains("keyMaterial"));
+    }
+
+    #[test]
+    fn test_dispatch_network_packet_capture_lifecycle() {
+        // Start capture
+        let start_req = CapabilityRequest {
+            id: "Network.StartPacketCapture".into(),
+            parameters: json!({
+                "interface_name": "Wi-Fi",
+                "duration_seconds": 30,
+                "max_packets": 50
+            }),
+            request_id: Some("test-start-capture".into()),
+        };
+        let start_resp = dispatch_capability(&start_req);
+        assert!(start_resp.success);
+        let start_data = start_resp.data.expect("data missing");
+        assert_eq!(start_data["status"]["is_active"], true);
+        assert_eq!(start_data["status"]["interface_name"], "Wi-Fi");
+
+        // Get status
+        let status_req = CapabilityRequest {
+            id: "Network.GetPacketCaptureStatus".into(),
+            parameters: json!({}),
+            request_id: Some("test-status-capture".into()),
+        };
+        let status_resp = dispatch_capability(&status_req);
+        assert!(status_resp.success);
+        let status_data = status_resp.data.expect("data missing");
+        assert_eq!(status_data["status"]["is_active"], true);
+
+        // Security check: ensure no payload or raw body in packet observations
+        let status_json = serde_json::to_string(&status_data).unwrap();
+        assert!(!status_json.contains("payload"));
+        assert!(!status_json.contains("body_raw"));
+
+        // Stop capture
+        let stop_req = CapabilityRequest {
+            id: "Network.StopPacketCapture".into(),
+            parameters: json!({}),
+            request_id: Some("test-stop-capture".into()),
+        };
+        let stop_resp = dispatch_capability(&stop_req);
+        assert!(stop_resp.success);
+        let stop_data = stop_resp.data.expect("data missing");
+        assert_eq!(stop_data["status"]["is_active"], false);
+    }
+
 
     #[test]
     fn test_dispatch_startup_list() {

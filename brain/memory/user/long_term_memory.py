@@ -6,15 +6,21 @@ Persists user preferences, trusted processes, behavioral history, and profile ac
 import json
 import os
 from threading import Lock
-from datetime import datetime
+from datetime import datetime, timezone
 from pathlib import Path
 
 MEMORY_PATH = Path("fluffy_data/memory/long_term.json")
 _lock = Lock()
 
 
+def _utc_now_iso() -> str:
+    """Return current UTC timestamp in ISO 8601 format."""
+    return datetime.now(timezone.utc).isoformat()
+
+
 def _empty_memory() -> dict:
     """Return empty memory structure"""
+    now = _utc_now_iso()
     return {
         "user_profile": {
             "identity": {},
@@ -36,8 +42,8 @@ def _empty_memory() -> dict:
             "command_history": []
         },
         "metadata": {
-            "created_at": datetime.utcnow().isoformat() + "Z",
-            "last_updated": datetime.utcnow().isoformat() + "Z",
+            "created_at": now,
+            "last_updated": now,
             "version": "2.0"
         }
     }
@@ -66,7 +72,7 @@ def save_memory(memory: dict) -> None:
         return
     
     # Update timestamp
-    memory["metadata"]["last_updated"] = datetime.utcnow().isoformat() + "Z"
+    memory["metadata"]["last_updated"] = _utc_now_iso()
     
     # Ensure directory exists
     MEMORY_PATH.parent.mkdir(parents=True, exist_ok=True)
@@ -294,7 +300,7 @@ def record_command(intent: str, success: bool) -> None:
     history.append({
         "intent": intent,
         "success": success,
-        "timestamp": datetime.utcnow().isoformat() + "Z"
+        "timestamp": _utc_now_iso()
     })
     behavior["command_history"] = history[-100:]
 
@@ -307,6 +313,164 @@ def get_frequent_intents(top_n: int = 5) -> list:
     frequent = memory.get("behavior", {}).get("frequent_intents", {})
     sorted_intents = sorted(frequent.items(), key=lambda x: x[1], reverse=True)
     return [intent for intent, _ in sorted_intents[:top_n]]
+
+
+# ── Network Intelligence Durable Memory (N9.2) ───────────────────────────────
+
+def get_known_networks() -> dict:
+    """Get all known network environment identities from long-term memory."""
+    memory = load_memory()
+    return memory.get("network_intelligence", {}).get("known_networks", {})
+
+
+def get_known_network(network_id: str):
+    """Get details for a specific known network identity."""
+    known = get_known_networks()
+    return known.get(network_id)
+
+
+def save_known_network(
+    network_id: str,
+    alias=None,
+    trusted: bool = False,
+    confidence: float = 0.80,
+    evidence=None,
+) -> None:
+    """Save or update a known network identity in long-term memory (idempotent, bounded)."""
+    if not network_id:
+        return
+    memory = load_memory()
+    net_intel = memory.setdefault("network_intelligence", {"known_networks": {}, "device_aliases": {}, "approved_services": {}})
+    known = net_intel.setdefault("known_networks", {})
+
+    now_iso = _utc_now_iso()
+    existing = known.get(network_id, {})
+
+    known[network_id] = {
+        "alias": alias if alias is not None else existing.get("alias"),
+        "trusted": trusted if trusted is not None else existing.get("trusted", False),
+        "confidence": confidence,
+        "first_seen": existing.get("first_seen", now_iso),
+        "last_seen": now_iso,
+        "evidence": evidence or existing.get("evidence", []),
+    }
+
+    # Bounded retention: max 64 known networks
+    if len(known) > 64:
+        sorted_keys = sorted(known.keys(), key=lambda k: known[k].get("last_seen", ""))
+        for k in sorted_keys[: len(known) - 64]:
+            del known[k]
+
+    save_memory(memory)
+
+
+def get_device_aliases() -> dict:
+    """Get all user-defined device aliases."""
+    memory = load_memory()
+    return memory.get("network_intelligence", {}).get("device_aliases", {})
+
+
+def get_device_alias(device_id: str):
+    """Get user-defined alias for a device."""
+    aliases = get_device_aliases()
+    dev = aliases.get(device_id)
+    if isinstance(dev, dict):
+        return dev.get("alias")
+    elif isinstance(dev, str):
+        return dev
+    return None
+
+
+def set_device_alias(device_id: str, alias: str, user_classified=None) -> None:
+    """Set a user-defined alias for a specific device identifier."""
+    if not device_id:
+        return
+    memory = load_memory()
+    net_intel = memory.setdefault("network_intelligence", {"known_networks": {}, "device_aliases": {}, "approved_services": {}})
+    aliases = net_intel.setdefault("device_aliases", {})
+
+    now_iso = _utc_now_iso()
+    aliases[device_id] = {
+        "alias": alias,
+        "user_classified": user_classified,
+        "updated_at": now_iso,
+    }
+
+    # Bounded retention: max 256 device aliases
+    if len(aliases) > 256:
+        sorted_keys = sorted(aliases.keys(), key=lambda k: aliases[k].get("updated_at", ""))
+        for k in sorted_keys[: len(aliases) - 256]:
+            del aliases[k]
+
+    save_memory(memory)
+
+
+def get_approved_services() -> dict:
+    """Get all user-approved local services."""
+    memory = load_memory()
+    return memory.get("network_intelligence", {}).get("approved_services", {})
+
+
+def set_approved_service(service_key: str, description: str, approved: bool = True) -> None:
+    """Register or update an approved local service in long-term memory."""
+    if not service_key:
+        return
+    memory = load_memory()
+    net_intel = memory.setdefault("network_intelligence", {"known_networks": {}, "device_aliases": {}, "approved_services": {}})
+    approved_services = net_intel.setdefault("approved_services", {})
+
+    now_iso = _utc_now_iso()
+    approved_services[service_key] = {
+        "description": description,
+        "approved": approved,
+        "updated_at": now_iso,
+    }
+
+    # Bounded retention: max 128 approved services
+    if len(approved_services) > 128:
+        sorted_keys = sorted(approved_services.keys(), key=lambda k: approved_services[k].get("updated_at", ""))
+        for k in sorted_keys[: len(approved_services) - 128]:
+            del approved_services[k]
+
+    save_memory(memory)
+
+
+def project_network_intelligence_to_memory(snapshot_dict_or_obj) -> bool:
+    """
+    Safely projects durable network knowledge (network identity, aliases) into long-term memory.
+    Strictly excludes: packet payloads, Wi-Fi credentials/passwords, raw packet buffers,
+    bulk socket flows, and sensitive telemetry.
+    Returns True if successfully evaluated/saved without errors.
+    """
+    try:
+        if hasattr(snapshot_dict_or_obj, "to_dict"):
+            data = snapshot_dict_or_obj.to_dict()
+        elif isinstance(snapshot_dict_or_obj, dict):
+            data = snapshot_dict_or_obj
+        else:
+            return False
+
+        net_id_obj = data.get("network_identity")
+        if net_id_obj and isinstance(net_id_obj, dict):
+            net_id = net_id_obj.get("network_id")
+            if net_id:
+                ssid = net_id_obj.get("ssid")
+                conf = net_id_obj.get("confidence", 0.80)
+                evidence = net_id_obj.get("evidence", [])
+                trust = net_id_obj.get("trust_level") == "TRUSTED"
+                existing = get_known_network(net_id)
+                alias = existing.get("alias") if existing else (ssid if ssid else None)
+                save_known_network(
+                    network_id=net_id,
+                    alias=alias,
+                    trusted=trust or (existing.get("trusted", False) if existing else False),
+                    confidence=conf,
+                    evidence=evidence,
+                )
+        return True
+    except Exception as e:
+        print(f"[WARN] Network intelligence memory projection error: {e}")
+        return False
 
 
 # ── Initialize memory on module load ──────────────────────────────────────────
