@@ -115,7 +115,8 @@ export async function streamChatMessage(
   message: string,
   useVoice = false,
   onChunk?: (chunk: string) => void,
-  signal?: AbortSignal
+  signal?: AbortSignal,
+  sessionId?: string
 ): Promise<string> {
   const url = "http://127.0.0.1:5123/chat/stream";
 
@@ -139,7 +140,7 @@ export async function streamChatMessage(
     const response = await fetch(url, {
       method: "POST",
       headers,
-      body: JSON.stringify({ message, use_voice: useVoice }),
+      body: JSON.stringify({ message, use_voice: useVoice, session_id: sessionId }),
       signal,
     });
 

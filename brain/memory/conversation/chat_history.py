@@ -14,8 +14,17 @@ import uuid
 class ChatHistory:
     """Manages chat history with individual JSON files per session"""
     
-    def __init__(self, data_dir: str = "data"):
-        self.data_dir = Path(data_dir)
+    def __init__(self, data_dir: Optional[str] = None):
+        if data_dir:
+            self.data_dir = Path(data_dir).resolve()
+        else:
+            fluffy_env = os.getenv("FLUFFY_DATA_DIR")
+            if fluffy_env:
+                self.data_dir = Path(fluffy_env).resolve() / "data"
+            else:
+                project_root = Path(__file__).resolve().parent.parent.parent.parent
+                self.data_dir = (project_root / "data").resolve()
+                
         self.sessions_dir = self.data_dir / "sessions"
         self.index_file = self.data_dir / "chat_index.json"
         
@@ -72,11 +81,12 @@ class ChatHistory:
         except Exception as e:
             print(f"Error saving session {session['id']}: {e}")
     
-    def create_session(self) -> str:
+    def create_session(self, title: Optional[str] = None) -> str:
         """Create a new chat session"""
         session_id = str(uuid.uuid4())
         session = {
             "id": session_id,
+            "title": title or "New conversation",
             "created": datetime.now().isoformat(),
             "last_updated": datetime.now().isoformat(),
             "messages": []
@@ -105,14 +115,30 @@ class ChatHistory:
         """Save a message to a session"""
         session = self._load_session_file(session_id)
         if not session:
-            print(f"Session {session_id} not found")
-            return False
+            # Auto-create session if missing
+            session = {
+                "id": session_id,
+                "title": "New conversation",
+                "created": datetime.now().isoformat(),
+                "last_updated": datetime.now().isoformat(),
+                "messages": []
+            }
         
         # Add message
-        session["messages"].append(message)
+        session.setdefault("messages", []).append(message)
         session["last_updated"] = datetime.now().isoformat()
         
+        # Auto-update title from first user message
+        if not session.get("title") or session.get("title") == "New conversation":
+            preview = self._get_session_preview(session)
+            if preview and preview != "New conversation":
+                session["title"] = preview
+        
         self._save_session_file(session)
+        
+        index = self._load_index()
+        index["current_session_id"] = session_id
+        self._save_index(index)
         return True
     
     def load_session(self, session_id: str) -> Optional[Dict[str, Any]]:
@@ -128,19 +154,23 @@ class ChatHistory:
                 session_id = file_path.stem
                 session = self._load_session_file(session_id)
                 if session:
+                    messages = session.get("messages", [])
+                    preview = self._get_session_preview(session)
+                    title = session.get("title") or preview or "Conversation"
                     summary = {
                         "id": session["id"],
-                        "created": session["created"],
-                        "last_updated": session["last_updated"],
-                        "message_count": len(session["messages"]),
-                        "preview": self._get_session_preview(session)
+                        "title": title,
+                        "created": session.get("created"),
+                        "last_updated": session.get("last_updated"),
+                        "message_count": len(messages),
+                        "preview": preview
                     }
                     sessions.append(summary)
         except Exception as e:
             print(f"Error listing sessions: {e}")
         
         # Sort by last_updated (most recent first)
-        sessions.sort(key=lambda x: x["last_updated"], reverse=True)
+        sessions.sort(key=lambda x: str(x.get("last_updated", "")), reverse=True)
         return sessions
     
     def _get_session_preview(self, session: Dict[str, Any]) -> str:

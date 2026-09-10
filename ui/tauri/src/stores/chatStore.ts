@@ -264,8 +264,20 @@ class ChatStoreManager {
       error: null,
     });
 
-    const sessionId = this.state.activeSessionId || undefined;
+    let sessionId = this.state.activeSessionId || undefined;
     const useVoice = this.state.useVoice;
+
+    // Auto-create session if sending first message with no active session
+    if (!sessionId && this.state.sessions.length === 0) {
+      try {
+        const createdId = await this.newSession();
+        if (createdId) {
+          sessionId = createdId;
+        }
+      } catch {
+        // Continue with backend auto-session creation
+      }
+    }
 
     // Use SSE streaming when enabled
     if (useStreaming) {
@@ -281,7 +293,8 @@ class ChatStoreManager {
             accumulated += chunk;
             this.setState({ streamingMessage: accumulated });
           },
-          abortController.signal
+          abortController.signal,
+          sessionId
         );
 
         const assistantMessage: ChatMessage = {
@@ -297,6 +310,9 @@ class ChatStoreManager {
           streamingMessage: "",
           isSending: false,
         });
+
+        // Refresh sessions list in background to update message count and preview
+        void this.loadSessions();
       } catch (err) {
         if (abortController.signal.aborted) {
           // Cancelled by user

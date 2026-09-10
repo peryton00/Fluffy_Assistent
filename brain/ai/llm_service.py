@@ -55,7 +55,10 @@ class LLMService:
         # ── Step 2: Parse intent (two-stage) ─────────────────────────────
         parser = get_llm_parser()
         understanding = parser.parse_with_llm(user_message, context=context)
-        print(f"[LLMService] Understanding: intent={understanding.intent}, text={understanding.text[:60] if understanding.text else ''}...")
+        try:
+            print(f"[LLMService] Understanding: intent={understanding.intent}")
+        except Exception:
+            pass
 
         # ── Step 3: Apply memory updates ─────────────────────────────────
         if understanding.memory_update:

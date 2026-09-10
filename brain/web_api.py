@@ -812,18 +812,51 @@ def chat_stream():
     """
     
     try:
-        data = request.get_json()
+        data = request.get_json() or {}
         user_message = data.get("message", "").strip()
+        session_id = data.get("session_id")
         use_voice = data.get("use_voice", False)
         
         if not user_message:
             return jsonify({"error": "No message provided"}), 400
         
-        # Import LLM service
         # Import LLM service - add project root to path
         project_root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
         if project_root not in sys.path:
             sys.path.insert(0, project_root)
+        
+        from chat_history import ChatHistory
+        history = ChatHistory()
+        
+        # Ensure a valid session_id exists
+        if not session_id:
+            session_id = history.get_current_session_id()
+            if not session_id:
+                session_id = history.create_session()
+        else:
+            history.set_current_session(session_id)
+        
+        # Load conversation history for context
+        context_messages = []
+        session_data = history.load_session(session_id)
+        if session_data and "messages" in session_data:
+            for msg in session_data["messages"][-10:]:
+                role = msg.get("role")
+                if not role:
+                    msg_type = msg.get("type")
+                    role = "user" if msg_type == "user" else "assistant"
+                content = msg.get("content") or msg.get("text") or ""
+                if content:
+                    context_messages.append({"role": role, "content": content})
+        
+        # Save user message to chat history immediately
+        history.save_message(session_id, {
+            "role": "user",
+            "content": user_message,
+            "type": "user",
+            "text": user_message,
+            "timestamp": __import__('time').time()
+        })
         
         from ai.src.llm_service import get_service
         from flask import Response, stream_with_context
@@ -833,16 +866,27 @@ def chat_stream():
         if use_voice:
             stop_speech()
         
-        # Process message
+        # Process message through LLM service
         llm_service = get_service()
-        result = llm_service.process_message(user_message)
+        result = llm_service.process_message(user_message, session_id=session_id, context_messages=context_messages)
         
         if result["type"] == "command":
-            # Return command result immediately (not streaming)
+            response_text = result["message"]
+            history.save_message(session_id, {
+                "role": "assistant",
+                "content": response_text,
+                "type": "fluffy",
+                "text": response_text,
+                "timestamp": __import__('time').time(),
+                "command_result": result.get("result")
+            })
+            state.add_execution_log(f"Command: {user_message} → {response_text}", "action")
             return jsonify({
                 "ok": True,
                 "type": "command",
-                "message": result["message"]
+                "message": response_text,
+                "session_id": session_id,
+                "result": result.get("result")
             })
         
         # Stream LLM response
@@ -851,22 +895,28 @@ def chat_stream():
             chunks_for_voice = []
             
             for chunk in result["stream"]:
-                # Send chunk to client
-                yield f"data: {json.dumps({'chunk': chunk})}\n\n"
-                
-                # Collect for voice
-                if use_voice:
-                    chunks_for_voice.append(chunk)
+                yield f"data: {json.dumps({'chunk': chunk, 'session_id': session_id})}\n\n"
+                chunks_for_voice.append(chunk)
+            
+            full_text = "".join(chunks_for_voice)
+            
+            # Save assistant response to chat history
+            if full_text:
+                history.save_message(session_id, {
+                    "role": "assistant",
+                    "content": full_text,
+                    "type": "fluffy",
+                    "text": full_text,
+                    "timestamp": __import__('time').time()
+                })
+                llm_service.add_assistant_message(full_text)
+                state.add_execution_log(f"LLM Query: {user_message[:50]}...", "action")
             
             # Send completion signal
-            yield f"data: {json.dumps({'done': True})}\n\n"
+            yield f"data: {json.dumps({'done': True, 'session_id': session_id})}\n\n"
             
             # Speak collected response
             if use_voice and chunks_for_voice:
-                full_text = "".join(chunks_for_voice)
-                llm_service.add_assistant_message(full_text)
-                
-                # Use streaming TTS
                 def chunk_generator():
                     yield full_text
                 
