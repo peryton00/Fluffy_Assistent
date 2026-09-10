@@ -194,7 +194,8 @@ class GuardianStoreManager {
    */
   public takeSecurityAction = async (
     pid: number,
-    action: SecurityActionType
+    action: SecurityActionType,
+    processName?: string
   ): Promise<void> => {
     this.setState({
       inFlightSecurityActions: { ...this.state.inFlightSecurityActions, [pid]: action },
@@ -202,7 +203,7 @@ class GuardianStoreManager {
     });
 
     try {
-      await executeSecurityAction(pid, action);
+      await executeSecurityAction(pid, action, processName);
       if (action === "trust") {
         await this.loadTrustedProcesses(true);
       }
@@ -221,9 +222,10 @@ class GuardianStoreManager {
 
   public handleSecurityAction = async (
     pid: number,
-    action: SecurityActionType
+    action: SecurityActionType,
+    processName?: string
   ): Promise<void> => {
-    return this.takeSecurityAction(pid, action);
+    return this.takeSecurityAction(pid, action, processName);
   };
 
   /**
@@ -259,8 +261,8 @@ export type ExtendedGuardianState = GuardianState & {
   removeTrusted: (processName: string) => Promise<void>;
   authorize: (commandId: string) => Promise<void>;
   reject: (commandId: string) => Promise<void>;
-  takeSecurityAction: (pid: number, action: SecurityActionType) => Promise<void>;
-  handleSecurityAction: (pid: number, action: SecurityActionType) => Promise<void>;
+  takeSecurityAction: (pid: number, action: SecurityActionType, processName?: string) => Promise<void>;
+  handleSecurityAction: (pid: number, action: SecurityActionType, processName?: string) => Promise<void>;
   clearBaselines: () => Promise<void>;
   resetRecognition: () => Promise<void>;
 };

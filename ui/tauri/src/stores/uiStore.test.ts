@@ -53,4 +53,42 @@ describe("UiStore", () => {
       expect(document.documentElement.getAttribute("data-theme")).toBe("highContrast");
     }
   });
+
+  it("updates and clamps sidebar width properly", () => {
+    uiStore.resetSidebarWidth();
+    expect(uiStore.getState().sidebarWidth).toBe(240);
+
+    uiStore.setSidebarWidth(350);
+    expect(uiStore.getState().sidebarWidth).toBe(350);
+
+    // Test under min clamp (160)
+    uiStore.setSidebarWidth(100);
+    expect(uiStore.getState().sidebarWidth).toBe(160);
+
+    // Test over max clamp (600)
+    uiStore.setSidebarWidth(900);
+    expect(uiStore.getState().sidebarWidth).toBe(600);
+
+    uiStore.resetSidebarWidth();
+    expect(uiStore.getState().sidebarWidth).toBe(240);
+  });
+
+  it("updates and clamps inspector width properly", () => {
+    uiStore.resetInspectorWidth();
+    expect(uiStore.getState().inspectorWidth).toBe(320);
+
+    uiStore.setInspectorWidth(450);
+    expect(uiStore.getState().inspectorWidth).toBe(450);
+
+    // Test under min clamp (240)
+    uiStore.setInspectorWidth(150);
+    expect(uiStore.getState().inspectorWidth).toBe(240);
+
+    // Test over max clamp (700)
+    uiStore.setInspectorWidth(950);
+    expect(uiStore.getState().inspectorWidth).toBe(700);
+
+    uiStore.resetInspectorWidth();
+    expect(uiStore.getState().inspectorWidth).toBe(320);
+  });
 });

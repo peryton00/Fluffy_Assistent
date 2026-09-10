@@ -5,7 +5,7 @@
  * Supports collapsed / expanded state via uiStore.
  */
 
-import React from "react";
+import React, { useState } from "react";
 import { useUiStore, uiStore } from "../../stores/uiStore";
 import { DOMAIN_DEFINITIONS } from "../../types/ui";
 import { SidebarIcon, ChevronLeftIcon, ChevronRightIcon } from "../../components/common/Icons";
@@ -14,8 +14,36 @@ export const ContextualSidebar: React.FC = () => {
   const activeDomain = useUiStore((s) => s.activeDomain);
   const activeSidebarView = useUiStore((s) => s.activeSidebarView);
   const sidebarCollapsed = useUiStore((s) => s.sidebarCollapsed);
+  const sidebarWidth = useUiStore((s) => s.sidebarWidth);
+  const [isDragging, setIsDragging] = useState(false);
+  const [isHovered, setIsHovered] = useState(false);
 
   const domain = DOMAIN_DEFINITIONS[activeDomain];
+
+  const handleMouseDown = (e: React.MouseEvent) => {
+    e.preventDefault();
+    setIsDragging(true);
+    const startX = e.clientX;
+    const startWidth = sidebarWidth;
+
+    const onMouseMove = (moveEvent: MouseEvent) => {
+      const delta = moveEvent.clientX - startX;
+      uiStore.setSidebarWidth(startWidth + delta);
+    };
+
+    const onMouseUp = () => {
+      setIsDragging(false);
+      window.removeEventListener("mousemove", onMouseMove);
+      window.removeEventListener("mouseup", onMouseUp);
+      document.body.style.userSelect = "";
+      document.body.style.cursor = "";
+    };
+
+    document.body.style.userSelect = "none";
+    document.body.style.cursor = "col-resize";
+    window.addEventListener("mousemove", onMouseMove);
+    window.addEventListener("mouseup", onMouseUp);
+  };
 
   if (sidebarCollapsed) {
     return (
@@ -59,7 +87,9 @@ export const ContextualSidebar: React.FC = () => {
     <aside
       aria-label={`${domain.label} Secondary Navigation`}
       style={{
-        width: "var(--sidebar-width)",
+        width: `${sidebarWidth}px`,
+        minWidth: `${sidebarWidth}px`,
+        maxWidth: `${sidebarWidth}px`,
         backgroundColor: "var(--color-surface)",
         borderRight: "1px solid var(--color-border)",
         display: "flex",
@@ -68,6 +98,7 @@ export const ContextualSidebar: React.FC = () => {
         flexShrink: 0,
         height: "100%",
         overflowY: "auto",
+        position: "relative",
       }}
     >
       {/* Header with Domain Title & Collapse Toggle */}
@@ -116,8 +147,8 @@ export const ContextualSidebar: React.FC = () => {
         style={{
           display: "flex",
           flexDirection: "column",
-          padding: "var(--space-2) var(--space-2)",
-          gap: "2px",
+          padding: "var(--space-3) var(--space-3)",
+          gap: "var(--space-1)",
           flex: 1,
         }}
       >
@@ -181,6 +212,40 @@ export const ContextualSidebar: React.FC = () => {
         <span style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
           {domain.description}
         </span>
+      </div>
+
+      {/* VS Code-style Resize Sash */}
+      <div
+        role="separator"
+        aria-orientation="vertical"
+        aria-label="Resize Sidebar"
+        title="Drag to resize sidebar (Double-click to reset)"
+        onMouseDown={handleMouseDown}
+        onDoubleClick={() => uiStore.resetSidebarWidth()}
+        onMouseEnter={() => setIsHovered(true)}
+        onMouseLeave={() => setIsHovered(false)}
+        style={{
+          position: "absolute",
+          top: 0,
+          right: "-3px",
+          width: "6px",
+          height: "100%",
+          cursor: "col-resize",
+          zIndex: 40,
+          userSelect: "none",
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "center",
+        }}
+      >
+        <div
+          style={{
+            width: "2px",
+            height: "100%",
+            backgroundColor: (isDragging || isHovered) ? "var(--color-accent)" : "transparent",
+            transition: "background-color 150ms ease",
+          }}
+        />
       </div>
     </aside>
   );

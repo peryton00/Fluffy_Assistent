@@ -192,6 +192,7 @@ export type InspectorItemType =
   | "log"
   | "confirmation"
   | "process"
+  | "runningApplication"
   | "application"
   | "startup"
   | "machine"
@@ -235,7 +236,7 @@ export type ConnectionState =
   | "REQUEST_FAILED"
   | "STALE";
 
-export type ThemeMode = "fluffyDark" | "fluffyLight" | "highContrast";
+export type ThemeMode = "fluffyDark" | "fluffyLight" | "highContrast" | "custom";
 
 export interface CommandPaletteState {
   open: boolean;

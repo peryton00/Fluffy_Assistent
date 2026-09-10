@@ -31,20 +31,25 @@ export const GuardianOverview: React.FC = () => {
   }, []);
 
   const pendingApprovals = telemetry.snapshot?.pending_confirmations || [];
-  const rawVerdicts = telemetry.snapshot?._guardian_verdicts || {};
-  const verdicts = Object.entries(rawVerdicts).map(([pidStr, v]) => {
-    const verdictObj = v as {
-      process_name?: string;
-      anomaly_score?: number;
-      verdict?: string;
-      is_anomaly?: boolean;
-    };
+  const rawVerdicts = telemetry.snapshot?._guardian_verdicts;
+  const verdictItems: Array<Record<string, unknown>> = Array.isArray(rawVerdicts)
+    ? (rawVerdicts as Array<Record<string, unknown>>)
+    : typeof rawVerdicts === "object" && rawVerdicts !== null
+    ? (Object.values(rawVerdicts) as Array<Record<string, unknown>>)
+    : [];
+
+  const verdicts = verdictItems.map((v, idx) => {
+    const pid = Number(v.pid || idx);
+    const processName = String(v.process_name || v.process || v.name || `PID ${pid}`);
+    const score = Number(v.anomaly_score ?? v.risk_score ?? v.score ?? 0);
+    const verdict = String(v.verdict || v.level || "normal");
+    const isAnomaly = Boolean(v.is_anomaly ?? (score >= 25));
     return {
-      pid: parseInt(pidStr, 10),
-      processName: verdictObj.process_name || `PID ${pidStr}`,
-      score: verdictObj.anomaly_score ?? 0,
-      verdict: verdictObj.verdict || "normal",
-      isAnomaly: verdictObj.is_anomaly || false,
+      pid,
+      processName,
+      score,
+      verdict,
+      isAnomaly,
     };
   });
 
@@ -174,7 +179,7 @@ export const GuardianOverview: React.FC = () => {
                     <span style={{ fontFamily: "var(--font-mono)", color: "var(--color-text-muted)" }}>
                       Score:{" "}
                       <strong style={{ color: v.isAnomaly ? "var(--color-danger)" : "var(--color-text)" }}>
-                        {(v.score * 100).toFixed(0)}%
+                        {v.score > 1 ? `${v.score.toFixed(0)}%` : `${(v.score * 100).toFixed(0)}%`}
                       </strong>
                     </span>
                     <span

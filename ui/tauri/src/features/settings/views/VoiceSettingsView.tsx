@@ -1,8 +1,8 @@
 /**
  * Fluffy Desktop - Voice Settings View
  * 
- * Configures local offline speech recognition (Vosk) and voice synthesis (pyttsx3).
- * Integrates with existing Phase 7 voice architecture.
+ * Configures local offline speech recognition (Vosk STT) and neural voice synthesis (Piper TTS).
+ * Integrates with Phase 7 voice architecture and global TTS mute/enable state.
  * Styled using Fluffy semantic design tokens.
  */
 
@@ -17,13 +17,15 @@ import {
   VolumeXIcon,
   RefreshCwIcon,
   CheckIcon,
+  PlayIcon,
 } from "../../../components/common/Icons";
 
 export const VoiceSettingsView: React.FC = () => {
   const { general, actionLoading, saveSuccessMessage } = useSettingsStore();
-  const { ttsMuted } = useChatStore();
+  const { ttsMuted, isSpeaking } = useChatStore();
 
   const [voiceSpeed, setVoiceSpeed] = useState<number>(general.voiceSpeed || 1.0);
+  const [testingSpeech, setTestingSpeech] = useState<boolean>(false);
 
   useEffect(() => {
     settingsStore.loadAllSettings();
@@ -39,9 +41,24 @@ export const VoiceSettingsView: React.FC = () => {
     await settingsStore.updateGeneralSettings({ voiceSpeed });
   };
 
-  const handleToggleMute = async (muted: boolean) => {
-    await chatStore.setTtsMuted(muted);
+  const handleToggleTts = async (enabled: boolean) => {
+    // If enabled is true -> ttsMuted is false, and vice versa
+    await chatStore.setTtsMuted(!enabled);
   };
+
+  const handleTestSpeech = async () => {
+    if (testingSpeech || isSpeaking) return;
+    setTestingSpeech(true);
+    try {
+      await chatStore.speak("Hello! Fluffy neural voice synthesis is operational and ready to assist you.");
+    } catch {
+      // Ignored
+    } finally {
+      setTimeout(() => setTestingSpeech(false), 2000);
+    }
+  };
+
+  const isTtsEnabled = !ttsMuted;
 
   return (
     <div
@@ -74,29 +91,45 @@ export const VoiceSettingsView: React.FC = () => {
               width: "36px",
               height: "36px",
               borderRadius: "var(--radius-sm)",
-              backgroundColor: "var(--color-accent-subtle)",
-              border: "1px solid var(--color-accent-border)",
-              color: "var(--color-accent)",
+              backgroundColor: isTtsEnabled ? "var(--color-accent-subtle)" : "var(--color-surface-elevated)",
+              border: `1px solid ${isTtsEnabled ? "var(--color-accent-border)" : "var(--color-border)"}`,
+              color: isTtsEnabled ? "var(--color-accent)" : "var(--color-text-muted)",
               display: "flex",
               alignItems: "center",
               justifyContent: "center",
+              transition: "all var(--transition-fast)",
             }}
           >
-            <MicIcon size={18} />
+            {isTtsEnabled ? <Volume2Icon size={18} /> : <VolumeXIcon size={18} />}
           </div>
           <div>
-            <h2
-              style={{
-                fontSize: "var(--font-size-md)",
-                fontWeight: "var(--font-weight-bold)",
-                color: "var(--color-text)",
-                margin: 0,
-              }}
-            >
-              Voice Engine Settings
-            </h2>
+            <div style={{ display: "flex", alignItems: "center", gap: "var(--space-2)" }}>
+              <h2
+                style={{
+                  fontSize: "var(--font-size-md)",
+                  fontWeight: "var(--font-weight-bold)",
+                  color: "var(--color-text)",
+                  margin: 0,
+                }}
+              >
+                Voice Engine Settings
+              </h2>
+              <span
+                style={{
+                  fontSize: "10px",
+                  fontWeight: "var(--font-weight-semibold)",
+                  padding: "2px 6px",
+                  borderRadius: "var(--radius-xs)",
+                  backgroundColor: isTtsEnabled ? "var(--color-success-subtle)" : "var(--color-surface-elevated)",
+                  color: isTtsEnabled ? "var(--color-success)" : "var(--color-text-muted)",
+                  border: `1px solid ${isTtsEnabled ? "var(--color-success-border)" : "var(--color-border)"}`,
+                }}
+              >
+                {isTtsEnabled ? "VOICE ENABLED" : "VOICE MUTED"}
+              </span>
+            </div>
             <p style={{ fontSize: "var(--font-size-xs)", color: "var(--color-text-muted)", margin: "2px 0 0" }}>
-              Local Vosk STT recognition and pyttsx3 speech synthesis.
+              Local Piper ONNX neural speech synthesis and Vosk offline voice recognition.
             </p>
           </div>
         </div>
@@ -120,6 +153,31 @@ export const VoiceSettingsView: React.FC = () => {
               {saveSuccessMessage}
             </span>
           )}
+
+          <button
+            type="button"
+            onClick={handleTestSpeech}
+            disabled={!isTtsEnabled || testingSpeech || isSpeaking}
+            title={!isTtsEnabled ? "Enable TTS first to test voice synthesis" : "Generate test speech"}
+            style={{
+              display: "inline-flex",
+              alignItems: "center",
+              gap: "6px",
+              padding: "6px 12px",
+              borderRadius: "var(--radius-xs)",
+              fontSize: "var(--font-size-xs)",
+              fontWeight: "var(--font-weight-medium)",
+              backgroundColor: "var(--color-surface-elevated)",
+              color: isTtsEnabled ? "var(--color-text)" : "var(--color-text-muted)",
+              border: "1px solid var(--color-border)",
+              cursor: !isTtsEnabled || testingSpeech || isSpeaking ? "not-allowed" : "pointer",
+              opacity: !isTtsEnabled || testingSpeech || isSpeaking ? 0.6 : 1,
+              transition: "all var(--transition-fast)",
+            }}
+          >
+            <PlayIcon size={12} />
+            <span>{testingSpeech ? "Synthesizing..." : "Test Voice"}</span>
+          </button>
 
           <button
             type="button"
@@ -148,6 +206,81 @@ export const VoiceSettingsView: React.FC = () => {
 
       {/* Main Form */}
       <div style={{ flex: 1, overflowY: "auto", padding: "var(--space-5) var(--space-6)", maxWidth: "680px", display: "flex", flexDirection: "column", gap: "var(--space-5)" }}>
+        {/* Master Voice Enable/Disable Toggle Card */}
+        <div
+          style={{
+            padding: "var(--space-4)",
+            borderRadius: "var(--radius-sm)",
+            backgroundColor: "var(--color-surface)",
+            border: `1px solid ${isTtsEnabled ? "color-mix(in srgb, var(--color-accent) 40%, var(--color-border))" : "var(--color-border)"}`,
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "space-between",
+            gap: "var(--space-4)",
+            transition: "border-color var(--transition-fast)",
+          }}
+        >
+          <div style={{ display: "flex", alignItems: "flex-start", gap: "var(--space-3)" }}>
+            <div
+              style={{
+                padding: "8px",
+                borderRadius: "var(--radius-xs)",
+                backgroundColor: isTtsEnabled ? "var(--color-accent-subtle)" : "var(--color-surface-elevated)",
+                color: isTtsEnabled ? "var(--color-accent)" : "var(--color-text-muted)",
+                display: "flex",
+              }}
+            >
+              {isTtsEnabled ? <Volume2Icon size={18} /> : <VolumeXIcon size={18} />}
+            </div>
+            <div>
+              <span style={{ fontSize: "var(--font-size-sm)", fontWeight: "var(--font-weight-bold)", color: "var(--color-text)" }}>
+                Enable Fluffy Voice Speech (TTS)
+              </span>
+              <p style={{ fontSize: "var(--font-size-xs)", color: "var(--color-text-muted)", lineHeight: 1.4, margin: "3px 0 0" }}>
+                Allow Fluffy to vocalize chat responses and proactive Guardian security alerts. When disabled, Fluffy operates in silent text-only mode.
+              </p>
+            </div>
+          </div>
+
+          <label style={{ position: "relative", display: "inline-block", width: "40px", height: "22px", flexShrink: 0, cursor: "pointer" }}>
+            <input
+              type="checkbox"
+              checked={isTtsEnabled}
+              onChange={(e) => handleToggleTts(e.target.checked)}
+              style={{ opacity: 0, width: 0, height: 0 }}
+            />
+            <span
+              style={{
+                position: "absolute",
+                cursor: "pointer",
+                top: 0,
+                left: 0,
+                right: 0,
+                bottom: 0,
+                backgroundColor: isTtsEnabled ? "var(--color-accent)" : "var(--color-surface-elevated)",
+                border: `1px solid ${isTtsEnabled ? "var(--color-accent)" : "var(--color-border)"}`,
+                transition: "all var(--transition-fast)",
+                borderRadius: "11px",
+              }}
+            >
+              <span
+                style={{
+                  position: "absolute",
+                  content: '""',
+                  height: "16px",
+                  width: "16px",
+                  left: isTtsEnabled ? "19px" : "2px",
+                  bottom: "2px",
+                  backgroundColor: "#ffffff",
+                  transition: "all var(--transition-fast)",
+                  borderRadius: "50%",
+                  boxShadow: "0 1px 2px rgba(0,0,0,0.2)",
+                }}
+              />
+            </span>
+          </label>
+        </div>
+
         {/* Local Engine Status Cards */}
         <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(240px, 1fr))", gap: "var(--space-3)" }}>
           <div
@@ -197,40 +330,40 @@ export const VoiceSettingsView: React.FC = () => {
               style={{
                 padding: "8px",
                 borderRadius: "var(--radius-xs)",
-                backgroundColor: "var(--color-accent-subtle)",
-                color: "var(--color-accent)",
+                backgroundColor: isTtsEnabled ? "var(--color-accent-subtle)" : "var(--color-surface-elevated)",
+                color: isTtsEnabled ? "var(--color-accent)" : "var(--color-text-muted)",
                 display: "flex",
               }}
             >
-              {ttsMuted ? <VolumeXIcon size={16} /> : <Volume2Icon size={16} />}
+              {isTtsEnabled ? <Volume2Icon size={16} /> : <VolumeXIcon size={16} />}
             </div>
             <div>
               <span style={{ fontSize: "var(--font-size-xs)", fontWeight: "var(--font-weight-bold)", color: "var(--color-text)" }}>
-                pyttsx3 Offline TTS
+                Piper Neural TTS (ONNX)
               </span>
               <p style={{ fontSize: "11px", color: "var(--color-text-muted)", lineHeight: 1.4, margin: "2px 0 0" }}>
-                Native OS speech synthesizer (SAPI5 / AVFoundation). Zero network calls.
+                High-quality offline neural voice synthesizer using ONNXRuntime and en_US LJSpeech model.
               </p>
             </div>
           </div>
         </div>
 
-        {/* Mute and Speed Controls */}
+        {/* Speed Controls */}
         <div style={{ display: "flex", flexDirection: "column", gap: "var(--space-3)" }}>
           <h3 style={{ fontSize: "11px", fontWeight: "var(--font-weight-semibold)", color: "var(--color-text-muted)", textTransform: "uppercase", letterSpacing: "0.05em", margin: 0 }}>
             Playback Preferences
           </h3>
 
           <SettingToggle
-            label="Mute Voice Output"
-            description="Silence conversational voice responses from pyttsx3 while maintaining text responses in Chat."
+            label="Mute All Voice Output"
+            description="Quickly silence all conversational speech and voice alerts from Piper while retaining text responses in Chat."
             checked={ttsMuted}
-            onChange={handleToggleMute}
+            onChange={(muted) => chatStore.setTtsMuted(muted)}
           />
 
           <SettingSlider
             label="Speech Rate Multiplier"
-            description="Playback speed for local voice synthesis."
+            description="Playback speed for local neural voice synthesis."
             value={voiceSpeed}
             min={0.5}
             max={2.0}

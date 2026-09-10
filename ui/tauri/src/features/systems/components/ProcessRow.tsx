@@ -10,20 +10,61 @@ import type { ProcessTelemetry } from "../../../types/contracts";
 import { useUiStore, uiStore } from "../../../stores/uiStore";
 import { killProcess } from "../../../services/api/systems";
 import { telemetryCoordinator } from "../../../stores/telemetryStore";
-import { CloseIcon } from "../../../components/common/Icons";
+import { CloseIcon, ChevronRightIcon, ChevronDownIcon } from "../../../components/common/Icons";
 
 interface ProcessRowProps {
   process: ProcessTelemetry;
   indent?: number;
+  hasChildren?: boolean;
+  isExpanded?: boolean;
+  childCount?: number;
+  totalRamMb?: number;
+  totalCpuPercent?: number;
+  totalDiskKb?: number;
+  onToggleExpand?: (e: React.MouseEvent) => void;
 }
 
-export const ProcessRow: React.FC<ProcessRowProps> = ({ process, indent = 0 }) => {
+export const ProcessRow: React.FC<ProcessRowProps> = ({
+  process,
+  indent = 0,
+  hasChildren = false,
+  isExpanded = false,
+  childCount = 0,
+  totalRamMb,
+  totalCpuPercent,
+  totalDiskKb,
+  onToggleExpand,
+}) => {
   const selectedItem = useUiStore((s) => s.selectedItem);
   const [isKilling, setIsKilling] = useState(false);
 
   const isSelected = selectedItem?.type === "process" && selectedItem?.id === String(process.pid);
 
-  const handleSelect = () => {
+  // Compute effective working set (aggregating child processes for parent tree nodes)
+  const effectiveRamMb = hasChildren && totalRamMb !== undefined ? totalRamMb : (process.ram_mb || 0);
+  const ramFormatted = effectiveRamMb >= 1024
+    ? `${(effectiveRamMb / 1024).toFixed(2)} GB`
+    : `${Math.round(effectiveRamMb)} MB`;
+
+  // Compute effective CPU
+  const effectiveCpu = hasChildren && totalCpuPercent !== undefined ? totalCpuPercent : (process.cpu_percent || 0);
+  const cpuPercent = Math.min(100, Math.max(0, effectiveCpu));
+
+  // Compute effective Disk I/O (handling read_kb, written_kb, disk_usage_mb and aggregate totals)
+  const selfDiskKb =
+    (process.disk_read_kb || 0) +
+    (process.disk_written_kb || 0) +
+    ((process.disk_usage_mb || 0) * 1024);
+  const effectiveDiskKb = hasChildren && totalDiskKb !== undefined ? totalDiskKb : selfDiskKb;
+  const diskFormatted = effectiveDiskKb >= 1024 * 1024
+    ? `${(effectiveDiskKb / (1024 * 1024)).toFixed(2)} GB`
+    : effectiveDiskKb >= 1024
+    ? `${(effectiveDiskKb / 1024).toFixed(1)} MB`
+    : effectiveDiskKb > 0
+    ? `${Math.round(effectiveDiskKb)} KB`
+    : "0 KB";
+
+  const handleSelect = (e: React.MouseEvent) => {
     uiStore.setSelectedItem({
       type: "process",
       id: String(process.pid),
@@ -31,17 +72,22 @@ export const ProcessRow: React.FC<ProcessRowProps> = ({ process, indent = 0 }) =
       data: {
         pid: process.pid,
         name: process.name,
-        cpu_percent: process.cpu_percent,
-        ram_mb: process.ram_mb,
-        disk_usage_mb: process.disk_usage_mb,
+        cpu_percent: `${cpuPercent.toFixed(1)}%`,
+        ram_mb: ramFormatted,
+        disk_usage: diskFormatted,
         status: process.status,
         user: process.user,
         parent_pid: process.parent_pid,
         net_received: process.net_received,
         net_sent: process.net_sent,
         start_time: process.start_time,
+        ...(hasChildren ? { linked_children_count: childCount } : {}),
       },
     }, true);
+
+    if (hasChildren && onToggleExpand) {
+      onToggleExpand(e);
+    }
   };
 
   const handleKill = async (e: React.MouseEvent) => {
@@ -50,13 +96,13 @@ export const ProcessRow: React.FC<ProcessRowProps> = ({ process, indent = 0 }) =
     try {
       await killProcess(process.pid);
       await telemetryCoordinator.refreshNow();
+      if (uiStore.getState().selectedItem?.id === String(process.pid)) {
+        uiStore.setSelectedItem(null, false);
+      }
     } finally {
       setIsKilling(false);
     }
   };
-
-  const cpuPercent = Math.min(100, Math.max(0, process.cpu_percent || 0));
-  const ramMb = process.ram_mb ? Math.round(process.ram_mb) : 0;
 
   return (
     <tr
@@ -81,13 +127,63 @@ export const ProcessRow: React.FC<ProcessRowProps> = ({ process, indent = 0 }) =
         {process.pid}
       </td>
 
-      {/* Process Name (with tree indentation if applicable) */}
+      {/* Process Name (with collapsible tree indentation and child count) */}
       <td style={{ padding: "6px 10px", color: "var(--color-text)", fontWeight: "var(--font-weight-medium)" }}>
-        <div style={{ display: "flex", alignItems: "center", paddingLeft: `${indent * 16}px` }}>
-          {indent > 0 && <span style={{ color: "var(--color-text-muted)", marginRight: "6px" }}>└─</span>}
+        <div style={{ display: "flex", alignItems: "center", gap: "4px", paddingLeft: `${indent * 18}px` }}>
+          {indent > 0 && <span style={{ color: "var(--color-text-muted)", marginRight: "2px" }}>└─</span>}
+
+          {hasChildren ? (
+            <button
+              type="button"
+              onClick={(e) => {
+                e.stopPropagation();
+                onToggleExpand?.(e);
+              }}
+              title={isExpanded ? "Collapse child processes" : "Expand child processes"}
+              aria-label={isExpanded ? `Collapse ${childCount} child processes` : `Expand ${childCount} child processes`}
+              style={{
+                display: "inline-flex",
+                alignItems: "center",
+                justifyContent: "center",
+                width: "16px",
+                height: "16px",
+                padding: 0,
+                border: "none",
+                borderRadius: "var(--radius-xs)",
+                backgroundColor: isExpanded ? "rgba(99, 102, 241, 0.15)" : "var(--color-surface-subtle)",
+                color: isExpanded ? "var(--color-accent)" : "var(--color-text-muted)",
+                cursor: "pointer",
+                flexShrink: 0,
+                transition: "all var(--transition-fast)",
+              }}
+            >
+              {isExpanded ? <ChevronDownIcon size={11} /> : <ChevronRightIcon size={11} />}
+            </button>
+          ) : indent > 0 ? (
+            <span style={{ width: "16px", display: "inline-block", flexShrink: 0 }} />
+          ) : null}
+
           <span style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
             {process.name}
           </span>
+
+          {hasChildren && childCount > 0 && (
+            <span
+              style={{
+                fontSize: "9px",
+                fontFamily: "var(--font-mono)",
+                fontWeight: "var(--font-weight-semibold)",
+                color: isExpanded ? "var(--color-accent)" : "var(--color-text-muted)",
+                backgroundColor: isExpanded ? "rgba(99, 102, 241, 0.12)" : "var(--color-surface-subtle)",
+                border: `1px solid ${isExpanded ? "rgba(99, 102, 241, 0.25)" : "var(--color-border-subtle)"}`,
+                padding: "0px 4px",
+                borderRadius: "var(--radius-xs)",
+                marginLeft: "3px",
+              }}
+            >
+              {childCount}
+            </span>
+          )}
         </div>
       </td>
 
@@ -107,14 +203,14 @@ export const ProcessRow: React.FC<ProcessRowProps> = ({ process, indent = 0 }) =
         </div>
       </td>
 
-      {/* Memory Consumption */}
-      <td style={{ padding: "6px 10px", width: "100px", textAlign: "right" }}>
-        {ramMb > 1024 ? `${(ramMb / 1024).toFixed(2)} GB` : `${ramMb} MB`}
+      {/* Memory Consumption (Working Set) */}
+      <td style={{ padding: "6px 10px", width: "100px", textAlign: "right", color: hasChildren ? "var(--color-text)" : "var(--color-text-secondary)" }}>
+        {ramFormatted}
       </td>
 
       {/* Disk Usage */}
       <td style={{ padding: "6px 10px", width: "80px", textAlign: "right", color: "var(--color-text-muted)" }}>
-        {process.disk_usage_mb ? `${process.disk_usage_mb.toFixed(1)} MB` : "—"}
+        {diskFormatted}
       </td>
 
       {/* Network Rx/Tx */}

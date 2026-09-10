@@ -45,7 +45,7 @@ def generate_ftp_qr(username: str, password: str, ip: str, port: int = 2121) -> 
         buffer.seek(0)
         img_base64 = base64.b64encode(buffer.read()).decode('utf-8')
         
-        return img_base64
+        return f"data:image/png;base64,{img_base64}"
     
     except Exception as e:
         print(f"❌ QR code generation failed: {e}")

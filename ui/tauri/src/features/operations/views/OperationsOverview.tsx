@@ -13,7 +13,6 @@ import { OperationalHeader } from "../components/OperationalHeader";
 import { TelemetryMetricCard } from "../components/TelemetryMetricCard";
 import { SubsystemsStatusCard } from "../components/SubsystemsStatusCard";
 import { GuardianSummaryCard } from "../components/GuardianSummaryCard";
-import { PendingConfirmationsBanner } from "../components/PendingConfirmationsBanner";
 import { QuickActionsCard } from "../components/QuickActionsCard";
 import { RecentActivityFeed } from "../components/RecentActivityFeed";
 import { CpuIcon, DatabaseIcon, HardDriveIcon, WifiIcon, BatteryIcon } from "../../../components/common/Icons";
@@ -70,11 +69,6 @@ export const OperationsOverview: React.FC = () => {
         subtitle="Live host telemetry, subsystem health, and authorization control"
       />
 
-      {/* Pending Confirmations Banner (High priority alerts) */}
-      {snapshot?.pending_confirmations && snapshot.pending_confirmations.length > 0 && (
-        <PendingConfirmationsBanner confirmations={snapshot.pending_confirmations} />
-      )}
-
       {/* Primary Metrics Group */}
       <section aria-label="System Metrics" style={{ display: "flex", flexWrap: "wrap", gap: "var(--space-3)" }}>
         <TelemetryMetricCard
@@ -88,10 +82,12 @@ export const OperationsOverview: React.FC = () => {
           statusText={cpuPercent > 80 ? "HIGH LOAD" : "NORMAL"}
           inspectData={{
             usage_percent: cpuPercent,
-            cores_count: cpu?.cores_usage?.length || 0,
+            cores_count: cpu?.cores_count ?? cpu?.cores_usage?.length ?? 0,
             cores_usage: cpu?.cores_usage || [],
-            temperature: cpu?.temperature,
-            frequency_mhz: cpu?.frequency_mhz,
+            temperature: cpu?.temperature ? `${cpu.temperature} °C` : undefined,
+            frequency_mhz: cpu?.frequency_mhz ? `${cpu.frequency_mhz} MHz` : undefined,
+            brand: cpu?.brand,
+            physical_cores: cpu?.physical_cores,
           }}
         />
 

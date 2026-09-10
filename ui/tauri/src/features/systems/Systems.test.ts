@@ -218,12 +218,18 @@ describe("Systems Domain Test Suite", () => {
     expect(rowHtml).toContain("1001");
     expect(rowHtml).toContain("Terminate chrome.exe");
 
-    const treeHtml = renderToStaticMarkup(
+    const treeCollapsedHtml = renderToStaticMarkup(
       React.createElement(ProcessTree, { processes: mockProcesses })
     );
-    expect(treeHtml).toContain("chrome.exe");
-    expect(treeHtml).toContain("code.exe");
-    expect(treeHtml).toContain("node.exe");
+    expect(treeCollapsedHtml).toContain("chrome.exe");
+    expect(treeCollapsedHtml).toContain("Expand 1 child processes");
+
+    const treeExpandedHtml = renderToStaticMarkup(
+      React.createElement(ProcessTree, { processes: mockProcesses, defaultExpanded: true })
+    );
+    expect(treeExpandedHtml).toContain("chrome.exe");
+    expect(treeExpandedHtml).toContain("code.exe");
+    expect(treeExpandedHtml).toContain("node.exe");
   });
 
   it("renders ApplicationsView and ApplicationCard with real icons and metadata", async () => {

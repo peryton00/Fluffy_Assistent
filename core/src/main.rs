@@ -23,7 +23,7 @@ use std::{
     thread,
     time::{Duration, SystemTime, UNIX_EPOCH},
 };
-use sysinfo::{Networks, ProcessesToUpdate, System};
+use sysinfo::{Components, Networks, ProcessesToUpdate, System};
 pub static IS_UI_ACTIVE: AtomicBool = AtomicBool::new(false);
 
 #[cfg(target_os = "windows")]
@@ -73,6 +73,13 @@ struct RamStats {
 #[derive(Serialize)]
 struct CpuStats {
     usage_percent: f32,
+    cores_count: usize,
+    cores_usage: Vec<f32>,
+    frequency_mhz: u64,
+    brand: String,
+    vendor_id: String,
+    physical_cores: usize,
+    temperature: Option<f32>,
 }
 
 #[derive(Serialize)]
@@ -400,7 +407,7 @@ fn read_env_key(env_path: &str, key: &str) -> Option<String> {
     None
 }
 
-fn spawn_listener(is_production: bool) {
+fn spawn_listener(is_production: bool) -> Option<std::process::Child> {
     println!("[Fluffy Core] Spawning Brain...");
 
     let (brain_dir, env_file, default_python) = if is_production {
@@ -439,14 +446,16 @@ fn spawn_listener(is_production: bool) {
         cmd.creation_flags(0x08000000); // CREATE_NO_WINDOW
     }
 
-    let res = cmd.spawn();
-
-    if let Err(e) = res {
-        eprintln!(
-            "[Fluffy Core] Failed to spawn brain: {}. \
-             Check PYTHON_PATH in .env (currently: {}) and that brain/listener.py exists.",
-            e, python_path
-        );
+    match cmd.spawn() {
+        Ok(child) => Some(child),
+        Err(e) => {
+            eprintln!(
+                "[Fluffy Core] Failed to spawn brain: {}. \
+                 Check PYTHON_PATH in .env (currently: {}) and that brain/listener.py exists.",
+                e, python_path
+            );
+            None
+        }
     }
 }
 
@@ -508,7 +517,7 @@ fn main() {
     let is_production = std::path::Path::new(".env").exists();
 
     // 👂 Start Brain Listener
-    spawn_listener(is_production);
+    let brain_child = spawn_listener(is_production);
     // 🚀 Launch UI Dashboard automatically (only in dev mode)
     if !is_production {
         spawn_ui();
@@ -525,6 +534,7 @@ fn main() {
 
     let mut system = System::new_all();
     let mut networks = Networks::new_with_refreshed_list();
+    let mut components = Components::new_with_refreshed_list();
     let mut cpu_history = CpuHistory::new();
 
     // Cache startup entries - registry reads are expensive, only refresh every 60s
@@ -537,6 +547,7 @@ fn main() {
             system.refresh_cpu_all();
             system.refresh_processes(ProcessesToUpdate::All, true);
             networks.refresh(true);
+            components.refresh(true);
 
             let mut processes = collect_processes(&system, &mut cpu_history);
             processes.sort_by(|a, b| b.ram_mb.cmp(&a.ram_mb));
@@ -544,6 +555,22 @@ fn main() {
             let total_mb = kib_to_mb(system.total_memory());
             let free_mb = kib_to_mb(system.available_memory());
             let used_mb = total_mb - free_mb;
+
+            let cpus = system.cpus();
+            let cores_usage: Vec<f32> = cpus.iter().map(|c| c.cpu_usage()).collect();
+            let cores_count = cpus.len();
+            let frequency_mhz = cpus.first().map(|c| c.frequency()).unwrap_or(0);
+            let brand = cpus.first().map(|c| c.brand().to_string()).unwrap_or_default();
+            let vendor_id = cpus.first().map(|c| c.vendor_id().to_string()).unwrap_or_default();
+            let physical_cores = system.physical_core_count().unwrap_or(cores_count);
+
+            let temperature: Option<f32> = components
+                .iter()
+                .filter_map(|comp| comp.temperature())
+                .fold(None, |acc, t| match acc {
+                    None => Some(t),
+                    Some(m) => Some(if t > m { t } else { m }),
+                });
 
             let mut total_received = 0;
             let mut total_transmitted = 0;
@@ -605,6 +632,13 @@ fn main() {
                     },
                     cpu: CpuStats {
                         usage_percent: system.global_cpu_usage(),
+                        cores_count,
+                        cores_usage,
+                        frequency_mhz,
+                        brand,
+                        vendor_id,
+                        physical_cores,
+                        temperature,
                     },
                     network: NetworkStats {
                         received_kb: total_received / 1024,
@@ -651,6 +685,11 @@ fn main() {
 
     // Give clients time to receive the message
     thread::sleep(Duration::from_millis(500));
+
+    // Kill brain child process on shutdown
+    if let Some(mut child) = brain_child {
+        let _ = child.kill();
+    }
 
     // 👇 clean exit point
     eprintln!("[Fluffy Core] Clean shutdown complete");

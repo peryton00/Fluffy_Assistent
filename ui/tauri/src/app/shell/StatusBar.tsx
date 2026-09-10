@@ -5,9 +5,9 @@
  * Consumes telemetryStore exclusively (zero duplicate polling loops).
  */
 
-import React from "react";
+import React, { useState, useEffect } from "react";
 import { useTelemetryStore, telemetryCoordinator } from "../../stores/telemetryStore";
-import { RefreshCwIcon } from "../../components/common/Icons";
+import { RefreshCwIcon, ClockIcon } from "../../components/common/Icons";
 import type { SubsystemHealth } from "../../types/contracts";
 
 export const StatusBar: React.FC = () => {
@@ -17,6 +17,15 @@ export const StatusBar: React.FC = () => {
     connectionState,
     activityState,
   } = useTelemetryStore();
+
+  const [currentTime, setCurrentTime] = useState<string>(() => new Date().toLocaleTimeString());
+
+  useEffect(() => {
+    const timer = setInterval(() => {
+      setCurrentTime(new Date().toLocaleTimeString());
+    }, 1000);
+    return () => clearInterval(timer);
+  }, []);
 
   const isConnected = connectionState === "CONNECTED";
 
@@ -33,7 +42,7 @@ export const StatusBar: React.FC = () => {
   // Formatted Metrics
   const cpuSource = snapshot?.system?.cpu || snapshot?.cpu;
   const ramSource = snapshot?.system?.ram || snapshot?.ram;
-  const netSource = snapshot?.system?.network || snapshot?.networks;
+  const netSource = snapshot?.system?.network || (snapshot as unknown as { network?: Record<string, unknown> })?.network;
 
   const cpuPercent = cpuSource?.usage_percent !== undefined
     ? `${cpuSource.usage_percent.toFixed(0)}%`
@@ -49,11 +58,19 @@ export const StatusBar: React.FC = () => {
     ? `${(ramSource.used_mb / 1024).toFixed(1)} GB`
     : "--";
 
-  const netStatus = Array.isArray(netSource)
-    ? `${netSource.length} IF`
-    : netSource && typeof netSource === "object" && "status" in netSource
-    ? String((netSource as { status?: string }).status || "OK")
-    : isConnected ? "UP" : "DOWN";
+  const formatSpeed = (kbps: number | undefined) => {
+    if (kbps === undefined || kbps <= 0) return "0 KB/s";
+    if (kbps >= 1024) {
+      return `${(kbps / 1024).toFixed(1)} MB/s`;
+    }
+    return `${kbps.toFixed(0)} KB/s`;
+  };
+
+  const rxKbps = typeof netSource?.total_rx_kbps === "number" ? netSource.total_rx_kbps : 0;
+  const txKbps = typeof netSource?.total_tx_kbps === "number" ? netSource.total_tx_kbps : 0;
+  const netSpeedText = isConnected
+    ? `↓ ${formatSpeed(rxKbps)} ↑ ${formatSpeed(txKbps)}`
+    : "OFFLINE";
 
   const getHealthDotColor = (health: SubsystemHealth): string => {
     switch (health) {
@@ -108,14 +125,22 @@ export const StatusBar: React.FC = () => {
         ))}
       </div>
 
-      {/* Right: Operational Telemetry & Controls */}
-      <div style={{ display: "flex", alignItems: "center", gap: "var(--space-4)" }}>
+      {/* Right: Operational Telemetry, Time & Controls */}
+      <div style={{ display: "flex", alignItems: "center", gap: "var(--space-3)" }}>
         <div style={{ display: "flex", alignItems: "center", gap: "var(--space-2)" }}>
           <span>CPU: <strong style={{ color: "var(--color-text)" }}>{cpuPercent}</strong></span>
           <span>•</span>
           <span>RAM: <strong style={{ color: "var(--color-text)" }}>{ramPercent} ({ramGb})</strong></span>
           <span>•</span>
-          <span>NET: <strong style={{ color: "var(--color-text)" }}>{netStatus}</strong></span>
+          <span>NET: <strong style={{ color: "var(--color-text)" }}>{netSpeedText}</strong></span>
+        </div>
+
+        <span>•</span>
+
+        {/* Live Clock */}
+        <div style={{ display: "flex", alignItems: "center", gap: "4px", color: "var(--color-text-secondary)" }}>
+          <ClockIcon size={11} />
+          <strong style={{ color: "var(--color-text)", fontWeight: "var(--font-weight-medium)" }}>{currentTime}</strong>
         </div>
 
         {/* Polling Cadence Badge */}

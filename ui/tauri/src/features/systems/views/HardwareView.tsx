@@ -298,7 +298,7 @@ export const HardwareView: React.FC = () => {
           </div>
         </div>
 
-        {/* Storage Mount Points */}
+        {/* Storage Mount Points & Devices */}
         <div
           style={{
             backgroundColor: "var(--color-surface)",
@@ -307,11 +307,19 @@ export const HardwareView: React.FC = () => {
             padding: "var(--space-4)",
           }}
         >
-          <div style={{ display: "flex", alignItems: "center", gap: "var(--space-2)", marginBottom: "var(--space-3)" }}>
-            <HardDriveIcon size={16} style={{ color: "var(--color-accent)" }} />
-            <span style={{ fontSize: "13px", fontWeight: "var(--font-weight-semibold)", color: "var(--color-text)" }}>
-              Storage Disks & Filesystem Mounts ({disks.length})
-            </span>
+          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "var(--space-3)", flexWrap: "wrap", gap: "var(--space-2)" }}>
+            <div style={{ display: "flex", alignItems: "center", gap: "var(--space-2)" }}>
+              <HardDriveIcon size={16} style={{ color: "var(--color-accent)" }} />
+              <span style={{ fontSize: "13px", fontWeight: "var(--font-weight-semibold)", color: "var(--color-text)" }}>
+                Storage Disks & Filesystem Mounts ({disks.length})
+              </span>
+            </div>
+            {disks.length > 0 && (
+              <span style={{ fontSize: "11px", fontFamily: "var(--font-mono)", color: "var(--color-text-muted)" }}>
+                Total: <strong style={{ color: "var(--color-text)" }}>{formatBytes(disks.reduce((acc, d) => acc + (d.total_bytes || 0), 0))}</strong>
+                {" • "}Free: <strong style={{ color: "var(--color-text)" }}>{formatBytes(disks.reduce((acc, d) => acc + (d.available_bytes || 0), 0))}</strong>
+              </span>
+            )}
           </div>
 
           <div
@@ -323,6 +331,7 @@ export const HardwareView: React.FC = () => {
           >
             {disks.map((disk) => {
               const usedPct = disk.used_percent ?? 0;
+              const usedBytes = disk.total_bytes && disk.available_bytes !== undefined ? Math.max(0, disk.total_bytes - disk.available_bytes) : undefined;
               return (
                 <div
                   key={disk.mount_point || disk.name}
@@ -332,7 +341,10 @@ export const HardwareView: React.FC = () => {
                       mount_point: disk.mount_point,
                       total: formatBytes(disk.total_bytes),
                       available: formatBytes(disk.available_bytes),
+                      used: usedBytes !== undefined ? formatBytes(usedBytes) : "N/A",
                       usage: `${usedPct.toFixed(1)}%`,
+                      file_system: disk.file_system || "Unknown",
+                      is_removable: disk.is_removable ? "Yes (External/USB)" : "No (Fixed Internal)",
                     })
                   }
                   style={{
@@ -341,15 +353,30 @@ export const HardwareView: React.FC = () => {
                     borderRadius: "var(--radius-sm)",
                     padding: "var(--space-3)",
                     cursor: "pointer",
+                    display: "flex",
+                    flexDirection: "column",
+                    gap: "var(--space-2)",
                   }}
                 >
-                  <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "var(--space-2)" }}>
-                    <span style={{ fontSize: "12px", fontWeight: "var(--font-weight-semibold)", color: "var(--color-text)" }}>
-                      {disk.mount_point || disk.name}
-                    </span>
-                    <span style={{ fontSize: "11px", fontFamily: "var(--font-mono)", color: "var(--color-accent)", fontWeight: "var(--font-weight-bold)" }}>
-                      {usedPct.toFixed(1)}%
-                    </span>
+                  <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start" }}>
+                    <div>
+                      <div style={{ fontSize: "13px", fontWeight: "var(--font-weight-bold)", color: "var(--color-text)", fontFamily: "var(--font-mono)" }}>
+                        {disk.mount_point || disk.name}
+                      </div>
+                      <div style={{ fontSize: "11px", color: "var(--color-text-muted)", marginTop: "1px" }}>
+                        {disk.name && disk.name !== disk.mount_point ? disk.name : (disk.is_removable ? "Removable Drive" : "Local Fixed Disk")}
+                      </div>
+                    </div>
+                    <div style={{ display: "flex", flexDirection: "column", alignItems: "flex-end", gap: "2px" }}>
+                      <span style={{ fontSize: "12px", fontFamily: "var(--font-mono)", color: "var(--color-accent)", fontWeight: "var(--font-weight-bold)" }}>
+                        {usedPct.toFixed(1)}%
+                      </span>
+                      {disk.file_system && (
+                        <span style={{ fontSize: "9px", padding: "1px 4px", borderRadius: "var(--radius-xs)", backgroundColor: "var(--color-surface-elevated)", color: "var(--color-text-muted)", fontFamily: "var(--font-mono)" }}>
+                          {disk.file_system}
+                        </span>
+                      )}
+                    </div>
                   </div>
 
                   <div
@@ -359,7 +386,6 @@ export const HardwareView: React.FC = () => {
                       backgroundColor: "var(--color-surface-elevated)",
                       borderRadius: "var(--radius-full)",
                       overflow: "hidden",
-                      marginBottom: "var(--space-2)",
                     }}
                   >
                     <div
@@ -388,8 +414,8 @@ export const HardwareView: React.FC = () => {
             })}
 
             {disks.length === 0 && (
-              <div style={{ fontSize: "11px", color: "var(--color-text-muted)", fontFamily: "var(--font-mono)" }}>
-                No disk mounts detected.
+              <div style={{ fontSize: "11px", color: "var(--color-text-muted)", fontFamily: "var(--font-mono)", padding: "var(--space-2)" }}>
+                Scanning storage devices & filesystem mounts...
               </div>
             )}
           </div>

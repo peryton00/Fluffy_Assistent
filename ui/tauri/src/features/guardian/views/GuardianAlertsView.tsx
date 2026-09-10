@@ -18,7 +18,7 @@ import {
   SearchIcon,
   CheckCircleIcon,
 } from "../../../components/common/Icons";
-import type { SecurityAlert, SecurityActionType } from "../../../types/contracts";
+import type { SecurityAlert, SecurityActionType, AlertSeverity } from "../../../types/contracts";
 
 const SEVERITY_FILTERS = ["all", "critical", "high", "medium", "info"] as const;
 
@@ -52,9 +52,69 @@ export const GuardianAlertsView: React.FC = () => {
   const [severityFilter, setSeverityFilter] = useState<string>("all");
   const [searchQuery, setSearchQuery] = useState<string>("");
 
-  const rawAlerts: SecurityAlert[] = telemetry.snapshot?.security_alerts || [];
+  const snapshot = telemetry.snapshot;
+  const rawSecurityAlerts: SecurityAlert[] = snapshot?.security_alerts || [];
+  const rawVerdicts = snapshot?._guardian_verdicts;
+  const isLearning = Boolean(snapshot?._guardian_state?.is_learning);
+  const remainingSecs = snapshot?._guardian_state?.learning_seconds_remaining ?? 0;
+  const progressPct = snapshot?._guardian_state?.learning_progress ?? 0;
 
-  const filteredAlerts = rawAlerts.filter((alert) => {
+  const verdictItems: Array<Record<string, unknown>> = Array.isArray(rawVerdicts)
+    ? (rawVerdicts as Array<Record<string, unknown>>)
+    : typeof rawVerdicts === "object" && rawVerdicts !== null
+    ? (Object.values(rawVerdicts) as Array<Record<string, unknown>>)
+    : [];
+
+  // Normalize and combine security alerts and Guardian verdicts
+  const combinedAlerts: SecurityAlert[] = [
+    ...rawSecurityAlerts.map((a, idx): SecurityAlert => ({
+      ...a,
+      id: a.id || `alert-${a.pid || idx}-${a.timestamp || Date.now()}`,
+      process_name: String(a.process_name || a.name || (a.pid ? `PID ${a.pid}` : "Unknown Process")),
+      severity: ((a.severity || "info").toLowerCase() as AlertSeverity),
+      message: String(a.message || a.reason || "Suspicious runtime behavior detected"),
+    })),
+    ...verdictItems
+      .filter((v) => {
+        const pid = Number(v.pid);
+        return !rawSecurityAlerts.some((a) => a.pid === pid);
+      })
+      .map((v, idx): SecurityAlert => {
+        const pid = Number(v.pid || 0);
+        const score = Number(v.score ?? v.risk_score ?? v.anomaly_score ?? 0);
+        const lvl = String(v.level || "").toLowerCase();
+        const sevStr = String(v.severity || v.type || "").toLowerCase();
+
+        let severity: AlertSeverity = "low";
+        if (sevStr === "critical" || lvl.includes("critical") || lvl.includes("termination") || score >= 75) {
+          severity = "critical";
+        } else if (sevStr === "high" || lvl.includes("high") || lvl.includes("confirmation") || score >= 50) {
+          severity = "high";
+        } else if (sevStr === "medium" || sevStr === "warning" || lvl.includes("moderate") || lvl.includes("warn") || score >= 25) {
+          severity = "medium";
+        }
+
+        return {
+          id: String(v.id || `verdict-${pid}-${idx}`),
+          timestamp: (v.timestamp as number) || Date.now(),
+          severity,
+          alert_type: "Guardian Behavioral Verdict",
+          message: String(v.message || v.reason || v.explanation || `Behavioral deviation detected in ${v.process_name || v.process || pid}`),
+          process_name: String(v.process_name || v.process || v.name || `PID ${pid}`),
+          pid,
+          score,
+          reason: String(v.reason || ""),
+          details: {
+            explanation: v.explanation,
+            confidence: v.confidence,
+            level: v.level,
+            anomalies: v.anomalies,
+          },
+        };
+      }),
+  ];
+
+  const filteredAlerts = combinedAlerts.filter((alert) => {
     const sev = alert.severity?.toLowerCase() || "info";
     if (severityFilter !== "all" && sev !== severityFilter) return false;
     if (searchQuery.trim()) {
@@ -63,15 +123,27 @@ export const GuardianAlertsView: React.FC = () => {
         alert.process_name?.toLowerCase().includes(q) ||
         alert.reason?.toLowerCase().includes(q) ||
         String(alert.pid || "").includes(q) ||
-        alert.message?.toLowerCase().includes(q)
+        alert.message?.toLowerCase().includes(q) ||
+        alert.alert_type?.toLowerCase().includes(q)
       );
     }
     return true;
   });
 
-  const handleAction = async (e: React.MouseEvent, pid: number, action: SecurityActionType) => {
+  const handleAction = async (
+    e: React.MouseEvent,
+    pid: number,
+    action: SecurityActionType,
+    processName?: string
+  ) => {
     e.stopPropagation();
-    await guardian.handleSecurityAction(pid, action);
+    await guardian.handleSecurityAction(pid, action, processName);
+  };
+
+  const formatTimer = (totalSeconds: number): string => {
+    const mins = Math.floor(totalSeconds / 60);
+    const secs = totalSeconds % 60;
+    return `${mins}m ${secs.toString().padStart(2, "0")}s`;
   };
 
   const card: React.CSSProperties = {
@@ -159,7 +231,7 @@ export const GuardianAlertsView: React.FC = () => {
       {/* Count */}
       <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "0 2px" }}>
         <span style={{ fontSize: "var(--font-size-xs)", fontFamily: "var(--font-mono)", color: "var(--color-text-muted)" }}>
-          Showing {filteredAlerts.length} of {rawAlerts.length} active alerts
+          Showing {filteredAlerts.length} of {combinedAlerts.length} active alerts
         </span>
       </div>
 
@@ -174,15 +246,33 @@ export const GuardianAlertsView: React.FC = () => {
             gap: "var(--space-3)",
           }}
         >
-          <span style={{ color: "var(--color-success)", display: "flex" }}><CheckCircleIcon size={36} /></span>
-          <div style={{ fontSize: "var(--font-size-sm)", fontWeight: "var(--font-weight-medium)", color: "var(--color-text)" }}>
-            No Security Alerts Found
-          </div>
-          <p style={{ fontSize: "var(--font-size-xs)", color: "var(--color-text-muted)", margin: 0, textAlign: "center" }}>
-            {searchQuery || severityFilter !== "all"
-              ? "No alerts match the active filter criteria."
-              : "Guardian has detected no active threats or anomalous process activities."}
-          </p>
+          {isLearning && !searchQuery && severityFilter === "all" ? (
+            <>
+              <span style={{ color: "var(--color-accent)", display: "flex" }}>
+                <ShieldCheckIcon size={36} />
+              </span>
+              <div style={{ fontSize: "var(--font-size-sm)", fontWeight: "var(--font-weight-medium)", color: "var(--color-text)" }}>
+                Learning & Baseline Profiling Active ({formatTimer(remainingSecs)} left)
+              </div>
+              <p style={{ fontSize: "var(--font-size-xs)", color: "var(--color-text-muted)", margin: 0, textAlign: "center", maxWidth: "480px" }}>
+                Guardian is currently observing system activity to establish behavioral baselines ({progressPct}% complete). Anomaly alerts will be generated if processes deviate from the calibrated baseline.
+              </p>
+            </>
+          ) : (
+            <>
+              <span style={{ color: "var(--color-success)", display: "flex" }}>
+                <CheckCircleIcon size={36} />
+              </span>
+              <div style={{ fontSize: "var(--font-size-sm)", fontWeight: "var(--font-weight-medium)", color: "var(--color-text)" }}>
+                No Security Alerts Found
+              </div>
+              <p style={{ fontSize: "var(--font-size-xs)", color: "var(--color-text-muted)", margin: 0, textAlign: "center" }}>
+                {searchQuery || severityFilter !== "all"
+                  ? "No alerts match the active filter criteria."
+                  : "Guardian has detected no active threats or anomalous process activities across your running software."}
+              </p>
+            </>
+          )}
         </div>
       ) : (
         <div style={{ display: "flex", flexDirection: "column", gap: "var(--space-2)" }}>
@@ -271,7 +361,7 @@ export const GuardianAlertsView: React.FC = () => {
                     <button
                       type="button"
                       disabled={!!inFlight}
-                      onClick={(e) => handleAction(e, alert.pid!, "trust")}
+                      onClick={(e) => handleAction(e, alert.pid!, "trust", alert.process_name)}
                       style={{
                         display: "inline-flex",
                         alignItems: "center",
@@ -293,7 +383,7 @@ export const GuardianAlertsView: React.FC = () => {
                     <button
                       type="button"
                       disabled={!!inFlight}
-                      onClick={(e) => handleAction(e, alert.pid!, "ignore")}
+                      onClick={(e) => handleAction(e, alert.pid!, "ignore", alert.process_name)}
                       style={{
                         display: "inline-flex",
                         alignItems: "center",
@@ -313,7 +403,7 @@ export const GuardianAlertsView: React.FC = () => {
                     <button
                       type="button"
                       disabled={!!inFlight}
-                      onClick={(e) => handleAction(e, alert.pid!, "mark_dangerous")}
+                      onClick={(e) => handleAction(e, alert.pid!, "mark_dangerous", alert.process_name)}
                       style={{
                         display: "inline-flex",
                         alignItems: "center",

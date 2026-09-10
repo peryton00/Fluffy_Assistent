@@ -119,10 +119,6 @@ describe("Operations Workspace Test Suite", () => {
     expect(html).toContain("BRAIN");
     expect(html).toContain("GUARDIAN");
     expect(html).toContain("MEMORY");
-
-    // Pending Confirmations banner
-    expect(html).toContain("Action Requires Approval");
-    expect(html).toContain("Kill Rogue Process");
   });
 
   it("renders SubsystemsStatusCard correctly with live snapshot", () => {

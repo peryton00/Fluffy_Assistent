@@ -16,13 +16,33 @@ import { NetworkSpikesView } from "./views/NetworkSpikesView";
 export const AnalyticsWorkspace: React.FC = () => {
   const activeSidebarView = useUiStore((s) => s.activeSidebarView);
 
-  switch (activeSidebarView) {
-    case "activity":
-      return <ProcessActivityView />;
-    case "network_spikes":
-      return <NetworkSpikesView />;
-    case "timeline":
-    default:
-      return <ResourceTimelineView />;
-  }
+  const renderContent = () => {
+    switch (activeSidebarView) {
+      case "activity":
+        return <ProcessActivityView />;
+      case "network_spikes":
+        return <NetworkSpikesView />;
+      case "timeline":
+      default:
+        return <ResourceTimelineView />;
+    }
+  };
+
+  return (
+    <div
+      style={{
+        flex: "1 1 0%",
+        display: "flex",
+        flexDirection: "column",
+        minHeight: 0,
+        overflowY: "auto",
+        backgroundColor: "var(--color-bg)",
+        padding: "var(--space-4) var(--space-6)",
+      }}
+    >
+      <div style={{ maxWidth: "1280px", width: "100%", margin: "0 auto", display: "flex", flexDirection: "column", gap: "var(--space-4)" }}>
+        {renderContent()}
+      </div>
+    </div>
+  );
 };

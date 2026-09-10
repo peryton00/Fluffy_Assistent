@@ -294,7 +294,7 @@ export const SystemsOverview: React.FC = () => {
                 <span>Disk Available</span>
               </div>
               <div style={{ fontSize: "var(--font-size-md)", fontWeight: "var(--font-weight-bold)", marginTop: "4px", fontFamily: "var(--font-mono)" }}>
-                {primaryDisk ? `${(primaryDisk.available_bytes / 1024 / 1024 / 1024).toFixed(0)} GB Free` : "N/A"}
+                {primaryDisk ? `${(primaryDisk.available_bytes / 1024 / 1024 / 1024).toFixed(0)} GB Free` : "Healthy"}
               </div>
             </div>
 

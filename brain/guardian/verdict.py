@@ -24,10 +24,15 @@ def generate_verdicts(process_name, pid, score, anomalies, level, confidence):
     verdict = {
         "level": level,
         "type": severity_map.get(level, "info"),
+        "severity": severity_map.get(level, "info"),
         "process": process_name,
+        "process_name": process_name,
+        "name": process_name,
         "pid": pid,
         "reason": primary_anomaly["explanation"],
         "risk_score": round(score, 1),
+        "score": round(score, 1),
+        "anomaly_score": round(score, 1),
         "confidence": confidence,
         "explanation": f"Contributing behaviors: {', '.join(behaviors)}. Magnitude: {primary_anomaly['deviation_ratio']}x deviation detected."
     }

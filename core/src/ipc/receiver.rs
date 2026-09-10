@@ -162,14 +162,14 @@ fn execute(cmd: IpcCommand) {
             let mut status = "success";
             let mut error_msg = String::new();
 
-            // 1. Rate Limiting Check
+            // 1. Rate Limiting Check (Allows batch / child process tree termination up to 50 in 10s)
             let now = Instant::now();
             let mut history = KILL_HISTORY.lock().unwrap();
             history.retain(|&t| now.duration_since(t) < Duration::from_secs(10));
             
-            if history.len() >= 3 {
+            if history.len() >= 50 {
                 status = "error";
-                error_msg = "Rate limit exceeded: >3 kills in 10s".to_string();
+                error_msg = "Rate limit exceeded: >50 kills in 10s".to_string();
             } else {
                 // 2. Protected Process Check
                 let mut sys = System::new();
@@ -384,7 +384,7 @@ fn execute(cmd: IpcCommand) {
                     let hex_val = if enabled { "02,00,00,00,00,00,00,00,00,00,00,00" } else { "03,00,00,00,00,00,00,00,00,00,00,00" };
                     
                     let script = format!(
-                        "Set-ItemProperty -Path '{}' -Name '{}' -Value ([byte[]]({})) -Type Binary -Force",
+                        "if (-not (Test-Path '{0}')) {{ New-Item -Path '{0}' -Force | Out-Null }}; Set-ItemProperty -Path '{0}' -Name '{1}' -Value ([byte[]]({2})) -Type Binary -Force",
                         approved_path,
                         real_name.replace("'", "''"),
                         hex_val

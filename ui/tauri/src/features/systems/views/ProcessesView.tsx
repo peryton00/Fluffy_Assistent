@@ -60,9 +60,12 @@ export const ProcessesView: React.FC = () => {
       case "name":
         diff = a.name.localeCompare(b.name);
         break;
-      case "disk":
-        diff = (a.disk_usage_mb || 0) - (b.disk_usage_mb || 0);
+      case "disk": {
+        const diskA = (a.disk_read_kb || 0) + (a.disk_written_kb || 0) + ((a.disk_usage_mb || 0) * 1024);
+        const diskB = (b.disk_read_kb || 0) + (b.disk_written_kb || 0) + ((b.disk_usage_mb || 0) * 1024);
+        diff = diskA - diskB;
         break;
+      }
       case "net":
         diff = (a.net_received || 0) + (a.net_sent || 0) - ((b.net_received || 0) + (b.net_sent || 0));
         break;

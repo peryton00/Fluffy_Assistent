@@ -17,13 +17,20 @@ class BaselineEngine:
             try:
                 with open(self.path, "r") as f:
                     data = json.load(f)
-                    # Ensure metadata is present
                     if "_metadata" not in data:
                         data["_metadata"] = {"system_first_run": time.time()}
                     return data
             except Exception:
-                return {"_metadata": {"system_first_run": time.time()}}
-        return {"_metadata": {"system_first_run": time.time()}}
+                pass
+        
+        initial = {"_metadata": {"system_first_run": time.time()}}
+        try:
+            os.makedirs(os.path.dirname(self.path), exist_ok=True)
+            with open(self.path, "w") as f:
+                json.dump(initial, f, indent=2)
+        except Exception:
+            pass
+        return initial
 
     def save(self):
         try:
@@ -31,9 +38,29 @@ class BaselineEngine:
             with open(self.path, "w") as f:
                 json.dump(self.baselines, f, indent=2)
         except Exception as e:
-            # Using stderr for silent logging in dev
             import sys
             print(f"[Guardian] Failed to save baselines: {e}", file=sys.stderr)
+
+    def check_and_reload_if_reset(self):
+        """
+        Detects if an external process (such as web_api POST /clear_guardian)
+        wrote a reset signal and reloads fresh baselines.
+        """
+        signal_file = "fluffy_data/guardian/.reset_signal"
+        if os.path.exists(signal_file):
+            try:
+                with open(signal_file, "r") as f:
+                    content = f.read().strip()
+                signal_ts = float(content)
+                current_first_run = self.baselines.get("_metadata", {}).get("system_first_run", 0)
+                if signal_ts > current_first_run:
+                    self.baselines = self._load()
+                    if "_metadata" in self.baselines:
+                        self.baselines["_metadata"]["system_first_run"] = signal_ts
+                    return True
+            except Exception:
+                pass
+        return False
 
     def update(self, process_name, cpu, ram, child_count, net_sent=0.0, net_received=0.0, lifespan=0):
         """
@@ -128,4 +155,10 @@ class BaselineEngine:
         """Returns % of the 5-minute learning phase completed."""
         first_run = self.baselines.get("_metadata", {}).get("system_first_run", time.time())
         elapsed = time.time() - first_run
-        return min(100, int((elapsed / 300) * 100))
+        return min(100, max(0, int((elapsed / 300) * 100)))
+
+    def get_learning_seconds_remaining(self):
+        """Returns seconds remaining in the 5-minute learning phase (max 300, min 0)."""
+        first_run = self.baselines.get("_metadata", {}).get("system_first_run", time.time())
+        elapsed = time.time() - first_run
+        return max(0, 300 - int(elapsed))

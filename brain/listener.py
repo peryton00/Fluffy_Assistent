@@ -65,6 +65,32 @@ import sys
 import signal
 import time
 
+def _enforce_single_instance():
+    """Ensure only one instance of listener.py runs at a time."""
+    pid_file = os.path.join(_app_dir, "fluffy_data", "listener.pid")
+    try:
+        os.makedirs(os.path.dirname(pid_file), exist_ok=True)
+        if os.path.exists(pid_file):
+            with open(pid_file, "r") as f:
+                content = f.read().strip()
+                if content:
+                    old_pid = int(content)
+                    if old_pid != os.getpid():
+                        try:
+                            import psutil
+                            if psutil.pid_exists(old_pid):
+                                p = psutil.Process(old_pid)
+                                p.terminate()
+                                p.wait(timeout=2)
+                        except Exception:
+                            pass
+        with open(pid_file, "w") as f:
+            f.write(str(os.getpid()))
+    except Exception as e:
+        print(f"[Fluffy Brain] PID lock warning: {e}", file=sys.stderr)
+
+_enforce_single_instance()
+
 print("[Fluffy Brain] Listener script started", file=sys.stderr)
 
 IPC_HOST = "127.0.0.1"
@@ -78,6 +104,8 @@ PROCESS_MSG_COUNTER = 0 # For periodic saving
 PROACTIVE_PROMPTS = set() # Track processes already prompted for confirmation
 GUARDIAN_TICK_COUNTER = 0  # For throttling Guardian analysis
 GUARDIAN_FULL_INTERVAL = 2  # Full analysis every 2nd tick (4 seconds)
+LAST_GUARDIAN_VOICE_ALERT_TIME = 0  # Global cooldown to prevent chatter storms
+GUARDIAN_VOICE_COOLDOWN = 30  # Minimum 30s between spoken Guardian alerts
 
 
 
@@ -273,13 +301,21 @@ def handle_message(raw_msg, monitor):
     processes = msg.get("system", {}).get("processes", {}).get("top_ram", [])
     active_pids = [p["pid"] for p in processes]
     
-    current_scores = {}
-    
+    # Check if external reset signal was triggered from web API / UI
+    if GUARDIAN_BASELINE.check_and_reload_if_reset():
+        state.ACTIVE_VERDICTS.clear()
+        state.SECURITY_ALERTS.clear()
+        GUARDIAN_MEMORY.clear_all_data()
+        GUARDIAN_AUDIT.clear_all_data()
+        GUARDIAN_CHAINS.clear_all_data()
+        print("[Guardian Listener] Detected reset signal: Reloaded fresh baselines and re-entered 5-minute learning phase.", file=sys.stderr)
+
     # 5-Minute Learning Mode Check
     learning_progress = GUARDIAN_BASELINE.get_learning_progress()
+    learning_remaining_secs = GUARDIAN_BASELINE.get_learning_seconds_remaining()
     is_learning = learning_progress < 100
-
     # Throttle: full analysis every 3rd tick, lightweight (top 20) on other ticks
+    current_scores = {}
     analysis_processes = processes if run_full_guardian else processes[:20]
 
     for p in analysis_processes:
@@ -321,25 +357,25 @@ def handle_message(raw_msg, monitor):
             verdicts = generate_verdicts(name, pid, risk_score, anomalies, level, 0.8)
             if verdicts:
                 state.ACTIVE_VERDICTS[pid] = verdicts[0]
+                
+                # Voice alert for serious verdicts with metrics (lazy loaded, throttled)
+                now_ts = time.time()
+                global LAST_GUARDIAN_VOICE_ALERT_TIME
+                if _ensure_voice() and (now_ts - LAST_GUARDIAN_VOICE_ALERT_TIME >= GUARDIAN_VOICE_COOLDOWN):
+                    if level in ["Recommend", "Request Confirmation"] or risk_score >= 65:
+                        LAST_GUARDIAN_VOICE_ALERT_TIME = now_ts
+                        speak_guardian_alert(
+                            verdicts[0],
+                            cpu=cpu,
+                            ram=ram,
+                            network=(net_sent + net_received) / 1024  # Convert to KB/s
+                        )
             else:
                 state.ACTIVE_VERDICTS.pop(pid, None)
-        else:
-            state.ACTIVE_VERDICTS.pop(pid, None)
-            
-            # Voice alert for serious verdicts with metrics (lazy loaded)
-            if _ensure_voice() and verdicts:
-                for verdict in verdicts:
-                    # Pass current process metrics for conversational alerts
-                    speak_guardian_alert(
-                        verdict,
-                        cpu=cpu,
-                        ram=ram,
-                        network=(net_sent + net_received) / 1024  # Convert to KB/s
-                    )
             
             # Audit logging
             if anomalies:
-                 GUARDIAN_AUDIT.log_event("BehaviorAlert", name, {"score": risk_score, "level": level, "anomalies": anomalies})
+                GUARDIAN_AUDIT.log_event("BehaviorAlert", name, {"score": risk_score, "level": level, "anomalies": anomalies})
 
             # Confirmation Logic (Level: Request Confirmation) -> Only if not learning
             if level == "Request Confirmation" and name not in PROACTIVE_PROMPTS:
@@ -352,6 +388,8 @@ def handle_message(raw_msg, monitor):
                     details=details_str
                 )
                 add_execution_log(f"Guardian requesting confirmation to terminate {name}", "action")
+        else:
+            state.ACTIVE_VERDICTS.pop(pid, None)
 
         # 7. Update Baseline (Slow adaptation)
         GUARDIAN_BASELINE.update(name, cpu, ram, child_count, net_sent, net_received)
@@ -382,6 +420,8 @@ def handle_message(raw_msg, monitor):
     guardian_state_info = GUARDIAN_STATE.get_ui_info()
     guardian_state_info["learning_progress"] = learning_progress
     guardian_state_info["is_learning"] = is_learning
+    guardian_state_info["learning_seconds_remaining"] = learning_remaining_secs
+    guardian_state_info["system_first_run"] = GUARDIAN_BASELINE.baselines.get("_metadata", {}).get("system_first_run", time.time())
     msg["_guardian_state"] = guardian_state_info
     msg["_guardian_verdicts"] = all_guardian_verdicts # Structured for UI
     msg["_recommendations"] = recommendations

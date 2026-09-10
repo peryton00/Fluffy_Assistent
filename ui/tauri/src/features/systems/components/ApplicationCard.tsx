@@ -162,28 +162,43 @@ export const ApplicationCard: React.FC<ApplicationCardProps> = ({ app }) => {
       </div>
 
       {/* Footer: Action Buttons */}
-      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", paddingTop: "var(--space-2)", borderTop: "1px solid var(--color-border-subtle)" }}>
-        <button
-          type="button"
-          disabled={isLaunching}
-          onClick={handleLaunch}
-          style={{
-            display: "inline-flex",
-            alignItems: "center",
-            gap: "4px",
-            padding: "3px 8px",
-            fontSize: "10px",
-            fontWeight: "var(--font-weight-semibold)",
-            backgroundColor: "var(--color-surface-elevated)",
-            border: "1px solid var(--color-border)",
-            borderRadius: "var(--radius-xs)",
-            color: "var(--color-accent)",
-            cursor: isLaunching ? "not-allowed" : "pointer",
-          }}
-        >
-          <PlayIcon size={11} />
-          <span>{isLaunching ? "Launching..." : "Launch"}</span>
-        </button>
+      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", paddingTop: "var(--space-2)", borderTop: "1px solid var(--color-border-subtle)", gap: "var(--space-2)" }}>
+        {app.exe_path && app.exe_path !== "N/A" && app.exe_path.trim() !== "" ? (
+          <button
+            type="button"
+            disabled={isLaunching}
+            onClick={handleLaunch}
+            style={{
+              display: "inline-flex",
+              alignItems: "center",
+              gap: "4px",
+              padding: "3px 8px",
+              fontSize: "10px",
+              fontWeight: "var(--font-weight-semibold)",
+              backgroundColor: "var(--color-surface-elevated)",
+              border: "1px solid var(--color-border)",
+              borderRadius: "var(--radius-xs)",
+              color: "var(--color-accent)",
+              cursor: isLaunching ? "not-allowed" : "pointer",
+            }}
+          >
+            <PlayIcon size={11} />
+            <span>{isLaunching ? "Launching..." : "Launch"}</span>
+          </button>
+        ) : (
+          <span
+            style={{
+              fontSize: "10px",
+              color: "var(--color-text-muted)",
+              backgroundColor: "var(--color-surface-subtle)",
+              padding: "2px 6px",
+              borderRadius: "var(--radius-xs)",
+              fontFamily: "var(--font-mono)",
+            }}
+          >
+            Component / Library
+          </span>
+        )}
 
         {app.uninstall_string && (
           <button

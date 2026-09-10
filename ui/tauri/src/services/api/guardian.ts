@@ -49,11 +49,12 @@ export async function cancelApproval(
 export async function executeSecurityAction(
   pid: number,
   action: SecurityActionType,
+  processName?: string,
   options?: RequestOptions
 ): Promise<{ ok: boolean }> {
   return apiClient.post<{ ok: boolean }>(
     "/security_action",
-    { pid, action },
+    { pid, action, process_name: processName },
     options
   );
 }

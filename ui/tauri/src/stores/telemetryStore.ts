@@ -7,9 +7,9 @@
  */
 
 import { useSyncExternalStore } from "react";
-import { fetchStatus } from "../services/api/status";
+import { fetchStatus, fetchSystemDisks } from "../services/api/status";
 import { ApiClientError } from "../services/api/client";
-import type { TelemetrySnapshot } from "../types/contracts";
+import type { TelemetrySnapshot, DiskTelemetry } from "../types/contracts";
 import type { ConnectionState, ActivityState } from "../types/ui";
 
 export interface TelemetryState {
@@ -43,6 +43,8 @@ class TelemetryCoordinator {
   private timerId: ReturnType<typeof setTimeout> | null = null;
   private inFlightController: AbortController | null = null;
   private isExecutingPoll = false;
+  private disksCache: DiskTelemetry[] = [];
+  private lastDisksScan = 0;
 
   public getState(): TelemetryState {
     return this.state;
@@ -127,6 +129,8 @@ class TelemetryCoordinator {
       clearTimeout(this.timerId);
       this.timerId = null;
     }
+    // Force immediate disk scan on explicit refresh
+    this.lastDisksScan = 0;
     await this.pollOnce();
     if (this.state.isPolling) {
       this.scheduleNext();
@@ -185,7 +189,54 @@ class TelemetryCoordinator {
       }
     }
 
-    // 3. Ensure top-level field mirrors exist
+    // 3. Normalize Process telemetry
+    const rawProcesses = snapshot.system?.processes || snapshot.processes;
+    if (rawProcesses) {
+      const allProcesses = Array.isArray(rawProcesses.top_ram)
+        ? rawProcesses.top_ram
+        : Array.isArray(rawProcesses)
+        ? (rawProcesses as unknown as typeof rawProcesses.top_ram)
+        : [];
+
+      const total_count =
+        typeof rawProcesses.total_count === "number" && rawProcesses.total_count > 0
+          ? rawProcesses.total_count
+          : allProcesses.length;
+
+      const top_ram =
+        Array.isArray(rawProcesses.top_ram) && rawProcesses.top_ram.length > 0
+          ? rawProcesses.top_ram
+          : [...allProcesses].sort((a, b) => (b.ram_mb || 0) - (a.ram_mb || 0));
+
+      const top_cpu =
+        Array.isArray(rawProcesses.top_cpu) && rawProcesses.top_cpu.length > 0
+          ? rawProcesses.top_cpu
+          : [...allProcesses].sort((a, b) => (b.cpu_percent || 0) - (a.cpu_percent || 0));
+
+      const normalizedProcesses = {
+        total_count,
+        top_ram,
+        top_cpu,
+        top_disk: rawProcesses.top_disk || [],
+      };
+
+      if (snapshot.system) {
+        snapshot.system.processes = normalizedProcesses;
+      }
+      snapshot.processes = normalizedProcesses;
+    }
+
+    // 4. Enrich Disks telemetry from disksCache if missing
+    const rawDisks = snapshot.system?.disks || snapshot.disks;
+    if (Array.isArray(rawDisks) && rawDisks.length > 0) {
+      this.disksCache = rawDisks;
+    } else if (this.disksCache.length > 0) {
+      if (!snapshot.system) snapshot.system = {};
+      snapshot.system.disks = this.disksCache;
+      snapshot.disks = this.disksCache;
+    }
+
+    // 5. Ensure top-level field mirrors exist
     if (!snapshot.cpu && snapshot.system?.cpu) snapshot.cpu = snapshot.system.cpu;
     if (!snapshot.ram && snapshot.system?.ram) snapshot.ram = snapshot.system.ram;
     if (!snapshot.disks && snapshot.system?.disks) snapshot.disks = snapshot.system.disks;
@@ -211,13 +262,36 @@ class TelemetryCoordinator {
     }
 
     try {
+      const now = Date.now();
+      // Scan connected storage devices every 30s or on startup
+      if (this.disksCache.length === 0 || now - this.lastDisksScan > 30000) {
+        this.lastDisksScan = now;
+        fetchSystemDisks()
+          .then((disks) => {
+            if (disks && disks.length > 0) {
+              this.disksCache = disks;
+              if (this.state.snapshot) {
+                const updated = { ...this.state.snapshot };
+                if (!updated.system) updated.system = {};
+                if (!updated.system.disks || updated.system.disks.length === 0) {
+                  updated.system.disks = disks;
+                }
+                if (!updated.disks || updated.disks.length === 0) {
+                  updated.disks = disks;
+                }
+                this.setState({ snapshot: updated });
+              }
+            }
+          })
+          .catch(() => {});
+      }
+
       const rawSnapshot = await fetchStatus({
         signal: this.inFlightController.signal,
         timeoutMs: 4000,
       });
 
       const snapshot = this.normalizeSnapshot(rawSnapshot);
-      const now = Date.now();
       this.setState({
         snapshot,
         loading: false,

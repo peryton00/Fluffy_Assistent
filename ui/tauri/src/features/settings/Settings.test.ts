@@ -118,7 +118,7 @@ describe("Settings Workspace", () => {
 
     expect(html).toContain("Voice Engine Settings");
     expect(html).toContain("Vosk Offline STT");
-    expect(html).toContain("pyttsx3 Offline TTS");
+    expect(html).toContain("Piper Neural TTS (ONNX)");
   });
 
   it("renders FtpSettingsView when view is ftp", () => {

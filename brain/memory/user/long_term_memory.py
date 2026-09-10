@@ -149,7 +149,8 @@ def get_preference(key: str, default=None):
 def set_preference(key: str, value):
     """Set a specific preference"""
     memory = load_memory()
-    
+    if "user_profile" not in memory:
+        memory["user_profile"] = {}
     if "preferences" not in memory["user_profile"]:
         memory["user_profile"]["preferences"] = {}
     
@@ -190,6 +191,16 @@ def get_trusted_processes() -> list:
     """Get list of all trusted processes"""
     memory = load_memory()
     return memory["user_profile"]["system_preferences"]["trusted_processes"]["value"]
+
+
+def clear_trusted_processes():
+    """Clear all trusted processes from long-term memory."""
+    memory = load_memory()
+    if "user_profile" in memory and "system_preferences" in memory["user_profile"]:
+        if "trusted_processes" in memory["user_profile"]["system_preferences"]:
+            memory["user_profile"]["system_preferences"]["trusted_processes"]["value"] = []
+            save_memory(memory)
+            print("✅ Cleared all trusted processes from long-term memory")
 
 
 def add_ignored_process(process_name: str):

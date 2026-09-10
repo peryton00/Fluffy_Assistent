@@ -31,8 +31,8 @@ class PiperSpeaker:
             self.consumer_thread = Thread(target=self._playback_consumer, daemon=True)
             self.consumer_thread.start()
             
-            # Thread pool for parallel generation (4 workers for high-volume)
-            self.executor = concurrent.futures.ThreadPoolExecutor(max_workers=4)
+            # Single-worker thread pool to prevent ONNX model contention and CPU thrashing
+            self.executor = concurrent.futures.ThreadPoolExecutor(max_workers=1)
     
     def _validate_setup(self) -> bool:
         """Validate that Piper executable and model exist."""
@@ -48,7 +48,7 @@ class PiperSpeaker:
     
     def _generate_chunk_sync(self, text: str):
         """Generate audio for a single chunk synchronously."""
-        if not text.strip():
+        if not text or not text.strip():
             return None
         
         try:
@@ -57,17 +57,26 @@ class PiperSpeaker:
             temp_wav.close()
             wav_path = Path(temp_wav.name)
             
-            # Run Piper
+            # Run Piper with CREATE_NO_WINDOW on Windows and 35s timeout
+            extra_kwargs = {}
+            if os.name == "nt":
+                extra_kwargs["creationflags"] = subprocess.CREATE_NO_WINDOW
+            
             result = subprocess.run(
                 [str(self.piper_exe), "-m", str(self.model_path), "-f", str(wav_path)],
-                input=text,
+                input=text.strip(),
                 text=True,
                 capture_output=True,
-                timeout=10
+                timeout=35,
+                **extra_kwargs
             )
             
             if result.returncode != 0:
                 print(f"[Voice] Piper error: {result.stderr}", file=sys.stderr)
+                try:
+                    wav_path.unlink()
+                except Exception:
+                    pass
                 return None
             
             return wav_path

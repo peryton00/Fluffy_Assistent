@@ -22,13 +22,62 @@ import { StatusBar } from "./StatusBar";
 import { CommandPalette } from "./CommandPalette";
 
 export const Shell: React.FC = () => {
-  // Global Keyboard Shortcuts (Ctrl+K, Escape)
+  // Global Keyboard Shortcuts (Ctrl+K, Ctrl+P, Ctrl+B, Ctrl+`, Ctrl+Shift+I, Domain 1-8, Escape)
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
-      // Ctrl+K or Cmd+K: Toggle Command Palette
-      if ((e.ctrlKey || e.metaKey) && (e.key === "k" || e.key === "K")) {
+      const isCtrlOrCmd = e.ctrlKey || e.metaKey;
+      const key = e.key.toLowerCase();
+
+      // Ctrl+K or Cmd+K or Ctrl+P or Cmd+P: Toggle Command Palette
+      if (isCtrlOrCmd && (key === "k" || key === "p") && !e.shiftKey && !e.altKey) {
         e.preventDefault();
+        e.stopPropagation();
         uiStore.toggleCommandPalette();
+        return;
+      }
+
+      // Ctrl+B / Cmd+B: Toggle Sidebar
+      if (isCtrlOrCmd && key === "b" && !e.shiftKey && !e.altKey) {
+        e.preventDefault();
+        e.stopPropagation();
+        uiStore.toggleSidebar();
+        return;
+      }
+
+      // Ctrl+` or Ctrl+J: Quick Terminal Jump
+      if (isCtrlOrCmd && (e.key === "`" || key === "j") && !e.shiftKey && !e.altKey) {
+        e.preventDefault();
+        e.stopPropagation();
+        uiStore.setActiveDomain("terminal");
+        return;
+      }
+
+      // Ctrl+Shift+I or Ctrl+I: Toggle Inspector
+      if (isCtrlOrCmd && key === "i") {
+        e.preventDefault();
+        e.stopPropagation();
+        uiStore.toggleInspector();
+        return;
+      }
+
+      // Ctrl+1 to Ctrl+8: Quick Domain Switching
+      if (isCtrlOrCmd && !e.shiftKey && !e.altKey) {
+        const domainMap: Record<string, "operations" | "chat" | "agents" | "guardian" | "systems" | "memory" | "terminal" | "settings"> = {
+          "1": "operations",
+          "2": "chat",
+          "3": "agents",
+          "4": "guardian",
+          "5": "systems",
+          "6": "memory",
+          "7": "terminal",
+          "8": "settings",
+        };
+        if (domainMap[e.key]) {
+          e.preventDefault();
+          e.stopPropagation();
+          uiStore.setActiveDomain(domainMap[e.key]);
+          return;
+        }
       }
 
       // Escape: Close Command Palette or Inspector
@@ -36,17 +85,19 @@ export const Shell: React.FC = () => {
         const state = uiStore.getState();
         if (state.commandPaletteOpen) {
           e.preventDefault();
+          e.stopPropagation();
           uiStore.setCommandPaletteOpen(false);
         } else if (state.inspectorOpen) {
           e.preventDefault();
+          e.stopPropagation();
           uiStore.setInspectorOpen(false);
         }
       }
     };
 
-    window.addEventListener("keydown", handleKeyDown);
+    window.addEventListener("keydown", handleKeyDown, true);
     return () => {
-      window.removeEventListener("keydown", handleKeyDown);
+      window.removeEventListener("keydown", handleKeyDown, true);
     };
   }, []);
 

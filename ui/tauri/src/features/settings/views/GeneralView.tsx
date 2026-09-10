@@ -7,6 +7,7 @@
 
 import React, { useEffect, useState } from "react";
 import { useSettingsStore, settingsStore } from "../../../stores/settingsStore";
+import { useChatStore, chatStore } from "../../../stores/chatStore";
 import { SettingToggle } from "../components/SettingToggle";
 import { SettingSlider } from "../components/SettingSlider";
 import {
@@ -18,6 +19,7 @@ import {
 
 export const GeneralView: React.FC = () => {
   const { general, loading, actionLoading, error, saveSuccessMessage } = useSettingsStore();
+  const { ttsMuted } = useChatStore();
 
   const [autoNormalize, setAutoNormalize] = useState(general.autoNormalize);
   const [alertThreshold, setAlertThreshold] = useState(general.alertThreshold);
@@ -184,6 +186,19 @@ export const GeneralView: React.FC = () => {
             step={0.05}
             onChange={setAlertThreshold}
             disabled={actionLoading}
+          />
+        </div>
+
+        <div style={{ display: "flex", flexDirection: "column", gap: "var(--space-3)" }}>
+          <h3 style={{ fontSize: "11px", fontWeight: "var(--font-weight-semibold)", color: "var(--color-text-muted)", textTransform: "uppercase", letterSpacing: "0.05em", margin: 0 }}>
+            Voice & Audio (TTS)
+          </h3>
+
+          <SettingToggle
+            label="Enable Fluffy Neural Voice (TTS)"
+            description="Allow Fluffy to vocalize chat responses and critical Guardian security alerts using Piper neural voice synthesis. When toggled off, Fluffy is completely muted."
+            checked={!ttsMuted}
+            onChange={(enabled) => chatStore.setTtsMuted(!enabled)}
           />
         </div>
 

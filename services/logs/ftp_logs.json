@@ -11,5 +11,18 @@
       "port": 2121,
       "shared_dir": "C:\\Users\\sudip\\OneDrive\\Desktop\\webProjects\\FluffyAssistent\\FluffyShared"
     }
+  },
+  {
+    "timestamp": "2026-09-10T15:32:19.266869",
+    "event": "server_started",
+    "details": {
+      "ip": "192.168.1.38",
+      "port": 2121,
+      "shared_dir": "C:\\Users\\sudip\\Downloads\\Mobile Devices"
+    }
+  },
+  {
+    "timestamp": "2026-09-10T15:32:41.883191",
+    "event": "server_stopped"
   }
 ]

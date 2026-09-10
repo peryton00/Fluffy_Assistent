@@ -255,9 +255,21 @@ class AnalyticsStoreManager {
     }
 
     // 8. Extract Processes
-    const topCpu = snapshot.processes?.top_cpu || snapshot.system?.processes?.top_cpu || [];
-    const topRam = snapshot.processes?.top_ram || snapshot.system?.processes?.top_ram || [];
-    const processCount = snapshot.processes?.total_count || snapshot.system?.processes?.total_count || 0;
+    const procObj = snapshot.processes || snapshot.system?.processes;
+    const processList = Array.isArray(procObj?.top_ram)
+      ? procObj.top_ram
+      : Array.isArray(procObj)
+      ? (procObj as unknown as ProcessTelemetry[])
+      : [];
+    const topCpu =
+      Array.isArray(procObj?.top_cpu) && procObj.top_cpu.length > 0
+        ? procObj.top_cpu
+        : [...processList].sort((a, b) => (b.cpu_percent || 0) - (a.cpu_percent || 0));
+    const topRam =
+      Array.isArray(procObj?.top_ram) && procObj.top_ram.length > 0
+        ? procObj.top_ram
+        : [...processList].sort((a, b) => (b.ram_mb || 0) - (a.ram_mb || 0));
+    const processCount = procObj?.total_count ?? processList.length;
 
     // 9. Compute Summary
     const cpuValues = newTimeline.map((p) => p.cpuPercent);

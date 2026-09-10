@@ -22,19 +22,39 @@ import { AdvancedView } from "./views/AdvancedView";
 export const SettingsWorkspace: React.FC = () => {
   const activeSidebarView = useUiStore((s) => s.activeSidebarView);
 
-  switch (activeSidebarView) {
-    case "appearance":
-      return <AppearanceView />;
-    case "models":
-      return <AiModelsView />;
-    case "voice":
-      return <VoiceSettingsView />;
-    case "ftp":
-      return <FtpSettingsView />;
-    case "advanced":
-      return <AdvancedView />;
-    case "general":
-    default:
-      return <GeneralView />;
-  }
+  const renderContent = () => {
+    switch (activeSidebarView) {
+      case "appearance":
+        return <AppearanceView />;
+      case "models":
+        return <AiModelsView />;
+      case "voice":
+        return <VoiceSettingsView />;
+      case "ftp":
+        return <FtpSettingsView />;
+      case "advanced":
+        return <AdvancedView />;
+      case "general":
+      default:
+        return <GeneralView />;
+    }
+  };
+
+  return (
+    <div
+      style={{
+        flex: "1 1 0%",
+        display: "flex",
+        flexDirection: "column",
+        minHeight: 0,
+        overflowY: "auto",
+        backgroundColor: "var(--color-bg)",
+        padding: "var(--space-4) var(--space-6)",
+      }}
+    >
+      <div style={{ maxWidth: "1200px", width: "100%", margin: "0 auto", display: "flex", flexDirection: "column", gap: "var(--space-4)" }}>
+        {renderContent()}
+      </div>
+    </div>
+  );
 };

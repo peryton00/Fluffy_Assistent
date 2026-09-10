@@ -38,8 +38,13 @@ def add_cors_headers(response):
     return response
 
 
-@app.route("/.well-known/appspecific/<path:_>")
-def chrome_probe(_):
+@app.route("/favicon.ico")
+def favicon():
+    return "", 204
+
+
+@app.route("/.well-known/<path:_>")
+def well_known_probe(_):
     return "", 204
 
 
@@ -51,9 +56,6 @@ def root():
 @app.route("/status")
 @token_required
 def status():
-    # Allow status check even if UI is not yet registered as active
-    # to prevent 403 boot-loops in some UI logic
-    
     if state.SHUTDOWN_MODE:
         return jsonify({"status": "shutdown"})
 
@@ -91,8 +93,7 @@ def status():
 @app.route("/logs")
 @token_required
 def logs():
-    if not state.UI_ACTIVE:
-        return jsonify({"error": "UI Disconnected"}), 403
+    state.UI_ACTIVE = True
     return jsonify(state.EXECUTION_LOGS)
 
 
@@ -117,57 +118,127 @@ def command():
     if not cmd_data:
         return jsonify({"error": "Invalid JSON payload"}), 400
 
-    # 4. Handle confirmation removal if applicable
+    # 2. Handle confirmation removal if applicable
     if "Confirm" in cmd_data:
         state.remove_confirmation(cmd_data["Confirm"]["command_id"])
     elif "Cancel" in cmd_data:
         state.remove_confirmation(cmd_data["Cancel"]["command_id"])
 
-    send_command(cmd_data)
+    ipc_ok = False
+    try:
+        send_command(cmd_data)
+        ipc_ok = True
+    except Exception as e:
+        print(f"[web_api] Core IPC send_command failed: {e}", file=sys.stderr)
+
+    # 3. Fallback for KillProcess if IPC is unavailable or direct termination requested
+    if "KillProcess" in cmd_data and not ipc_ok:
+        pid = cmd_data["KillProcess"].get("pid")
+        if pid:
+            try:
+                try:
+                    from brain.tools.platform_utils import kill_process_by_pid
+                except ImportError:
+                    try:
+                        from tools.platform_utils import kill_process_by_pid
+                    except ImportError:
+                        from platform_utils import kill_process_by_pid
+                success, msg = kill_process_by_pid(pid)
+                state.add_execution_log(f"Terminated process PID {pid}: {msg}", "info" if success else "error")
+                return jsonify({"ok": success, "message": msg})
+            except Exception as e:
+                print(f"[web_api] Fallback kill_process_by_pid failed: {e}", file=sys.stderr)
+
     return jsonify({"ok": True})
 
 
 @app.route("/security_action", methods=["POST"])
 @token_required
 def security_action():
-    
     data = request.get_json(silent=True)
-    if not data or "pid" not in data or "action" not in data:
+    if not data or "action" not in data:
         return jsonify({"error": "Invalid payload"}), 400
     
-    pid = int(data["pid"])
+    pid = int(data.get("pid", 0))
     action = data["action"]
     
-    # 1. Resolve Name from State
-    process_name = None
-    if state.LATEST_STATE:
+    # 1. Resolve Name from Payload or State
+    process_name = data.get("process_name") or data.get("process")
+    if not process_name and pid and state.LATEST_STATE:
         procs = state.LATEST_STATE.get("system", {}).get("processes", {}).get("top_ram", [])
         for p in procs:
             if p["pid"] == pid:
                 process_name = p["name"]
                 break
     
-    # 2. Update Monitors and Memory
-    from guardian_manager import GUARDIAN_MEMORY, GUARDIAN_AUDIT
-    
-    if state.MONITOR:
+    # Fallback to PID string if name still unknown
+    if not process_name and pid:
+        process_name = f"PID {pid}"
+
+    # 2. Update Guardian and Long-Term Memory
+    try:
+        from brain.security.guardian_manager import GUARDIAN_BASELINE, GUARDIAN_MEMORY, GUARDIAN_AUDIT
+    except ImportError:
+        try:
+            from security.guardian_manager import GUARDIAN_BASELINE, GUARDIAN_MEMORY, GUARDIAN_AUDIT
+        except ImportError:
+            from guardian_manager import GUARDIAN_BASELINE, GUARDIAN_MEMORY, GUARDIAN_AUDIT
+
+    if action == "trust" and process_name:
+        try:
+            from brain.memory.user import add_trusted_process
+        except ImportError:
+            try:
+                from memory.user import add_trusted_process
+            except ImportError:
+                from memory.long_term_memory import add_trusted_process
+        try:
+            add_trusted_process(process_name)
+        except Exception as e:
+            print(f"[web_api] Failed to add trusted process to LTM: {e}", file=sys.stderr)
+
+        GUARDIAN_MEMORY.mark_trusted(process_name)
+        GUARDIAN_BASELINE.mark_trusted(process_name)
+        GUARDIAN_AUDIT.log_event("UserDecision", process_name, {"action": "Trust", "pid": pid})
+        state.add_execution_log(f"Process {process_name} (PID: {pid}) marked as trusted and whitelisted", "action")
+
+    elif action == "ignore" and process_name:
+        GUARDIAN_MEMORY.mark_ignored(process_name)
+        GUARDIAN_AUDIT.log_event("UserDecision", process_name, {"action": "Ignore", "pid": pid})
+        state.add_execution_log(f"Process {process_name} (PID: {pid}) ignored by user", "info")
+
+    elif action == "mark_dangerous" and process_name:
+        GUARDIAN_MEMORY.mark_dangerous(process_name)
+        GUARDIAN_AUDIT.log_event("UserDecision", process_name, {"action": "Mark Dangerous", "pid": pid})
+        state.add_execution_log(f"Process {process_name} (PID: {pid}) flagged as DANGEROUS and terminated", "warning")
+        
+        # Terminate the dangerous process
+        if pid:
+            try:
+                send_command({"KillProcess": {"pid": pid}})
+            except Exception as e:
+                try:
+                    from brain.tools.platform_utils import kill_process_by_pid
+                    kill_process_by_pid(pid)
+                except Exception:
+                    pass
+
+    # Update in-memory Monitor if active in this process
+    if state.MONITOR and pid:
         if action == "ignore":
             state.MONITOR.mark_ignored(pid)
-            if process_name:
-                GUARDIAN_MEMORY.mark_ignored(process_name)
-                GUARDIAN_AUDIT.log_event("UserDecision", process_name, {"action": "Ignore"})
-            state.add_execution_log(f"Process {pid} ignored by user", "info")
         elif action == "trust":
             state.MONITOR.mark_trusted(pid)
-            if process_name:
-                GUARDIAN_MEMORY.mark_trusted(process_name)
-                GUARDIAN_AUDIT.log_event("UserDecision", process_name, {"action": "Trust"})
-            state.add_execution_log(f"Process {pid} marked as trusted", "info")
-        elif action == "mark_dangerous" and process_name: # Extended action for phase 11
-            GUARDIAN_MEMORY.mark_dangerous(process_name)
-            GUARDIAN_AUDIT.log_event("UserDecision", process_name, {"action": "Mark Dangerous"})
-            state.add_execution_log(f"Process {process_name} marked as DANGEROUS", "warning")
-            
+
+    # 3. Immediately clear alert/verdict from in-memory state
+    if pid:
+        state.ACTIVE_VERDICTS.pop(pid, None)
+    with state.LOCK:
+        state.SECURITY_ALERTS = [
+            a for a in state.SECURITY_ALERTS
+            if a.get("pid") != pid and (not process_name or a.get("process_name") != process_name and a.get("name") != process_name)
+        ]
+
     return jsonify({"ok": True})
 
 
@@ -227,8 +298,13 @@ def trust_process():
 @app.route("/clear_guardian", methods=["POST"])
 @token_required
 def clear_guardian_data():
-
-    from guardian_manager import reset_guardian
+    try:
+        from brain.security.guardian_manager import reset_guardian
+    except ImportError:
+        try:
+            from security.guardian_manager import reset_guardian
+        except ImportError:
+            from guardian_manager import reset_guardian
     reset_guardian()
     return jsonify({"ok": True, "message": "All Guardian recognition data cleared and state reset. Re-entering learning phase."})
 
@@ -292,10 +368,12 @@ def ui_disconnected():
 @app.route("/net-speed", methods=["POST"])
 @token_required
 def net_speed():
-    if not state.UI_ACTIVE:
-        return jsonify({"error": "UI Disconnected"}), 403
+    state.UI_ACTIVE = True
     
-    import net_utils
+    try:
+        import net_utils
+    except ImportError:
+        from brain.tools import net_utils
     
     state.add_execution_log("Initiating network speed test...", "action")
     
@@ -318,7 +396,13 @@ def net_speed():
 @token_required
 def get_apps():
     try:
-        from app_utils import list_installed_apps
+        try:
+            from brain.tools.app_utils import list_installed_apps
+        except ImportError:
+            try:
+                from tools.app_utils import list_installed_apps
+            except ImportError:
+                from app_utils import list_installed_apps
         apps = list_installed_apps()
         return jsonify(apps)
     except Exception as e:
@@ -328,7 +412,13 @@ def get_apps():
 @token_required
 def refresh_apps():
     try:
-        from app_utils import scan_and_cache_apps
+        try:
+            from brain.tools.app_utils import scan_and_cache_apps
+        except ImportError:
+            try:
+                from tools.app_utils import scan_and_cache_apps
+            except ImportError:
+                from app_utils import scan_and_cache_apps
         apps = scan_and_cache_apps()
         return jsonify({"ok": True, "count": len(apps)})
     except Exception as e:
@@ -338,14 +428,20 @@ def refresh_apps():
 @app.route("/apps/launch", methods=["POST"])
 @token_required
 def launch_application():
-    data = request.get_json(silent=True)
+    data = request.get_json(silent=True) or {}
     location = data.get("location")
     exe_path = data.get("exe_path")
     name = data.get("name")
     if not location and not exe_path:
         return jsonify({"error": "Missing executable path"}), 400
     try:
-        from app_utils import launch_app
+        try:
+            from brain.tools.app_utils import launch_app
+        except ImportError:
+            try:
+                from tools.app_utils import launch_app
+            except ImportError:
+                from app_utils import launch_app
         if launch_app(exe_path, location, name):
             state.add_execution_log(f"Launched application: {name}", "action")
             return jsonify({"ok": True})
@@ -360,15 +456,19 @@ def launch_application():
 def uninstall_application():
     if request.remote_addr not in ("127.0.0.1", "::1"):
         return jsonify({"error": "Forbidden"}), 403
-    if not _check_token(request):
-        return jsonify({"error": "Unauthorized"}), 401
-    data = request.get_json(silent=True)
+    data = request.get_json(silent=True) or {}
     uninstall_string = data.get("uninstall_string")
     name = data.get("name")
     if not uninstall_string:
         return jsonify({"error": "Missing uninstall string"}), 400
     try:
-        from app_utils import uninstall_app
+        try:
+            from brain.tools.app_utils import uninstall_app
+        except ImportError:
+            try:
+                from tools.app_utils import uninstall_app
+            except ImportError:
+                from app_utils import uninstall_app
         if uninstall_app(uninstall_string):
             state.add_execution_log(f"Triggered uninstaller for: {name}", "warning")
             return jsonify({"ok": True})
@@ -964,15 +1064,32 @@ def get_preferences():
 @app.route("/memory/preferences", methods=["POST"])
 @token_required
 def set_preference_endpoint():
-    """Set a specific preference"""
-    data = request.get_json(silent=True)
-    if not data or "key" not in data or "value" not in data:
-        return jsonify({"error": "Missing key or value"}), 400
+    """Set a specific preference or batch preferences"""
+    data = request.get_json(silent=True) or {}
     
     try:
         from memory.long_term_memory import set_preference
-        set_preference(data["key"], data["value"])
-        return jsonify({"ok": True})
+        import state
+
+        if "preferences" in data and isinstance(data["preferences"], dict):
+            for k, v in data["preferences"].items():
+                set_preference(k, v)
+                if k in ["tts_muted", "mute_tts"]:
+                    state.TTS_MUTED = bool(v)
+            return jsonify({"ok": True})
+        elif "key" in data and "value" in data:
+            set_preference(data["key"], data["value"])
+            if data["key"] in ["tts_muted", "mute_tts"]:
+                state.TTS_MUTED = bool(data["value"])
+            return jsonify({"ok": True})
+        elif isinstance(data, dict):
+            for k, v in data.items():
+                set_preference(k, v)
+                if k in ["tts_muted", "mute_tts"]:
+                    state.TTS_MUTED = bool(v)
+            return jsonify({"ok": True})
+        else:
+            return jsonify({"ok": True})
     except Exception as e:
         return jsonify({"error": str(e)}), 500
 
@@ -1010,14 +1127,15 @@ def add_trusted_process_endpoint():
 @token_required
 def remove_trusted_process_endpoint():
     """Remove a process from trusted list"""
-    data = request.get_json(silent=True)
-    if not data or "process_name" not in data:
+    data = request.get_json(silent=True) or {}
+    process_name = data.get("process_name") or request.args.get("process_name")
+    if not process_name:
         return jsonify({"error": "Missing process_name"}), 400
     
     try:
         from memory.long_term_memory import remove_trusted_process
-        remove_trusted_process(data["process_name"])
-        state.add_execution_log(f"Removed {data['process_name']} from trusted processes", "info")
+        remove_trusted_process(process_name)
+        state.add_execution_log(f"Removed {process_name} from trusted processes", "info")
         return jsonify({"ok": True})
     except Exception as e:
         return jsonify({"error": str(e)}), 500

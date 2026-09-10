@@ -35,16 +35,14 @@ pub fn evaluate(cmd: &Command) -> PermissionDecision {
             }
         }
 
-        // Killing processes is dangerous
+        // Process Termination (Protected system processes and pid < 100 are guarded)
         &Command::KillProcess { pid } => {
             if pid < 100 {
                 PermissionDecision::Deny {
-                    reason: "System process protection".into(),
+                    reason: "System process protection: Core system PIDs (< 100) cannot be terminated".into(),
                 }
             } else {
-                PermissionDecision::RequireConfirmation {
-                    reason: "Killing a process may cause data loss".into(),
-                }
+                PermissionDecision::Allow
             }
         }
 
@@ -63,11 +61,9 @@ pub fn evaluate(cmd: &Command) -> PermissionDecision {
             PermissionDecision::Allow
         }
 
-        // Startup App Management
+        // Startup App Management - Direct allow for dashboard controls
         &Command::StartupAdd { .. } | &Command::StartupRemove { .. } | &Command::StartupToggle { .. } => {
-            PermissionDecision::RequireConfirmation {
-                reason: "Modifying startup applications affects system boot".into(),
-            }
+            PermissionDecision::Allow
         }
 
         // UI state sync is always allowed

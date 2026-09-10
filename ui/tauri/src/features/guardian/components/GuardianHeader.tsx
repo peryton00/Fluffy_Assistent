@@ -100,21 +100,41 @@ export const GuardianHeader: React.FC<GuardianHeaderProps> = ({
               <h1 style={{ fontSize: "var(--font-size-md)", fontWeight: "var(--font-weight-bold)", color: "var(--color-text)", margin: 0 }}>
                 {title}
               </h1>
-              <span
-                style={{
-                  padding: "2px 8px",
-                  borderRadius: "999px",
-                  fontSize: "10px",
-                  fontWeight: "var(--font-weight-bold)",
-                  textTransform: "uppercase",
-                  letterSpacing: "0.5px",
-                  backgroundColor: "color-mix(in srgb, var(--color-success) 15%, transparent)",
-                  color: "var(--color-success)",
-                  border: "1px solid color-mix(in srgb, var(--color-success) 30%, transparent)",
-                }}
-              >
-                Active Guard
-              </span>
+              {snapshot?._guardian_state?.is_learning ? (
+                <span
+                  style={{
+                    padding: "2px 8px",
+                    borderRadius: "999px",
+                    fontSize: "10px",
+                    fontWeight: "var(--font-weight-bold)",
+                    textTransform: "uppercase",
+                    letterSpacing: "0.5px",
+                    backgroundColor: "color-mix(in srgb, var(--color-warning) 15%, transparent)",
+                    color: "var(--color-warning)",
+                    border: "1px solid color-mix(in srgb, var(--color-warning) 30%, transparent)",
+                  }}
+                >
+                  Learning Phase (
+                  {Math.floor((snapshot._guardian_state.learning_seconds_remaining ?? 300) / 60)}m{" "}
+                  {String((snapshot._guardian_state.learning_seconds_remaining ?? 300) % 60).padStart(2, "0")}s left)
+                </span>
+              ) : (
+                <span
+                  style={{
+                    padding: "2px 8px",
+                    borderRadius: "999px",
+                    fontSize: "10px",
+                    fontWeight: "var(--font-weight-bold)",
+                    textTransform: "uppercase",
+                    letterSpacing: "0.5px",
+                    backgroundColor: "color-mix(in srgb, var(--color-success) 15%, transparent)",
+                    color: "var(--color-success)",
+                    border: "1px solid color-mix(in srgb, var(--color-success) 30%, transparent)",
+                  }}
+                >
+                  Active Guard
+                </span>
+              )}
             </div>
             <p style={{ fontSize: "var(--font-size-xs)", color: "var(--color-text-muted)", margin: "4px 0 0" }}>
               {subtitle}

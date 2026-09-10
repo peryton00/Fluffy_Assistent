@@ -44,7 +44,20 @@ def reset_guardian():
     GUARDIAN_AUDIT.clear_all_data()
     GUARDIAN_CHAINS.clear_all_data()
     
-    # 2. Reset in-memory tracking in state.py (if shared)
+    # 2. Clear whitelisted/trusted processes in long-term memory
+    try:
+        try:
+            from brain.memory.user.long_term_memory import clear_trusted_processes
+        except ImportError:
+            try:
+                from memory.user.long_term_memory import clear_trusted_processes
+            except ImportError:
+                from memory.long_term_memory import clear_trusted_processes
+        clear_trusted_processes()
+    except Exception as e:
+        print(f"[Guardian] Failed to clear trusted processes: {e}", file=sys.stderr)
+
+    # 3. Reset in-memory tracking in state.py (if shared)
     state.SECURITY_ALERTS = []
     state.ACTIVE_VERDICTS = {}
     with state.LOCK:
@@ -69,7 +82,9 @@ def reset_guardian():
     
     for filepath, initial_structure in files_to_clear.items():
         try:
-            os.makedirs(os.path.dirname(filepath), exist_ok=True)
+            dir_name = os.path.dirname(filepath)
+            if dir_name:
+                os.makedirs(dir_name, exist_ok=True)
             with open(filepath, 'w') as f:
                 json.dump(initial_structure, f, indent=2)
             print(f"[Guardian] Cleared {filepath}", file=sys.stderr)
@@ -79,5 +94,14 @@ def reset_guardian():
     # 5. Reload baselines into memory
     GUARDIAN_BASELINE.baselines = GUARDIAN_BASELINE._load()
     print(f"[Guardian] Reloaded baselines with fresh timestamp: {GUARDIAN_BASELINE.baselines.get('_metadata')}", file=sys.stderr)
+
+    # 6. Signal background listener process
+    try:
+        marker_path = "fluffy_data/guardian/.reset_signal"
+        os.makedirs(os.path.dirname(marker_path), exist_ok=True)
+        with open(marker_path, "w") as f:
+            f.write(str(time.time()))
+    except Exception as e:
+        print(f"[Guardian] Failed to write reset signal: {e}", file=sys.stderr)
 
     state.add_execution_log("Guardian comprehensive reset complete. Learning phase restarted.", "warning")

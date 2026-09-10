@@ -68,6 +68,52 @@ async fn notify_core_ui_state(active: bool) {
     }
 }
 
+#[derive(serde::Serialize, Clone, Debug)]
+pub struct DiskPayload {
+    pub name: String,
+    pub mount_point: String,
+    pub total_bytes: u64,
+    pub available_bytes: u64,
+    pub used_percent: f64,
+    pub file_system: Option<String>,
+    pub is_removable: Option<bool>,
+}
+
+#[tauri::command]
+fn get_system_disks() -> Vec<DiskPayload> {
+    let disks = sysinfo::Disks::new_with_refreshed_list();
+    disks
+        .list()
+        .iter()
+        .map(|d| {
+            let mount = d.mount_point().to_string_lossy().to_string();
+            let total = d.total_space();
+            let available = d.available_space();
+            let used = total.saturating_sub(available);
+            let used_pct = if total > 0 {
+                (used as f64 / total as f64) * 100.0
+            } else {
+                0.0
+            };
+            let name_str = d.name().to_string_lossy().to_string();
+            let name = if name_str.is_empty() {
+                mount.clone()
+            } else {
+                name_str
+            };
+            DiskPayload {
+                name,
+                mount_point: mount,
+                total_bytes: total,
+                available_bytes: available,
+                used_percent: (used_pct * 10.0).round() / 10.0,
+                file_system: Some(d.file_system().to_string_lossy().to_string()),
+                is_removable: Some(d.is_removable()),
+            }
+        })
+        .collect()
+}
+
 #[tauri::command]
 fn graceful_shutdown(app: tauri::AppHandle) {
     println!("[Fluffy Rust] Graceful shutdown requested from Frontend");
@@ -81,7 +127,7 @@ pub fn run() {
         .plugin(tauri_plugin_opener::init())
         .plugin(tauri_plugin_shell::init())
         .plugin(tauri_plugin_dialog::init())
-        .invoke_handler(tauri::generate_handler![graceful_shutdown])
+        .invoke_handler(tauri::generate_handler![graceful_shutdown, get_system_disks])
         .manage(AppState {
             python_child: Mutex::new(None),
         })

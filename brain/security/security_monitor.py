@@ -47,11 +47,32 @@ class SecurityMonitor:
             score = self.scores.get(pid, 0)
             if score >= self.alert_threshold:
                 hist = self.process_history.get(pid, {})
+                
+                # Determine severity level
+                if score >= 75:
+                    severity = "critical"
+                elif score >= 50:
+                    severity = "high"
+                elif score >= 35:
+                    severity = "medium"
+                else:
+                    severity = "low"
+
+                signals_list = list(hist.get("detected_signals", []))
+                reason_str = ", ".join(signals_list) if signals_list else "Anomalous behavior pattern"
+
                 alerts.append({
+                    "id": f"alert_{pid}_{int(timestamp)}",
                     "pid": pid,
                     "name": p["name"],
+                    "process_name": p["name"],
                     "score": round(score, 1),
-                    "reasons": list(hist.get("detected_signals", [])),
+                    "severity": severity,
+                    "level": severity.capitalize(),
+                    "alert_type": "Behavioral Anomaly",
+                    "message": f"Suspicious activity detected in {p['name']} ({reason_str})",
+                    "reason": reason_str,
+                    "reasons": signals_list,
                     "timestamp": timestamp
                 })
 

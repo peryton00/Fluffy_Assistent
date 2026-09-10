@@ -64,6 +64,10 @@ export interface CpuTelemetry {
   cores_usage: number[];
   temperature?: number;
   frequency_mhz?: number;
+  brand?: string;
+  vendor_id?: string;
+  cores_count?: number;
+  physical_cores?: number;
 }
 
 export interface MemoryTelemetry {
@@ -79,6 +83,8 @@ export interface DiskTelemetry {
   total_bytes: number;
   available_bytes: number;
   used_percent: number;
+  file_system?: string;
+  is_removable?: boolean;
 }
 
 export interface NetworkTelemetry {
@@ -89,6 +95,11 @@ export interface NetworkTelemetry {
   packets_recv: number;
   speed_mbps?: number;
   ping_ms?: number;
+  status?: string;
+  total_rx_kbps?: number;
+  total_tx_kbps?: number;
+  received_kb?: number;
+  transmitted_kb?: number;
 }
 
 export interface ProcessTelemetry {
@@ -97,12 +108,15 @@ export interface ProcessTelemetry {
   cpu_percent: number;
   ram_mb: number;
   disk_usage_mb?: number;
+  disk_read_kb?: number;
+  disk_written_kb?: number;
   status: string;
   user?: string;
   start_time?: string;
   parent_pid?: number;
   net_received?: number;
   net_sent?: number;
+  exe_path?: string;
 }
 
 export interface GpuTelemetry {
@@ -212,10 +226,21 @@ export interface TelemetrySnapshot {
   persistence?: StartupApp[];
   pending_confirmations?: PendingConfirmation[];
   security_alerts?: SecurityAlert[];
+  _guardian_state?: GuardianStateInfo;
   _guardian_verdicts?: Array<Record<string, unknown>> | Record<string, GuardianVerdict> | Record<string, unknown>;
   notifications?: Notification[];
   active_sessions?: number;
   _tts_muted?: boolean;
+}
+
+export interface GuardianStateInfo {
+  is_learning?: boolean;
+  learning_progress?: number;
+  learning_seconds_remaining?: number;
+  system_first_run?: number;
+  total_tracked?: number;
+  anomalies_count?: number;
+  [key: string]: unknown;
 }
 
 /**
@@ -731,6 +756,8 @@ export interface FtpStatusResponse {
   password?: string;
   qr_code?: string;
   active_clients: number;
+  connected_clients?: number;
+  shared_dir?: string;
   error?: string;
 }
 

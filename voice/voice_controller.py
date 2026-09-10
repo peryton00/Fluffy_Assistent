@@ -19,6 +19,18 @@ except ImportError:
     get_stt_engine = None
 
 
+def _is_tts_muted() -> bool:
+    """Safe check for TTS mute flag across module paths."""
+    try:
+        try:
+            import state
+        except ImportError:
+            from brain import state
+        return getattr(state, "TTS_MUTED", False)
+    except Exception:
+        return False
+
+
 class VoiceController:
     """
     Central voice control system with adaptive tone and dynamic phrasing.
@@ -43,10 +55,7 @@ class VoiceController:
     
     def speak_welcome(self):
         """Speak welcome message when Fluffy starts."""
-        if not self.enabled:
-            return
-        import state
-        if getattr(state, "TTS_MUTED", False):
+        if not self.enabled or _is_tts_muted():
             return
         
         message = "Welcome back master peryton. Fluffy is getting ready to serve you"
@@ -109,10 +118,7 @@ class VoiceController:
         Speak Guardian alert in conversational format.
         High Priority: Cannot be interrupted by normal UI events.
         """
-        if not self.enabled:
-            return
-        import state
-        if getattr(state, "TTS_MUTED", False):
+        if not self.enabled or _is_tts_muted():
             return
         
         level = verdict.get("level", "")
@@ -131,46 +137,49 @@ class VoiceController:
     
     def _split_text_hybrid(self, text: str) -> List[str]:
         """
-        Split text into chunks using punctuation and word counts.
-        Short sentences (≤6 words) are processed as a single unit.
+        Split text into natural sentence chunks for speech synthesis.
+        Sentences under 25 words are synthesized in a single unit to avoid cold-start overhead.
         """
-        # Check total word count first
-        total_words = len(text.split())
+        cleaned = text.strip()
+        if not cleaned:
+            return []
         
-        # If 6 words or less, process as single chunk (no splitting)
-        if total_words <= 6:
-            return [text.strip()]
+        words = cleaned.split()
+        # If 25 words or less, process as a single utterance
+        if len(words) <= 25:
+            return [cleaned]
         
-        # For longer text, split by natural punctuation
-        sentences = re.split(r'([.!?\n,;]+)', text)
+        # Split by full sentence boundaries (. ! ? \n)
+        sentences = re.split(r'([.!?\n]+)', cleaned)
         parts = []
         for i in range(0, len(sentences)-1, 2):
-            parts.append((sentences[i] + sentences[i+1]).strip())
-        if len(sentences) % 2 == 1:
+            combined = (sentences[i] + sentences[i+1]).strip()
+            if combined:
+                parts.append(combined)
+        if len(sentences) % 2 == 1 and sentences[-1].strip():
             parts.append(sentences[-1].strip())
         
         parts = [p for p in parts if p]
         
         final_chunks = []
         for part in parts:
-            words = part.split()
-            if len(words) > 12:
-                # Only chunk very long parts
-                for i in range(0, len(words), 8):
-                    chunk = " ".join(words[i:i+8])
-                    if chunk: final_chunks.append(chunk)
+            p_words = part.split()
+            if len(p_words) > 25:
+                # Subdivide very long runaway paragraphs
+                for i in range(0, len(p_words), 20):
+                    chunk = " ".join(p_words[i:i+20])
+                    if chunk:
+                        final_chunks.append(chunk)
             else:
                 final_chunks.append(part)
-        return final_chunks
+        return final_chunks if final_chunks else [cleaned]
 
     def speak_custom(self, text: str, message_key: Optional[str] = None, blocking: bool = False, priority: str = "NORMAL"):
         """
         Speak custom text with hybrid chunking and parallel pipeline.
         priority: "NORMAL" (interruptible) or "HIGH" (protected)
         """
-        if not self.enabled: return
-        import state
-        if getattr(state, "TTS_MUTED", False):
+        if not self.enabled or _is_tts_muted():
             return
         
         if message_key is not None and not self._should_speak(message_key):
@@ -191,9 +200,7 @@ class VoiceController:
         """
         LLM-Ready Streaming Interface.
         """
-        if not self.enabled: return
-        import state
-        if getattr(state, "TTS_MUTED", False):
+        if not self.enabled or _is_tts_muted():
             return
         self.current_priority = priority
         self.speaker.speak_stream(chunks_iterable)

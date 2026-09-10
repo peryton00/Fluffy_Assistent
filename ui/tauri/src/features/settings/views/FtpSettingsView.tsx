@@ -1,11 +1,3 @@
-/**
- * Fluffy Desktop - FTP Server Settings View
- * 
- * Configures local FTP file-sharing server (Port 2121), credential generation,
- * connected client monitoring, QR code pairing, and activity logging.
- * Styled using Fluffy semantic design tokens.
- */
-
 import React, { useState, useEffect } from "react";
 import { useSettingsStore, settingsStore } from "../../../stores/settingsStore";
 import {
@@ -17,6 +9,9 @@ import {
   CheckIcon,
   TrashIcon,
   AlertTriangleIcon,
+  EyeIcon,
+  EyeOffIcon,
+  CopyIcon,
 } from "../../../components/common/Icons";
 
 export const FtpSettingsView: React.FC = () => {
@@ -24,11 +19,19 @@ export const FtpSettingsView: React.FC = () => {
     useSettingsStore();
 
   const [sharedDir, setSharedDir] = useState<string>("");
+  const [showPassword, setShowPassword] = useState<boolean>(false);
+  const [copiedField, setCopiedField] = useState<string | null>(null);
 
   useEffect(() => {
     settingsStore.refreshFtpStatus();
     settingsStore.loadFtpLogs();
   }, []);
+
+  useEffect(() => {
+    if (ftpStatus?.shared_dir && !sharedDir) {
+      setSharedDir(ftpStatus.shared_dir);
+    }
+  }, [ftpStatus?.shared_dir]);
 
   const isRunning = ftpStatus?.status === "running";
 
@@ -52,6 +55,42 @@ export const FtpSettingsView: React.FC = () => {
   const handleDisconnect = async (clientIp: string) => {
     await settingsStore.disconnectClient(clientIp);
   };
+
+  const handleBrowseFolder = async () => {
+    if (isRunning) return;
+    try {
+      const { open } = await import("@tauri-apps/plugin-dialog");
+      const selected = await open({
+        directory: true,
+        multiple: false,
+        title: "Select Shared Folder for FTP Server",
+      });
+      if (typeof selected === "string" && selected.trim()) {
+        setSharedDir(selected.trim());
+      }
+    } catch (err) {
+      console.warn("Folder picker error or running in web mode:", err);
+    }
+  };
+
+  const handleCopy = (text: string, fieldName: string) => {
+    if (!text) return;
+    navigator.clipboard.writeText(text);
+    setCopiedField(fieldName);
+    setTimeout(() => {
+      setCopiedField(null);
+    }, 2000);
+  };
+
+  const ftpUrl = ftpStatus?.ip
+    ? `ftp://${ftpStatus.username || "fluffy"}:${ftpStatus.password || ""}@${ftpStatus.ip}:${ftpStatus.port || 2121}`
+    : "";
+
+  const qrImageSrc = ftpStatus?.qr_code
+    ? ftpStatus.qr_code.startsWith("data:")
+      ? ftpStatus.qr_code
+      : `data:image/png;base64,${ftpStatus.qr_code}`
+    : null;
 
   return (
     <div
@@ -131,6 +170,25 @@ export const FtpSettingsView: React.FC = () => {
             </span>
           )}
 
+          {copiedField && (
+            <span
+              style={{
+                display: "inline-flex",
+                alignItems: "center",
+                gap: "5px",
+                fontSize: "11px",
+                color: "var(--color-accent)",
+                backgroundColor: "var(--color-accent-subtle)",
+                padding: "3px 8px",
+                borderRadius: "var(--radius-xs)",
+                border: "1px solid var(--color-accent-border)",
+              }}
+            >
+              <CheckIcon size={12} />
+              {copiedField} copied
+            </span>
+          )}
+
           <button
             type="button"
             onClick={handleRefresh}
@@ -207,7 +265,7 @@ export const FtpSettingsView: React.FC = () => {
           </div>
         )}
 
-        {/* Server Status Panel */}
+        {/* Server Status & Credentials Panel */}
         <div
           style={{
             padding: "var(--space-4)",
@@ -230,11 +288,11 @@ export const FtpSettingsView: React.FC = () => {
                 }}
               />
               <span style={{ fontSize: "var(--font-size-xs)", fontWeight: "var(--font-weight-bold)", color: "var(--color-text)" }}>
-                Status: {isRunning ? "Running" : "Stopped"}
+                Status: {isRunning ? "Running (Listening on LAN)" : "Stopped"}
               </span>
             </div>
             <span style={{ fontSize: "var(--font-size-xs)", fontFamily: "var(--font-mono)", color: "var(--color-text-muted)" }}>
-              Port: 2121 (TCP)
+              Port: {ftpStatus?.port || 2121} (TCP)
             </span>
           </div>
 
@@ -242,31 +300,128 @@ export const FtpSettingsView: React.FC = () => {
             <div
               style={{
                 display: "grid",
-                gridTemplateColumns: "repeat(auto-fit, minmax(180px, 1fr))",
+                gridTemplateColumns: "repeat(auto-fit, minmax(200px, 1fr))",
                 gap: "var(--space-3)",
-                paddingTop: "var(--space-2)",
+                paddingTop: "var(--space-3)",
                 borderTop: "1px solid var(--color-border-subtle)",
                 fontSize: "var(--font-size-xs)",
                 fontFamily: "var(--font-mono)",
               }}
             >
-              <div style={{ padding: "8px", borderRadius: "var(--radius-xs)", backgroundColor: "var(--color-surface-elevated)" }}>
-                <span style={{ fontSize: "10px", color: "var(--color-text-muted)", display: "block" }}>IP Address</span>
-                <span style={{ color: "var(--color-text)", fontWeight: "var(--font-weight-bold)" }}>{ftpStatus.ip}</span>
+              {/* Host / IP */}
+              <div style={{ padding: "10px", borderRadius: "var(--radius-xs)", backgroundColor: "var(--color-surface-elevated)", border: "1px solid var(--color-border-subtle)", display: "flex", flexDirection: "column", gap: "4px" }}>
+                <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+                  <span style={{ fontSize: "10px", color: "var(--color-text-muted)", textTransform: "uppercase", fontWeight: "var(--font-weight-bold)" }}>Host / IP</span>
+                  <button
+                    type="button"
+                    onClick={() => handleCopy(ftpStatus.ip, "Host IP")}
+                    title="Copy IP"
+                    style={{ background: "none", border: "none", color: "var(--color-text-muted)", cursor: "pointer", display: "flex", padding: "2px" }}
+                  >
+                    <CopyIcon size={12} />
+                  </button>
+                </div>
+                <span style={{ color: "var(--color-text)", fontWeight: "var(--font-weight-bold)", fontSize: "13px" }}>{ftpStatus.ip}</span>
               </div>
-              <div style={{ padding: "8px", borderRadius: "var(--radius-xs)", backgroundColor: "var(--color-surface-elevated)" }}>
-                <span style={{ fontSize: "10px", color: "var(--color-text-muted)", display: "block" }}>Username</span>
-                <span style={{ color: "var(--color-text)", fontWeight: "var(--font-weight-bold)" }}>{ftpStatus.username}</span>
+
+              {/* Username */}
+              <div style={{ padding: "10px", borderRadius: "var(--radius-xs)", backgroundColor: "var(--color-surface-elevated)", border: "1px solid var(--color-border-subtle)", display: "flex", flexDirection: "column", gap: "4px" }}>
+                <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+                  <span style={{ fontSize: "10px", color: "var(--color-text-muted)", textTransform: "uppercase", fontWeight: "var(--font-weight-bold)" }}>Username</span>
+                  <button
+                    type="button"
+                    onClick={() => handleCopy(ftpStatus.username || "fluffy", "Username")}
+                    title="Copy Username"
+                    style={{ background: "none", border: "none", color: "var(--color-text-muted)", cursor: "pointer", display: "flex", padding: "2px" }}
+                  >
+                    <CopyIcon size={12} />
+                  </button>
+                </div>
+                <span style={{ color: "var(--color-text)", fontWeight: "var(--font-weight-bold)", fontSize: "13px" }}>{ftpStatus.username || "fluffy"}</span>
               </div>
-              <div style={{ padding: "8px", borderRadius: "var(--radius-xs)", backgroundColor: "var(--color-surface-elevated)" }}>
-                <span style={{ fontSize: "10px", color: "var(--color-text-muted)", display: "block" }}>Active Clients</span>
-                <span style={{ color: "var(--color-accent)", fontWeight: "var(--font-weight-bold)" }}>{ftpStatus.active_clients || 0}</span>
+
+              {/* Password */}
+              <div style={{ padding: "10px", borderRadius: "var(--radius-xs)", backgroundColor: "var(--color-surface-elevated)", border: "1px solid var(--color-border-subtle)", display: "flex", flexDirection: "column", gap: "4px" }}>
+                <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+                  <span style={{ fontSize: "10px", color: "var(--color-text-muted)", textTransform: "uppercase", fontWeight: "var(--font-weight-bold)" }}>Password</span>
+                  <div style={{ display: "flex", alignItems: "center", gap: "6px" }}>
+                    <button
+                      type="button"
+                      onClick={() => setShowPassword(!showPassword)}
+                      title={showPassword ? "Hide Password" : "Show Password"}
+                      style={{ background: "none", border: "none", color: "var(--color-text-muted)", cursor: "pointer", display: "flex", padding: "2px" }}
+                    >
+                      {showPassword ? <EyeOffIcon size={12} /> : <EyeIcon size={12} />}
+                    </button>
+                    {ftpStatus.password && (
+                      <button
+                        type="button"
+                        onClick={() => handleCopy(ftpStatus.password || "", "Password")}
+                        title="Copy Password"
+                        style={{ background: "none", border: "none", color: "var(--color-text-muted)", cursor: "pointer", display: "flex", padding: "2px" }}
+                      >
+                        <CopyIcon size={12} />
+                      </button>
+                    )}
+                  </div>
+                </div>
+                <span style={{ color: "var(--color-accent)", fontWeight: "var(--font-weight-bold)", fontSize: "13px", letterSpacing: showPassword ? "normal" : "2px" }}>
+                  {ftpStatus.password ? (showPassword ? ftpStatus.password : "••••••••") : "(No password set)"}
+                </span>
+              </div>
+
+              {/* Active Clients */}
+              <div style={{ padding: "10px", borderRadius: "var(--radius-xs)", backgroundColor: "var(--color-surface-elevated)", border: "1px solid var(--color-border-subtle)", display: "flex", flexDirection: "column", gap: "4px" }}>
+                <span style={{ fontSize: "10px", color: "var(--color-text-muted)", textTransform: "uppercase", fontWeight: "var(--font-weight-bold)" }}>Connected Clients</span>
+                <span style={{ color: "var(--color-accent)", fontWeight: "var(--font-weight-bold)", fontSize: "13px" }}>
+                  {ftpStatus.active_clients || ftpStatus.connected_clients || 0}
+                </span>
               </div>
             </div>
           )}
 
-          {/* QR Code preview if available */}
-          {isRunning && ftpStatus?.qr_code && (
+          {/* Quick Connect URL Banner */}
+          {isRunning && ftpStatus && (
+            <div
+              style={{
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "space-between",
+                padding: "8px 12px",
+                borderRadius: "var(--radius-xs)",
+                backgroundColor: "var(--color-surface-subtle)",
+                border: "1px solid var(--color-border-subtle)",
+                fontSize: "11px",
+                fontFamily: "var(--font-mono)",
+              }}
+            >
+              <span style={{ color: "var(--color-text-muted)" }}>
+                URL: <strong style={{ color: "var(--color-text)" }}>ftp://{ftpStatus.ip}:{ftpStatus.port || 2121}</strong>
+              </span>
+              <button
+                type="button"
+                onClick={() => handleCopy(`ftp://${ftpStatus.ip}:${ftpStatus.port || 2121}`, "FTP URL")}
+                style={{
+                  display: "inline-flex",
+                  alignItems: "center",
+                  gap: "4px",
+                  padding: "3px 8px",
+                  fontSize: "10px",
+                  borderRadius: "var(--radius-xs)",
+                  backgroundColor: "var(--color-surface-elevated)",
+                  border: "1px solid var(--color-border)",
+                  color: "var(--color-text)",
+                  cursor: "pointer",
+                }}
+              >
+                <CopyIcon size={11} />
+                <span>Copy URL</span>
+              </button>
+            </div>
+          )}
+
+          {/* QR Code preview */}
+          {isRunning && qrImageSrc && (
             <div
               style={{
                 display: "flex",
@@ -279,21 +434,53 @@ export const FtpSettingsView: React.FC = () => {
               }}
             >
               <img
-                src={ftpStatus.qr_code}
+                src={qrImageSrc}
                 alt="FTP Connection QR Code"
-                style={{ width: "80px", height: "80px", borderRadius: "var(--radius-xs)", backgroundColor: "#ffffff", padding: "4px" }}
+                style={{
+                  width: "96px",
+                  height: "96px",
+                  borderRadius: "var(--radius-xs)",
+                  backgroundColor: "#ffffff",
+                  padding: "6px",
+                  flexShrink: 0,
+                  boxShadow: "0 2px 4px rgba(0,0,0,0.1)",
+                }}
               />
               <div style={{ fontSize: "var(--font-size-xs)", color: "var(--color-text-muted)" }}>
-                <div style={{ fontWeight: "var(--font-weight-bold)", color: "var(--color-text)" }}>Mobile Quick Connect</div>
+                <div style={{ fontWeight: "var(--font-weight-bold)", color: "var(--color-text)", fontSize: "12px" }}>
+                  Mobile Quick Connect QR
+                </div>
                 <p style={{ fontSize: "11px", margin: "4px 0 0", lineHeight: 1.4 }}>
-                  Scan this QR code with a mobile FTP client on the same Wi-Fi network to transfer files instantly.
+                  Scan this QR code with any mobile FTP client (e.g. AndFTP, FTPManager, Documents) on the same Wi-Fi network to authenticate and transfer files instantly.
                 </p>
+                {ftpUrl && (
+                  <button
+                    type="button"
+                    onClick={() => handleCopy(ftpUrl, "Full Connection URI")}
+                    style={{
+                      marginTop: "6px",
+                      display: "inline-flex",
+                      alignItems: "center",
+                      gap: "4px",
+                      padding: "2px 6px",
+                      fontSize: "10px",
+                      borderRadius: "var(--radius-xs)",
+                      backgroundColor: "var(--color-surface)",
+                      border: "1px solid var(--color-border)",
+                      color: "var(--color-text-secondary)",
+                      cursor: "pointer",
+                    }}
+                  >
+                    <CopyIcon size={10} />
+                    <span>Copy Full Credentials URI</span>
+                  </button>
+                )}
               </div>
             </div>
           )}
         </div>
 
-        {/* Directory configuration */}
+        {/* Directory configuration with Native Folder Picker */}
         <div
           style={{
             padding: "var(--space-4)",
@@ -309,27 +496,54 @@ export const FtpSettingsView: React.FC = () => {
             <FolderIcon size={14} style={{ color: "var(--color-accent)" }} />
             Shared Storage Directory
           </label>
-          <input
-            type="text"
-            value={sharedDir}
-            disabled={isRunning}
-            onChange={(e) => setSharedDir(e.target.value)}
-            placeholder="Default (Downloads / Shared)"
-            style={{
-              width: "100%",
-              padding: "8px 10px",
-              borderRadius: "var(--radius-xs)",
-              fontSize: "var(--font-size-xs)",
-              fontFamily: "var(--font-mono)",
-              backgroundColor: "var(--color-surface-elevated)",
-              border: "1px solid var(--color-border)",
-              color: "var(--color-text)",
-              outline: "none",
-              opacity: isRunning ? 0.6 : 1,
-            }}
-          />
+          <div style={{ display: "flex", alignItems: "center", gap: "var(--space-2)" }}>
+            <input
+              type="text"
+              value={sharedDir}
+              disabled={isRunning}
+              onChange={(e) => setSharedDir(e.target.value)}
+              placeholder="Default (Downloads / Shared)"
+              style={{
+                flex: 1,
+                padding: "8px 10px",
+                borderRadius: "var(--radius-xs)",
+                fontSize: "var(--font-size-xs)",
+                fontFamily: "var(--font-mono)",
+                backgroundColor: "var(--color-surface-elevated)",
+                border: "1px solid var(--color-border)",
+                color: "var(--color-text)",
+                outline: "none",
+                opacity: isRunning ? 0.6 : 1,
+              }}
+            />
+            <button
+              type="button"
+              disabled={isRunning}
+              onClick={handleBrowseFolder}
+              title={isRunning ? "Stop server to change folder" : "Browse local folders"}
+              style={{
+                display: "inline-flex",
+                alignItems: "center",
+                gap: "6px",
+                padding: "8px 12px",
+                borderRadius: "var(--radius-xs)",
+                fontSize: "var(--font-size-xs)",
+                backgroundColor: "var(--color-surface-elevated)",
+                border: "1px solid var(--color-border)",
+                color: "var(--color-text)",
+                cursor: isRunning ? "not-allowed" : "pointer",
+                opacity: isRunning ? 0.6 : 1,
+                whiteSpace: "nowrap",
+              }}
+            >
+              <FolderIcon size={12} />
+              <span>Browse...</span>
+            </button>
+          </div>
           <p style={{ fontSize: "11px", color: "var(--color-text-muted)", margin: 0 }}>
-            Specify a custom folder to serve over FTP. Server must be stopped before modifying directory path.
+            {isRunning
+              ? "Server is active. To change the shared folder, stop the server first."
+              : "Select or enter a custom folder on your system to serve over FTP. If left blank, Fluffy's default shared folder is used."}
           </p>
         </div>
 
