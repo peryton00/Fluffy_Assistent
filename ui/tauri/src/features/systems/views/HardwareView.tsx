@@ -14,6 +14,7 @@ import { useTelemetryStore, telemetryCoordinator } from "../../../stores/telemet
 import { uiStore } from "../../../stores/uiStore";
 import {
   CpuIcon,
+  GpuIcon,
   MemoryIcon,
   HardDriveIcon,
   ActivityIcon,
@@ -35,6 +36,7 @@ export const HardwareView: React.FC = () => {
 
   const cpu = snapshot?.system?.cpu || snapshot?.cpu;
   const ram = snapshot?.system?.ram || snapshot?.ram;
+  const gpus = snapshot?.system?.gpus || snapshot?.gpus || [];
   const disks = snapshot?.system?.disks || snapshot?.disks || [];
   const network = snapshot?.system?.network;
   const battery = snapshot?.system?.battery || snapshot?.battery;
@@ -295,6 +297,151 @@ export const HardwareView: React.FC = () => {
               <div>Free: <strong style={{ color: "var(--color-text)" }}>{ram?.free_mb ? `${Math.round(ram.free_mb / 1024)} GB` : "0 GB"}</strong></div>
               <div>Total: <strong style={{ color: "var(--color-text)" }}>{ram?.total_mb ? `${Math.round(ram.total_mb / 1024)} GB` : "0 GB"}</strong></div>
             </div>
+          </div>
+        </div>
+
+        {/* Graphics & GPU Accelerators */}
+        <div
+          style={{
+            backgroundColor: "var(--color-surface)",
+            border: "1px solid var(--color-border)",
+            borderRadius: "var(--radius-md)",
+            padding: "var(--space-4)",
+          }}
+        >
+          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "var(--space-3)", flexWrap: "wrap", gap: "var(--space-2)" }}>
+            <div style={{ display: "flex", alignItems: "center", gap: "var(--space-2)" }}>
+              <GpuIcon size={16} style={{ color: "var(--color-accent)" }} />
+              <span style={{ fontSize: "13px", fontWeight: "var(--font-weight-semibold)", color: "var(--color-text)" }}>
+                Graphics & GPU Accelerators ({gpus.length})
+              </span>
+            </div>
+            {gpus.length > 0 && (
+              <span style={{ fontSize: "11px", fontFamily: "var(--font-mono)", color: "var(--color-text-muted)" }}>
+                Active Display Adapters: <strong style={{ color: "var(--color-text)" }}>{gpus.length}</strong>
+              </span>
+            )}
+          </div>
+
+          <div
+            style={{
+              display: "grid",
+              gridTemplateColumns: "repeat(auto-fill, minmax(300px, 1fr))",
+              gap: "var(--space-3)",
+            }}
+          >
+            {gpus.map((gpu, index) => {
+              const vramTotalMb = gpu.memory_total_mb;
+              const vramUsedMb = gpu.memory_used_mb;
+              const vramPct = vramTotalMb && vramUsedMb ? (vramUsedMb / vramTotalMb) * 100 : undefined;
+              const usagePct = gpu.usage_percent;
+
+              return (
+                <div
+                  key={gpu.name + index}
+                  onClick={() =>
+                    handleSelectHardware("gpu", gpu.name, {
+                      name: gpu.name,
+                      vendor: gpu.vendor || "Unknown",
+                      driver_version: gpu.driver_version || "Unknown",
+                      dedicated_vram: vramTotalMb ? `${vramTotalMb} MB (${(vramTotalMb / 1024).toFixed(2)} GB)` : "Shared / System",
+                      used_vram: vramUsedMb ? `${vramUsedMb} MB` : "N/A",
+                      usage_percent: usagePct !== undefined ? `${usagePct.toFixed(1)}%` : "N/A",
+                      temperature: gpu.temperature_c !== undefined ? `${gpu.temperature_c} °C` : "N/A",
+                    })
+                  }
+                  style={{
+                    backgroundColor: "var(--color-surface-subtle)",
+                    border: "1px solid var(--color-border-subtle)",
+                    borderRadius: "var(--radius-sm)",
+                    padding: "var(--space-3)",
+                    cursor: "pointer",
+                    display: "flex",
+                    flexDirection: "column",
+                    gap: "var(--space-2)",
+                  }}
+                >
+                  <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", gap: "var(--space-2)" }}>
+                    <div style={{ minWidth: 0 }}>
+                      <div style={{ fontSize: "13px", fontWeight: "var(--font-weight-bold)", color: "var(--color-text)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }} title={gpu.name}>
+                        {gpu.name}
+                      </div>
+                      <div style={{ display: "flex", alignItems: "center", gap: "6px", marginTop: "3px", flexWrap: "wrap" }}>
+                        {gpu.vendor && (
+                          <span style={{ fontSize: "10px", padding: "1px 6px", borderRadius: "var(--radius-xs)", backgroundColor: "var(--color-surface-elevated)", color: "var(--color-accent)", fontFamily: "var(--font-mono)", fontWeight: 600 }}>
+                            {gpu.vendor}
+                          </span>
+                        )}
+                        {gpu.driver_version && (
+                          <span style={{ fontSize: "10px", padding: "1px 5px", borderRadius: "var(--radius-xs)", backgroundColor: "var(--color-surface-elevated)", color: "var(--color-text-muted)", fontFamily: "var(--font-mono)" }}>
+                            v{gpu.driver_version}
+                          </span>
+                        )}
+                      </div>
+                    </div>
+
+                    <div style={{ display: "flex", flexDirection: "column", alignItems: "flex-end", gap: "2px", flexShrink: 0 }}>
+                      <span style={{ fontSize: "13px", fontFamily: "var(--font-mono)", color: "var(--color-accent)", fontWeight: "var(--font-weight-bold)" }}>
+                        {usagePct !== undefined
+                          ? `${usagePct.toFixed(1)}%`
+                          : vramPct !== undefined
+                          ? `${vramPct.toFixed(0)}% VRAM`
+                          : "Active"}
+                      </span>
+                      <span style={{ fontSize: "10px", fontFamily: "var(--font-mono)", color: gpu.temperature_c && gpu.temperature_c > 80 ? "var(--color-danger)" : "var(--color-text-muted)" }}>
+                        {gpu.temperature_c !== undefined
+                          ? `${gpu.temperature_c}°C`
+                          : cpu?.temperature
+                          ? `${cpu.temperature}°C (SoC)`
+                          : "Operational"}
+                      </span>
+                    </div>
+                  </div>
+
+                  {vramTotalMb && (
+                    <>
+                      <div
+                        style={{
+                          width: "100%",
+                          height: "6px",
+                          backgroundColor: "var(--color-surface-elevated)",
+                          borderRadius: "var(--radius-full)",
+                          overflow: "hidden",
+                          marginTop: "2px",
+                        }}
+                      >
+                        <div
+                          style={{
+                            width: `${Math.min(100, Math.max(0, vramPct !== undefined ? vramPct : 100))}%`,
+                            height: "100%",
+                            backgroundColor: vramPct && vramPct > 85 ? "var(--color-danger)" : vramPct && vramPct > 70 ? "var(--color-warning)" : "var(--color-accent)",
+                            transition: "width 0.3s ease",
+                          }}
+                        />
+                      </div>
+                      <div
+                        style={{
+                          display: "flex",
+                          justifyContent: "space-between",
+                          fontSize: "10px",
+                          fontFamily: "var(--font-mono)",
+                          color: "var(--color-text-muted)",
+                        }}
+                      >
+                        <span>{vramUsedMb ? `Used: ${(vramUsedMb / 1024).toFixed(2)} GB (${vramUsedMb} MB)` : "Dedicated Video Memory"}</span>
+                        <span>Total: {(vramTotalMb / 1024).toFixed(1)} GB ({vramTotalMb} MB)</span>
+                      </div>
+                    </>
+                  )}
+                </div>
+              );
+            })}
+
+            {gpus.length === 0 && (
+              <div style={{ fontSize: "11px", color: "var(--color-text-muted)", fontFamily: "var(--font-mono)", padding: "var(--space-2)" }}>
+                No discrete or integrated GPU accelerators detected.
+              </div>
+            )}
           </div>
         </div>
 

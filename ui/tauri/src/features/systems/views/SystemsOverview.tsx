@@ -14,6 +14,7 @@ import { uiStore } from "../../../stores/uiStore";
 import { SystemsHeader } from "../components/SystemsHeader";
 import {
   CpuIcon,
+  GpuIcon,
   DatabaseIcon,
   HardDriveIcon,
   WifiIcon,
@@ -31,6 +32,7 @@ export const SystemsOverview: React.FC = () => {
 
   const cpu = snapshot?.system?.cpu || snapshot?.cpu;
   const ram = snapshot?.system?.ram || snapshot?.ram;
+  const gpus = snapshot?.system?.gpus || snapshot?.gpus || [];
   const disks = snapshot?.system?.disks || snapshot?.disks;
   const primaryDisk = disks && disks.length > 0 ? disks[0] : undefined;
   const network = snapshot?.system?.network;
@@ -317,6 +319,18 @@ export const SystemsOverview: React.FC = () => {
                 {cpu?.temperature ? `${cpu.temperature}°C` : "Nominal"}
               </div>
             </div>
+
+            {gpus.length > 0 && (
+              <div style={{ backgroundColor: "var(--color-surface-elevated)", padding: "var(--space-3)", borderRadius: "var(--radius-xs)", gridColumn: "span 2" }}>
+                <div style={{ display: "flex", alignItems: "center", gap: "var(--space-2)", color: "var(--color-text-muted)", fontSize: "10px", textTransform: "uppercase" }}>
+                  <GpuIcon size={12} />
+                  <span>Graphics Adapter</span>
+                </div>
+                <div style={{ fontSize: "var(--font-size-sm)", fontWeight: "var(--font-weight-bold)", marginTop: "4px", fontFamily: "var(--font-mono)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                  {gpus[0].name} {gpus[0].memory_total_mb ? `(${(gpus[0].memory_total_mb / 1024).toFixed(1)} GB)` : ""}
+                </div>
+              </div>
+            )}
           </div>
         </div>
       </div>

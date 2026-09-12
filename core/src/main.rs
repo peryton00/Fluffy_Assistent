@@ -92,6 +92,23 @@ struct NetworkStats {
     status: String, // "wifi", "ethernet", "offline"
 }
 
+#[derive(Serialize, Clone, Debug)]
+struct GpuStats {
+    name: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    vendor: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    driver_version: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    memory_total_mb: Option<u64>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    memory_used_mb: Option<u64>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    usage_percent: Option<f32>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    temperature_c: Option<f32>,
+}
+
 #[derive(Serialize)]
 struct SystemStats {
     ram: RamStats,
@@ -100,6 +117,7 @@ struct SystemStats {
     processes: ProcessStats,
     battery: Option<BatteryStats>,
     bluetooth: Option<BluetoothStats>,
+    gpus: Vec<GpuStats>,
 }
 
 #[derive(Serialize)]
@@ -283,6 +301,279 @@ fn encode_wide(s: &str) -> Vec<u16> {
 #[cfg(not(target_os = "windows"))]
 fn get_startup_entries() -> Vec<StartupApp> {
     Vec::new()
+}
+
+#[cfg(target_os = "windows")]
+fn get_gpu_entries() -> Vec<GpuStats> {
+    use winreg::enums::*;
+    use winreg::RegKey;
+
+    let mut gpus: Vec<GpuStats> = Vec::new();
+    let hklm = RegKey::predef(HKEY_LOCAL_MACHINE);
+    let class_path = r"SYSTEM\CurrentControlSet\Control\Class\{4d36e968-e325-11ce-bfc1-08002be10318}";
+
+    if let Ok(class_key) = hklm.open_subkey_with_flags(class_path, KEY_READ) {
+        for subkey_name in class_key.enum_keys().filter_map(|r| r.ok()) {
+            if subkey_name.starts_with("00") || subkey_name.parse::<u32>().is_ok() {
+                if let Ok(adapter_key) = class_key.open_subkey_with_flags(&subkey_name, KEY_READ) {
+                    let desc: Result<String, _> = adapter_key.get_value("DriverDesc");
+                    let provider: Result<String, _> = adapter_key.get_value("ProviderName");
+                    let version: Result<String, _> = adapter_key.get_value("DriverVersion");
+
+                    let mem_bytes: Option<u64> = adapter_key
+                        .get_value::<u32, _>("HardwareInformation.MemorySize")
+                        .ok()
+                        .map(|v| v as u64)
+                        .or_else(|| {
+                            adapter_key
+                                .get_value::<u64, _>("HardwareInformation.qwMemorySize")
+                                .ok()
+                        })
+                        .or_else(|| {
+                            adapter_key
+                                .get_raw_value("HardwareInformation.MemorySize")
+                                .ok()
+                                .and_then(|raw| {
+                                    if raw.bytes.len() >= 4 {
+                                        let mut b = [0u8; 4];
+                                        b.copy_from_slice(&raw.bytes[0..4]);
+                                        Some(u32::from_le_bytes(b) as u64)
+                                    } else {
+                                        None
+                                    }
+                                })
+                        });
+
+                    if let Ok(name) = desc {
+                        let trimmed_name = name.trim();
+                        if trimmed_name.is_empty() {
+                            continue;
+                        }
+
+                        let name_lower = trimmed_name.to_lowercase();
+                        let is_virtual = name_lower.contains("spacedesk")
+                            || name_lower.contains("miracast")
+                            || name_lower.contains("rdpdd")
+                            || name_lower.contains("basic display");
+
+                        let mem_mb = mem_bytes.map(|b| b / (1024 * 1024));
+
+                        if is_virtual && mem_mb.unwrap_or(0) == 0 && !gpus.is_empty() {
+                            continue;
+                        }
+
+                        if !gpus.iter().any(|g| g.name == trimmed_name) {
+                            gpus.push(GpuStats {
+                                name: trimmed_name.to_string(),
+                                vendor: provider
+                                    .ok()
+                                    .map(|p| p.trim().to_string())
+                                    .filter(|p| !p.is_empty()),
+                                driver_version: version
+                                    .ok()
+                                    .map(|v| v.trim().to_string())
+                                    .filter(|v| !v.is_empty()),
+                                memory_total_mb: mem_mb,
+                                memory_used_mb: None,
+                                usage_percent: None,
+                                temperature_c: None,
+                            });
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    enrich_windows_gpus(&mut gpus);
+    gpus
+}
+
+#[cfg(target_os = "windows")]
+fn sample_windows_gpu_metrics() -> (Option<u64>, Option<f32>) {
+    let script = "$mem = (Get-CimInstance Win32_PerfFormattedData_GPUPerformanceCounters_GPUAdapterMemory -ErrorAction SilentlyContinue | Measure-Object -Property DedicatedUsage -Sum).Sum; $util = (Get-CimInstance Win32_PerfFormattedData_GPUPerformanceCounters_GPUEngine -ErrorAction SilentlyContinue | Measure-Object -Property UtilizationPercentage -Sum).Sum; Write-Output \"$mem,$util\"";
+
+    let output = std::process::Command::new("powershell")
+        .args(["-NoProfile", "-NonInteractive", "-Command", script])
+        .output();
+
+    if let Ok(out) = output {
+        if out.status.success() {
+            let text = String::from_utf8_lossy(&out.stdout).trim().to_string();
+            let parts: Vec<&str> = text.split(',').map(|s| s.trim()).collect();
+            let used_mb = parts.first().and_then(|s| s.parse::<u64>().ok()).map(|b| b / (1024 * 1024));
+            let util = parts.get(1).and_then(|s| s.parse::<f32>().ok());
+            return (used_mb, util);
+        }
+    }
+    (None, None)
+}
+
+#[cfg(target_os = "windows")]
+fn enrich_windows_gpus(gpus: &mut Vec<GpuStats>) {
+    enrich_nvidia_gpus(gpus);
+
+    if gpus.iter().any(|g| g.memory_used_mb.is_none() || g.usage_percent.is_none()) {
+        let (used_mb, util) = sample_windows_gpu_metrics();
+        for gpu in gpus.iter_mut() {
+            if gpu.memory_used_mb.is_none() && used_mb.is_some() {
+                gpu.memory_used_mb = used_mb;
+            }
+            if gpu.usage_percent.is_none() && util.is_some() {
+                gpu.usage_percent = util;
+            }
+        }
+    }
+}
+
+#[cfg(not(target_os = "windows"))]
+fn enrich_windows_gpus(gpus: &mut Vec<GpuStats>) {
+    enrich_nvidia_gpus(gpus);
+}
+
+#[cfg(target_os = "macos")]
+fn get_gpu_entries() -> Vec<GpuStats> {
+    let mut gpus = Vec::new();
+    let output = std::process::Command::new("system_profiler")
+        .args(["SPDisplaysDataType"])
+        .output();
+
+    if let Ok(out) = output {
+        if out.status.success() {
+            let text = String::from_utf8_lossy(&out.stdout);
+            let mut current_name = String::new();
+            let mut current_vendor = Some("Apple".to_string());
+            let mut current_vram = None;
+
+            for line in text.lines() {
+                let trimmed = line.trim();
+                if let Some(model) = trimmed.strip_prefix("Chipset Model:") {
+                    current_name = model.trim().to_string();
+                } else if let Some(vendor) = trimmed.strip_prefix("Vendor:") {
+                    current_vendor = Some(vendor.trim().to_string());
+                } else if let Some(vram_str) = trimmed.strip_prefix("VRAM (Total):") {
+                    let vram_clean = vram_str.trim();
+                    if vram_clean.ends_with("GB") {
+                        if let Ok(gb) = vram_clean.trim_end_matches("GB").trim().parse::<u64>() {
+                            current_vram = Some(gb * 1024);
+                        }
+                    } else if vram_clean.ends_with("MB") {
+                        if let Ok(mb) = vram_clean.trim_end_matches("MB").trim().parse::<u64>() {
+                            current_vram = Some(mb);
+                        }
+                    }
+                }
+            }
+
+            if !current_name.is_empty() {
+                gpus.push(GpuStats {
+                    name: current_name,
+                    vendor: current_vendor,
+                    driver_version: Some("Apple Metal".to_string()),
+                    memory_total_mb: current_vram,
+                    memory_used_mb: None,
+                    usage_percent: None,
+                    temperature_c: None,
+                });
+            }
+        }
+    }
+    gpus
+}
+
+#[cfg(target_os = "linux")]
+fn get_gpu_entries() -> Vec<GpuStats> {
+    let mut gpus = Vec::new();
+    enrich_nvidia_gpus(&mut gpus);
+
+    if gpus.is_empty() {
+        if let Ok(out) = std::process::Command::new("lspci").output() {
+            let text = String::from_utf8_lossy(&out.stdout);
+            for line in text.lines() {
+                let lower = line.to_lowercase();
+                if lower.contains("vga compatible controller") || lower.contains("3d controller") {
+                    let parts: Vec<&str> = line.split(':').collect();
+                    let name = if parts.len() >= 3 { parts[2].trim() } else { line.trim() };
+                    let vendor = if lower.contains("nvidia") {
+                        Some("NVIDIA".to_string())
+                    } else if lower.contains("amd") || lower.contains("ati") {
+                        Some("AMD".to_string())
+                    } else if lower.contains("intel") {
+                        Some("Intel".to_string())
+                    } else {
+                        None
+                    };
+
+                    gpus.push(GpuStats {
+                        name: name.to_string(),
+                        vendor,
+                        driver_version: None,
+                        memory_total_mb: None,
+                        memory_used_mb: None,
+                        usage_percent: None,
+                        temperature_c: None,
+                    });
+                }
+            }
+        }
+    }
+    gpus
+}
+
+#[cfg(not(any(target_os = "windows", target_os = "macos", target_os = "linux")))]
+fn get_gpu_entries() -> Vec<GpuStats> {
+    Vec::new()
+}
+
+fn enrich_nvidia_gpus(gpus: &mut Vec<GpuStats>) {
+    let output = std::process::Command::new("nvidia-smi")
+        .args([
+            "--query-gpu=name,memory.total,memory.used,utilization.gpu,temperature.gpu",
+            "--format=csv,noheader,nounits",
+        ])
+        .output();
+
+    if let Ok(out) = output {
+        if out.status.success() {
+            if let Ok(text) = String::from_utf8(out.stdout) {
+                for line in text.lines() {
+                    let parts: Vec<&str> = line.split(',').map(|s| s.trim()).collect();
+                    if parts.len() >= 5 {
+                        let name = parts[0];
+                        let total_mb: Option<u64> = parts[1].parse().ok();
+                        let used_mb: Option<u64> = parts[2].parse().ok();
+                        let usage_percent: Option<f32> = parts[3].parse().ok();
+                        let temperature_c: Option<f32> = parts[4].parse().ok();
+
+                        if let Some(existing) = gpus
+                            .iter_mut()
+                            .find(|g| g.name.contains(name) || name.contains(&g.name))
+                        {
+                            if total_mb.is_some() {
+                                existing.memory_total_mb = total_mb;
+                            }
+                            existing.memory_used_mb = used_mb;
+                            existing.usage_percent = usage_percent;
+                            existing.temperature_c = temperature_c;
+                            if existing.vendor.is_none() {
+                                existing.vendor = Some("NVIDIA".to_string());
+                            }
+                        } else {
+                            gpus.push(GpuStats {
+                                name: name.to_string(),
+                                vendor: Some("NVIDIA".to_string()),
+                                driver_version: None,
+                                memory_total_mb: total_mb,
+                                memory_used_mb: used_mb,
+                                usage_percent,
+                                temperature_c,
+                            });
+                        }
+                    }
+                }
+            }
+        }
+    }
 }
 
 fn collect_processes(system: &System, cpu_history: &mut CpuHistory) -> Vec<ProcessInfo> {
@@ -551,9 +842,11 @@ fn main() {
     let mut components = Components::new_with_refreshed_list();
     let mut cpu_history = CpuHistory::new();
 
-    // Cache startup entries - registry reads are expensive, only refresh every 60s
+    // Cache startup entries & GPU entries - registry reads are refreshed periodically
     let mut cached_startup: Vec<StartupApp> = get_startup_entries();
     let mut last_startup_scan: u64 = unix_timestamp();
+    let mut cached_gpus: Vec<GpuStats> = get_gpu_entries();
+    let mut last_gpu_scan: u64 = unix_timestamp();
 
     while running.load(Ordering::SeqCst) {
         if IS_UI_ACTIVE.load(Ordering::SeqCst) {
@@ -624,16 +917,23 @@ fn main() {
                 }
             }
 
-            // Refresh startup entries cache every 60 seconds
+            // Refresh startup & GPU entries cache every 30 seconds
             let now = unix_timestamp();
             if now - last_startup_scan >= 30 {
                 cached_startup = get_startup_entries();
                 last_startup_scan = now;
             }
+            if now - last_gpu_scan >= 30 {
+                cached_gpus = get_gpu_entries();
+                last_gpu_scan = now;
+            } else {
+                enrich_windows_gpus(&mut cached_gpus);
+            }
 
             println!(
-                "[Fluffy Core] Broadcasting telemetry ({} processes)...",
-                processes.len()
+                "[Fluffy Core] Broadcasting telemetry ({} processes, {} GPUs)...",
+                processes.len(),
+                cached_gpus.len()
             );
             let message = FluffyMessage {
                 schema_version: "1.0",
@@ -664,6 +964,7 @@ fn main() {
                     processes: ProcessStats { top_ram: processes },
                     battery: get_battery_info(),
                     bluetooth: Some(BluetoothStats { enabled: get_bluetooth_enabled().await }),
+                    gpus: cached_gpus.clone(),
                 },
                 persistence: cached_startup.clone(),
                 active_sessions: 1, // Hardcoded: UI is active if we are here

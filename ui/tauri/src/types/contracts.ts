@@ -121,6 +121,8 @@ export interface ProcessTelemetry {
 
 export interface GpuTelemetry {
   name: string;
+  vendor?: string;
+  driver_version?: string;
   usage_percent?: number;
   memory_used_mb?: number;
   memory_total_mb?: number;
@@ -202,6 +204,7 @@ export interface SystemTelemetryGroup {
   };
   disks?: DiskTelemetry[];
   persistence?: StartupApp[];
+  gpus?: GpuTelemetry[];
 }
 
 export type ProcessInfo = ProcessTelemetry;
