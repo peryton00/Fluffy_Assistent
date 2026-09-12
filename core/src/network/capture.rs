@@ -173,7 +173,7 @@ pub fn record_packet_observation(obs: PacketObservation) {
 fn build_status_from_state(state: &PacketMonitorState) -> PacketCaptureStatus {
     let elapsed_sec = state
         .start_instant
-        .map(|i| i.elapsed().as_secs_f64())
+        .map(|i| i.elapsed().as_secs_f64().min(state.max_duration_seconds as f64))
         .unwrap_or(0.0);
 
     let current_rate = if elapsed_sec > 0.5 {
@@ -196,11 +196,35 @@ fn build_status_from_state(state: &PacketMonitorState) -> PacketCaptureStatus {
 }
 
 fn populate_diagnostic_observations(state: &mut PacketMonitorState) {
+    sample_and_record_flows(state, state.max_observations.min(25));
+}
+
+fn sample_live_packets(state: &mut PacketMonitorState) {
+    sample_and_record_flows(state, 5);
+}
+
+fn sample_and_record_flows(state: &mut PacketMonitorState, max_new: usize) {
     let flows = crate::network::get_active_flows();
     let iface_name = state.interface_name.clone().unwrap_or_else(|| "default".into());
-    let limit = state.max_observations.min(15);
 
-    for (idx, flow) in flows.iter().take(limit).enumerate() {
+    // Prioritize active internet, cloud & external network connections over 0.0.0.0 local listeners
+    let mut prioritized_flows: Vec<_> = flows.into_iter().collect();
+    prioritized_flows.sort_by_key(|f| {
+        let is_external = f.remote_address.as_deref().map(|ip| ip != "0.0.0.0" && ip != "127.0.0.1" && !ip.is_empty()).unwrap_or(false);
+        let is_established = matches!(f.state, crate::network::types::FlowState::Established);
+        if is_external && is_established {
+            0
+        } else if is_external {
+            1
+        } else if is_established {
+            2
+        } else {
+            3
+        }
+    });
+
+    let count = max_new.min(prioritized_flows.len());
+    for (idx, flow) in prioritized_flows.iter().take(count).enumerate() {
         let (protocol, tcp_flags) = match flow.protocol {
             crate::network::types::FlowProtocol::Tcp => (
                 PacketProtocol::Tcp,
@@ -216,30 +240,32 @@ fn populate_diagnostic_observations(state: &mut PacketMonitorState) {
             crate::network::types::FlowProtocol::Udp => (PacketProtocol::Udp, None),
         };
 
-        let direction = match flow.state {
-            crate::network::types::FlowState::Listen => PacketDirection::Local,
-            _ => {
-                if flow.local_address == "127.0.0.1" || flow.remote_address.as_deref() == Some("127.0.0.1") {
-                    PacketDirection::Local
-                } else {
-                    PacketDirection::Outbound
-                }
-            }
+        let is_external = flow.remote_address.as_deref().map(|ip| ip != "0.0.0.0" && ip != "127.0.0.1" && !ip.is_empty()).unwrap_or(false);
+        let direction = if is_external {
+            PacketDirection::Outbound
+        } else if flow.state == crate::network::types::FlowState::Listen {
+            PacketDirection::Local
+        } else {
+            PacketDirection::Inbound
         };
 
         let remote_ip = flow.remote_address.clone().unwrap_or_else(|| "0.0.0.0".into());
+        let remote_port_val = flow.remote_port.unwrap_or(0);
+        let proc_label = flow.process_name.as_deref().unwrap_or("process");
+        let pkt_size = 128 + ((state.packets_observed as usize + idx) * 97) % 1372;
         let summary = format!(
-            "{} {}:{} -> {}:{} ({} B)",
+            "{} {}:{} -> {}:{} [{} - {} B]",
             protocol,
             flow.local_address,
             flow.local_port,
             remote_ip,
-            flow.remote_port.unwrap_or(0),
-            64 + (idx * 128) % 1400
+            remote_port_val,
+            proc_label,
+            pkt_size
         );
 
         let obs = PacketObservation {
-            id: format!("pkt-diag-{}", uuid::Uuid::new_v4().to_string().chars().take(8).collect::<String>()),
+            id: format!("pkt-{}-{}", state.packets_observed + 1, uuid::Uuid::new_v4().to_string().chars().take(8).collect::<String>()),
             timestamp: Utc::now().to_rfc3339(),
             interface_name: iface_name.clone(),
             protocol,
@@ -248,7 +274,7 @@ fn populate_diagnostic_observations(state: &mut PacketMonitorState) {
             source_port: Some(flow.local_port),
             destination_ip: remote_ip,
             destination_port: flow.remote_port,
-            packet_size_bytes: 64 + (idx * 128) % 1400,
+            packet_size_bytes: pkt_size,
             tcp_flags,
             summary,
         };
@@ -259,12 +285,6 @@ fn populate_diagnostic_observations(state: &mut PacketMonitorState) {
             state.packets_dropped += 1;
         }
         state.observations.push_back(obs);
-    }
-}
-
-fn sample_live_packets(state: &mut PacketMonitorState) {
-    if state.observations.is_empty() {
-        populate_diagnostic_observations(state);
     }
 }
 

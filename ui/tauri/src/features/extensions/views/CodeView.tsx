@@ -245,13 +245,17 @@ export const CodeView: React.FC = () => {
               ) : (
                 <span
                   style={{
+                    display: "inline-flex",
+                    alignItems: "center",
+                    gap: "3px",
                     fontSize: "10px",
                     fontFamily: "var(--font-mono)",
                     color: "var(--color-success, #c3e88d)",
                     opacity: 0.8,
                   }}
                 >
-                  ✓ Synced
+                  <CheckIcon size={10} />
+                  <span>Synced</span>
                 </span>
               )}
             </div>

@@ -105,6 +105,8 @@ pub fn get_interfaces() -> Vec<NetworkInterfaceInfo> {
             OperationalStatus::Down
         };
 
+        let is_up = status == OperationalStatus::Up;
+
         results.push(NetworkInterfaceInfo {
             id: name.clone(),
             name: name.clone(),
@@ -112,6 +114,7 @@ pub fn get_interfaces() -> Vec<NetworkInterfaceInfo> {
             mac_address: mac,
             interface_type: iface_type,
             status,
+            is_up,
             is_physical,
             is_loopback,
             is_default_gateway: false, // Default gateway detection is an extension point

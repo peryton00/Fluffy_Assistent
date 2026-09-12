@@ -18,7 +18,7 @@ import {
   useNetworkIntelligenceStore,
   networkIntelligenceStoreManager,
 } from "../../../stores/networkIntelligenceStore";
-import { useUiStore } from "../../../stores/uiStore";
+import { uiStore } from "../../../stores/uiStore";
 import type {
   DeviceCategory,
 } from "../../../types/contracts";
@@ -29,7 +29,6 @@ import {
   ServerIcon,
   LayersIcon,
   CpuIcon,
-  CloseIcon,
   GlobeIcon,
 } from "../../../components/common/Icons";
 
@@ -48,9 +47,6 @@ export const NetworkIntelligenceView: React.FC = () => {
     selectedDeviceId,
     selectedServiceId,
   } = useNetworkIntelligenceStore();
-
-  const setActiveDomain = useUiStore((s) => s.setActiveDomain);
-  const setActiveSidebarView = useUiStore((s) => s.setActiveSidebarView);
 
   const [activeTab, setActiveTab] = useState<IntelligenceTab>("overview");
   const [deviceSearch, setDeviceSearch] = useState("");
@@ -106,17 +102,6 @@ export const NetworkIntelligenceView: React.FC = () => {
     });
   }, [services, serviceStatusFilter, serviceSearch]);
 
-  // Selected device / service entities for Inspector
-  const selectedDevice = useMemo(() => {
-    if (!selectedDeviceId) return null;
-    return devices.find((d) => d.device_id === selectedDeviceId) || null;
-  }, [devices, selectedDeviceId]);
-
-  const selectedService = useMemo(() => {
-    if (!selectedServiceId) return null;
-    return services.find((s) => s.service_id === selectedServiceId) || null;
-  }, [services, selectedServiceId]);
-
   const handleTogglePolling = () => {
     if (isPolling) {
       networkIntelligenceStoreManager.stopPolling();
@@ -129,9 +114,48 @@ export const NetworkIntelligenceView: React.FC = () => {
     networkIntelligenceStoreManager.refreshNow();
   };
 
-  const handleCloseInspector = () => {
-    networkIntelligenceStoreManager.selectDevice(null);
+  const handleSelectDevice = (d: (typeof devices)[0]) => {
+    networkIntelligenceStoreManager.selectDevice(d.device_id);
     networkIntelligenceStoreManager.selectService(null);
+    uiStore.setSelectedItem({
+      type: "networkDevice",
+      id: d.device_id,
+      title: d.user_alias || d.hostname || d.ip_addresses[0] || "Network Device",
+      data: {
+        hostname: d.user_alias || d.hostname || "Unknown Host",
+        device_id: d.device_id,
+        ip_addresses: d.ip_addresses.join(", "),
+        mac_address: d.mac_address || "N/A",
+        vendor: d.vendor || "Generic Hardware",
+        classification: d.classification,
+        confidence: `${Math.round(d.confidence * 100)}%`,
+        status: d.status.toUpperCase(),
+        is_gateway: d.is_gateway ? "Yes (Default Gateway)" : "No",
+        first_seen: d.first_seen ? new Date(d.first_seen * 1000).toLocaleString() : "N/A",
+        last_seen: d.last_seen ? new Date(d.last_seen * 1000).toLocaleString() : "N/A",
+        evidence: d.evidence.join("; "),
+      },
+    }, true);
+  };
+
+  const handleSelectService = (s: (typeof services)[0]) => {
+    networkIntelligenceStoreManager.selectService(s.service_id);
+    networkIntelligenceStoreManager.selectDevice(null);
+    uiStore.setSelectedItem({
+      type: "networkService",
+      id: s.service_id,
+      title: s.well_known_name || `${s.process_name} (${s.protocol.toUpperCase()} :${s.port})`,
+      data: {
+        service_name: s.well_known_name || s.process_name,
+        address_port: `${s.local_address}:${s.port} (${s.protocol.toUpperCase()})`,
+        process_pid: `${s.process_name} ${s.pid ? `(PID ${s.pid})` : ""}`,
+        status: s.status.toUpperCase(),
+        lifetime: `${Math.round(s.lifetime_seconds)}s`,
+        history: `${s.consecutive_observations} consecutive cycles, ${s.missed_snapshots} missed`,
+        pid: s.pid || 0,
+        process_name: s.process_name,
+      },
+    }, true);
   };
 
   const renderConfidenceBadge = (confidence: number) => {
@@ -929,7 +953,7 @@ export const NetworkIntelligenceView: React.FC = () => {
                       filteredDevices.map((d) => (
                         <tr
                           key={d.device_id}
-                          onClick={() => networkIntelligenceStoreManager.selectDevice(d.device_id)}
+                          onClick={() => handleSelectDevice(d)}
                           style={{
                             borderBottom: "1px solid var(--color-border)",
                             cursor: "pointer",
@@ -1088,7 +1112,7 @@ export const NetworkIntelligenceView: React.FC = () => {
                       filteredServices.map((s) => (
                         <tr
                           key={s.service_id}
-                          onClick={() => networkIntelligenceStoreManager.selectService(s.service_id)}
+                          onClick={() => handleSelectService(s)}
                           style={{
                             borderBottom: "1px solid var(--color-border)",
                             cursor: "pointer",
@@ -1241,208 +1265,6 @@ export const NetworkIntelligenceView: React.FC = () => {
             </div>
           )}
         </div>
-
-        {/* INSPECTOR PANEL (Right Drawer) */}
-        {(selectedDevice || selectedService) && (
-          <div
-            data-testid="network-intelligence-inspector"
-            style={{
-              width: "320px",
-              flexShrink: 0,
-              backgroundColor: "var(--color-surface)",
-              border: "1px solid var(--color-border)",
-              borderRadius: "var(--radius-md)",
-              padding: "var(--space-4)",
-              display: "flex",
-              flexDirection: "column",
-              gap: "var(--space-3)",
-            }}
-          >
-            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-              <span style={{ fontSize: "13px", fontWeight: "600", color: "var(--color-text)" }}>
-                {selectedDevice ? "Device Inspector" : "Service Inspector"}
-              </span>
-              <button
-                onClick={handleCloseInspector}
-                style={{
-                  background: "transparent",
-                  border: "none",
-                  cursor: "pointer",
-                  color: "var(--color-text-muted)",
-                  padding: "2px",
-                }}
-              >
-                <CloseIcon size={14} />
-              </button>
-            </div>
-
-            {/* Selected Device Details */}
-            {selectedDevice && (
-              <div style={{ display: "flex", flexDirection: "column", gap: "var(--space-2)", fontSize: "12px" }}>
-                <div>
-                  <span style={{ color: "var(--color-text-muted)", fontSize: "11px" }}>Hostname / Alias:</span>
-                  <div style={{ fontWeight: "600", color: "var(--color-text)" }}>
-                    {selectedDevice.user_alias || selectedDevice.hostname || "Unknown Host"}
-                  </div>
-                </div>
-
-                <div>
-                  <span style={{ color: "var(--color-text-muted)", fontSize: "11px" }}>Device ID:</span>
-                  <div style={{ fontFamily: "var(--font-mono)", color: "var(--color-text)" }}>
-                    {selectedDevice.device_id}
-                  </div>
-                </div>
-
-                <div>
-                  <span style={{ color: "var(--color-text-muted)", fontSize: "11px" }}>IP Addresses:</span>
-                  <div style={{ fontFamily: "var(--font-mono)", color: "var(--color-text)" }}>
-                    {selectedDevice.ip_addresses.join(", ")}
-                  </div>
-                </div>
-
-                <div>
-                  <span style={{ color: "var(--color-text-muted)", fontSize: "11px" }}>MAC & Vendor:</span>
-                  <div style={{ fontFamily: "var(--font-mono)", color: "var(--color-text)" }}>
-                    {selectedDevice.mac_address || "N/A"} ({selectedDevice.vendor || "Unknown"})
-                  </div>
-                </div>
-
-                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", paddingTop: "4px" }}>
-                  <div>
-                    <span style={{ color: "var(--color-text-muted)", fontSize: "11px" }}>Classification:</span>
-                    <div>{renderClassificationBadge(selectedDevice.classification)}</div>
-                  </div>
-                  <div>
-                    <span style={{ color: "var(--color-text-muted)", fontSize: "11px" }}>Confidence:</span>
-                    <div>{renderConfidenceBadge(selectedDevice.confidence)}</div>
-                  </div>
-                </div>
-
-                <div>
-                  <span style={{ color: "var(--color-text-muted)", fontSize: "11px" }}>Evidence Breakdown:</span>
-                  <div style={{ display: "flex", flexDirection: "column", gap: "2px", marginTop: "2px" }}>
-                    {selectedDevice.evidence.map((ev, i) => (
-                      <div
-                        key={i}
-                        style={{
-                          fontSize: "11px",
-                          fontFamily: "var(--font-mono)",
-                          backgroundColor: "var(--color-surface-elevated)",
-                          padding: "2px 4px",
-                          borderRadius: "var(--radius-xs)",
-                        }}
-                      >
-                        {ev}
-                      </div>
-                    ))}
-                  </div>
-                </div>
-
-                <div style={{ borderTop: "1px solid var(--color-border)", paddingTop: "var(--space-3)", marginTop: "var(--space-2)" }}>
-                  <button
-                    onClick={() => {
-                      setActiveDomain("systems");
-                      setActiveSidebarView("local_network");
-                    }}
-                    style={{
-                      width: "100%",
-                      padding: "var(--space-2)",
-                      fontSize: "11px",
-                      fontFamily: "var(--font-mono)",
-                      backgroundColor: "var(--color-surface-elevated)",
-                      border: "1px solid var(--color-border)",
-                      borderRadius: "var(--radius-sm)",
-                      color: "var(--color-text)",
-                      cursor: "pointer",
-                      textAlign: "center",
-                    }}
-                  >
-                    Inspect in Local Network Flows &rarr;
-                  </button>
-                </div>
-              </div>
-            )}
-
-            {/* Selected Service Details */}
-            {selectedService && (
-              <div style={{ display: "flex", flexDirection: "column", gap: "var(--space-2)", fontSize: "12px" }}>
-                <div>
-                  <span style={{ color: "var(--color-text-muted)", fontSize: "11px" }}>Service / Process:</span>
-                  <div style={{ fontWeight: "600", color: "var(--color-text)" }}>
-                    {selectedService.well_known_name || selectedService.process_name}
-                  </div>
-                </div>
-
-                <div>
-                  <span style={{ color: "var(--color-text-muted)", fontSize: "11px" }}>Address : Port:</span>
-                  <div style={{ fontFamily: "var(--font-mono)", color: "var(--color-text)" }}>
-                    {selectedService.local_address}:{selectedService.port} ({selectedService.protocol.toUpperCase()})
-                  </div>
-                </div>
-
-                <div>
-                  <span style={{ color: "var(--color-text-muted)", fontSize: "11px" }}>Owning Process PID:</span>
-                  <div style={{ fontFamily: "var(--font-mono)", color: "var(--color-text)" }}>
-                    {selectedService.process_name} {selectedService.pid ? `(PID ${selectedService.pid})` : ""}
-                  </div>
-                </div>
-
-                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", paddingTop: "4px" }}>
-                  <div>
-                    <span style={{ color: "var(--color-text-muted)", fontSize: "11px" }}>Lifecycle State:</span>
-                    <div>{renderServiceStatusBadge(selectedService.status)}</div>
-                  </div>
-                  <div>
-                    <span style={{ color: "var(--color-text-muted)", fontSize: "11px" }}>Lifetime:</span>
-                    <div style={{ fontFamily: "var(--font-mono)" }}>
-                      {Math.round(selectedService.lifetime_seconds)}s
-                    </div>
-                  </div>
-                </div>
-
-                <div>
-                  <span style={{ color: "var(--color-text-muted)", fontSize: "11px" }}>Observation History:</span>
-                  <div
-                    style={{
-                      fontSize: "11px",
-                      fontFamily: "var(--font-mono)",
-                      backgroundColor: "var(--color-surface-elevated)",
-                      padding: "var(--space-2)",
-                      borderRadius: "var(--radius-xs)",
-                      marginTop: "2px",
-                    }}
-                  >
-                    <div>{selectedService.consecutive_observations} consecutive cycles</div>
-                    <div>{selectedService.missed_snapshots} missed snapshots</div>
-                  </div>
-                </div>
-
-                <div style={{ borderTop: "1px solid var(--color-border)", paddingTop: "var(--space-3)", marginTop: "var(--space-2)" }}>
-                  <button
-                    onClick={() => {
-                      setActiveDomain("systems");
-                      setActiveSidebarView("processes");
-                    }}
-                    style={{
-                      width: "100%",
-                      padding: "var(--space-2)",
-                      fontSize: "11px",
-                      fontFamily: "var(--font-mono)",
-                      backgroundColor: "var(--color-surface-elevated)",
-                      border: "1px solid var(--color-border)",
-                      borderRadius: "var(--radius-sm)",
-                      color: "var(--color-text)",
-                      cursor: "pointer",
-                      textAlign: "center",
-                    }}
-                  >
-                    Inspect Process in Systems &rarr;
-                  </button>
-                </div>
-              </div>
-            )}
-          </div>
-        )}
       </div>
     </div>
   );

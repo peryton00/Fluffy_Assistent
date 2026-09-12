@@ -6,6 +6,7 @@
  */
 
 import React, { useRef, useState, useEffect, useMemo, useCallback } from "react";
+import { CheckIcon } from "../../../components/common/Icons";
 
 interface JellyfishCodeEditorProps {
   value: string;
@@ -727,7 +728,8 @@ export const JellyfishCodeEditor: React.FC<JellyfishCodeEditorProps> = ({
               }}
               title="All changes saved and active in runtime"
             >
-              ✓ Saved {lastSavedTime ? `at ${lastSavedTime}` : ""}
+              <CheckIcon size={11} />
+              <span>Saved {lastSavedTime ? `at ${lastSavedTime}` : ""}</span>
             </span>
           )}
         </div>

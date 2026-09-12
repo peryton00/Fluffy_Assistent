@@ -29,11 +29,22 @@ impl CapabilityHandler for NetworkListInterfacesHandler {
     }
 }
 
+use std::sync::Mutex;
+use once_cell::sync::Lazy;
+
+static RATE_CALCULATOR: Lazy<Mutex<crate::network::TrafficRateCalculator>> =
+    Lazy::new(|| Mutex::new(crate::network::TrafficRateCalculator::new()));
+
 pub struct NetworkGetInterfacesHandler;
 
 impl CapabilityHandler for NetworkGetInterfacesHandler {
     fn execute(&self, _params: &serde_json::Value) -> Result<serde_json::Value, CapabilityError> {
-        let interfaces = crate::network::get_interfaces();
+        let timestamp_nanos = std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .unwrap_or_default()
+            .as_nanos() as u64;
+        let mut calc = RATE_CALCULATOR.lock().unwrap();
+        let interfaces = crate::network::get_interfaces_with_rates(&mut calc, timestamp_nanos);
         Ok(json!({
             "count": interfaces.len(),
             "interfaces": interfaces,

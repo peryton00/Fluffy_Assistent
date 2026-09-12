@@ -215,6 +215,8 @@ export type InspectorItemType =
   | "chatContextItem"
   | "extension"
   | "analyticsPoint"
+  | "networkDevice"
+  | "networkService"
   | "settingItem";
 
 

@@ -9,7 +9,8 @@ import React, { useState } from "react";
 import type { PendingConfirmation } from "../../../types/contracts";
 import { confirmPendingAction, cancelPendingAction } from "../../../services/api/operations";
 import { telemetryCoordinator } from "../../../stores/telemetryStore";
-import { AlertTriangleIcon, CheckIcon, CloseIcon } from "../../../components/common/Icons";
+import { AlertTriangleIcon } from "../../../components/common/Icons";
+import { GuardianAlertCard } from "../../../components/common/GuardianAlertCard";
 
 interface PendingConfirmationsBannerProps {
   confirmations: PendingConfirmation[];
@@ -64,6 +65,9 @@ export const PendingConfirmationsBanner: React.FC<PendingConfirmationsBannerProp
         flexDirection: "column",
         gap: "var(--space-3)",
         marginBottom: "var(--space-4)",
+        maxWidth: "100%",
+        boxSizing: "border-box",
+        overflow: "hidden",
       }}
     >
       <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
@@ -103,107 +107,15 @@ export const PendingConfirmationsBanner: React.FC<PendingConfirmationsBannerProp
       )}
 
       <div style={{ display: "flex", flexDirection: "column", gap: "var(--space-2)" }}>
-        {confirmations.map((conf) => {
-          const isBusy = processingId === conf.command_id;
-          const detailsStr = conf.details ? JSON.stringify(conf.details) : null;
-
-          return (
-            <div
-              key={conf.command_id}
-              style={{
-                backgroundColor: "var(--color-surface)",
-                border: "1px solid var(--color-border)",
-                borderRadius: "var(--radius-xs)",
-                padding: "var(--space-3)",
-                display: "flex",
-                flexWrap: "wrap",
-                alignItems: "center",
-                justifyContent: "space-between",
-                gap: "var(--space-3)",
-              }}
-            >
-              <div style={{ minWidth: "220px", flex: 1 }}>
-                <div style={{ display: "flex", alignItems: "center", gap: "var(--space-2)" }}>
-                  <span style={{ fontSize: "var(--font-size-xs)", fontWeight: "var(--font-weight-bold)", color: "var(--color-text)" }}>
-                    {conf.command_name || "System Command"}
-                  </span>
-                  <span style={{ fontSize: "10px", color: "var(--color-text-muted)", fontFamily: "var(--font-mono)" }}>
-                    ID: {conf.command_id}
-                  </span>
-                </div>
-                {conf.message && (
-                  <p style={{ fontSize: "var(--font-size-xs)", color: "var(--color-text-secondary)", margin: "2px 0 0 0" }}>
-                    {conf.message}
-                  </p>
-                )}
-                {detailsStr && detailsStr !== "{}" && (
-                  <pre
-                    style={{
-                      fontSize: "10px",
-                      color: "var(--color-text-muted)",
-                      margin: "4px 0 0 0",
-                      backgroundColor: "var(--color-surface-subtle)",
-                      padding: "2px 4px",
-                      borderRadius: "2px",
-                      maxWidth: "500px",
-                      overflow: "hidden",
-                      textOverflow: "ellipsis",
-                      whiteSpace: "nowrap",
-                    }}
-                  >
-                    {detailsStr}
-                  </pre>
-                )}
-              </div>
-
-              <div style={{ display: "flex", alignItems: "center", gap: "var(--space-2)" }}>
-                <button
-                  type="button"
-                  disabled={isBusy}
-                  onClick={() => handleReject(conf.command_id)}
-                  style={{
-                    display: "flex",
-                    alignItems: "center",
-                    gap: "4px",
-                    padding: "4px 10px",
-                    fontSize: "11px",
-                    fontWeight: "var(--font-weight-medium)",
-                    backgroundColor: "var(--color-surface-elevated)",
-                    border: "1px solid var(--color-border)",
-                    borderRadius: "var(--radius-xs)",
-                    color: "var(--color-text-secondary)",
-                    cursor: isBusy ? "not-allowed" : "pointer",
-                  }}
-                >
-                  <CloseIcon size={12} />
-                  <span>Reject</span>
-                </button>
-
-                <button
-                  type="button"
-                  disabled={isBusy}
-                  onClick={() => handleAuthorize(conf.command_id)}
-                  style={{
-                    display: "flex",
-                    alignItems: "center",
-                    gap: "4px",
-                    padding: "4px 12px",
-                    fontSize: "11px",
-                    fontWeight: "var(--font-weight-bold)",
-                    backgroundColor: "var(--color-danger)",
-                    border: "1px solid rgba(239, 68, 68, 0.4)",
-                    borderRadius: "var(--radius-xs)",
-                    color: "#ffffff",
-                    cursor: isBusy ? "not-allowed" : "pointer",
-                  }}
-                >
-                  <CheckIcon size={12} />
-                  <span>{isBusy ? "Authorizing..." : "Authorize"}</span>
-                </button>
-              </div>
-            </div>
-          );
-        })}
+        {confirmations.map((conf) => (
+          <GuardianAlertCard
+            key={conf.command_id}
+            conf={conf}
+            onAuthorize={handleAuthorize}
+            onReject={handleReject}
+            isBusy={processingId === conf.command_id}
+          />
+        ))}
       </div>
     </div>
   );

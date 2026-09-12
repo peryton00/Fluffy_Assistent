@@ -1,6 +1,8 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { renderToStaticMarkup } from "react-dom/server";
 import { NetworkIntelligenceView } from "./NetworkIntelligenceView";
+import { Inspector } from "../../../app/shell/Inspector";
+import { uiStore } from "../../../stores/uiStore";
 
 vi.mock("../../../stores/networkIntelligenceStore", () => {
   const mockState = {
@@ -123,17 +125,57 @@ vi.mock("../../../stores/networkIntelligenceStore", () => {
   };
 });
 
-vi.mock("../../../stores/uiStore", () => ({
-  useUiStore: Object.assign(
-    vi.fn((selector) => selector({ activeDomain: "systems", activeSidebarView: "network_intelligence" })),
-    {
-      getState: vi.fn(() => ({
-        setActiveDomain: vi.fn(),
-        setActiveSidebarView: vi.fn(),
-      })),
-    }
-  ),
-}));
+vi.mock("../../../stores/uiStore", () => {
+  let selectedItem: any = {
+    type: "networkDevice",
+    id: "dev_gateway",
+    title: "Core Gateway",
+    data: {
+      hostname: "Core Gateway",
+      device_id: "dev_gateway",
+      ip_addresses: "192.168.1.1",
+      mac_address: "AA:BB:CC:11:22:33",
+      vendor: "ASUSTek Computer Inc.",
+      classification: "GATEWAY",
+      confidence: "95%",
+      status: "ACTIVE",
+    },
+  };
+  let inspectorOpen = true;
+
+  return {
+    uiStore: {
+      setSelectedItem: vi.fn((item, open) => {
+        selectedItem = item;
+        inspectorOpen = open ?? true;
+      }),
+      setInspectorWidth: vi.fn(),
+      setActiveDomain: vi.fn(),
+      setActiveSidebarView: vi.fn(),
+    },
+    useUiStore: Object.assign(
+      vi.fn((selector) => {
+        const state = {
+          activeDomain: "systems",
+          activeSidebarView: "network_intelligence",
+          selectedItem,
+          inspectorOpen,
+          inspectorWidth: 320,
+        };
+        return selector ? selector(state) : state;
+      }),
+      {
+        getState: vi.fn(() => ({
+          activeDomain: "systems",
+          activeSidebarView: "network_intelligence",
+          selectedItem,
+          inspectorOpen,
+          inspectorWidth: 320,
+        })),
+      }
+    ),
+  };
+});
 
 describe("NetworkIntelligenceView Component (Phase N9.4)", () => {
   beforeEach(() => {
@@ -165,13 +207,27 @@ describe("NetworkIntelligenceView Component (Phase N9.4)", () => {
     expect(html).toContain("DEVICE_SURGE");
   });
 
-  it("renders Inspector drawer when entity is selected", () => {
-    const html = renderToStaticMarkup(<NetworkIntelligenceView />);
-    expect(html).toContain("data-testid=\"network-intelligence-inspector\"");
-    expect(html).toContain("Device Inspector");
+  it("renders Inspector side panel when entity is selected", () => {
+    uiStore.setSelectedItem({
+      type: "networkDevice",
+      id: "dev_gateway",
+      title: "Core Gateway",
+      data: {
+        hostname: "Core Gateway",
+        device_id: "dev_gateway",
+        ip_addresses: "192.168.1.1",
+        mac_address: "AA:BB:CC:11:22:33",
+        vendor: "ASUSTek Computer Inc.",
+        classification: "GATEWAY",
+        confidence: "95%",
+        status: "ACTIVE",
+      },
+    }, true);
+
+    const html = renderToStaticMarkup(<Inspector />);
     expect(html).toContain("Core Gateway");
     expect(html).toContain("ASUSTek Computer Inc.");
-    expect(html).toContain("GATEWAY");
+    expect(html).toContain("192.168.1.1");
   });
 
   it("never leaks passwords, credentials, raw packet payloads, or threat verdicts", () => {

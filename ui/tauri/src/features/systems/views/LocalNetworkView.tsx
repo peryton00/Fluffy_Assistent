@@ -11,7 +11,7 @@
  * Strictly separated from Cluster Mesh Networking (NetworkView.tsx).
  */
 
-import React, { useEffect, useState, useMemo } from "react";
+import React, { useEffect, useState, useMemo, useRef } from "react";
 import { useLocalNetworkStore, localNetworkStoreManager } from "../../../stores/localNetworkStore";
 import { uiStore } from "../../../stores/uiStore";
 import {
@@ -59,6 +59,63 @@ export const LocalNetworkView: React.FC = () => {
   const [flowSearch, setFlowSearch] = useState("");
   const [flowProtocolFilter, setFlowProtocolFilter] = useState<string>("all");
   const [flowStateFilter, setFlowStateFilter] = useState<string>("all");
+
+  // Fluent UI stopwatch ticker and packet telemetry poller
+  const [liveDuration, setLiveDuration] = useState<number>(0);
+  const stopwatchStartRef = useRef<number | null>(null);
+
+  useEffect(() => {
+    if (!packetCaptureStatus?.is_active) {
+      stopwatchStartRef.current = null;
+      const maxSec = packetCaptureStatus?.max_duration_seconds ?? 60;
+      setLiveDuration(Math.min(maxSec, packetCaptureStatus?.duration_seconds ?? 0));
+      return;
+    }
+
+    if (stopwatchStartRef.current === null) {
+      if (packetCaptureStatus.started_at) {
+        stopwatchStartRef.current = new Date(packetCaptureStatus.started_at).getTime();
+      } else {
+        stopwatchStartRef.current = Date.now();
+      }
+    }
+
+    const maxSec = packetCaptureStatus.max_duration_seconds ?? 60;
+
+    // Smooth 50ms stopwatch ticker on the UI side
+    const stopwatchTimer = setInterval(() => {
+      const startMs = stopwatchStartRef.current ?? Date.now();
+      const elapsed = (Date.now() - startMs) / 1000;
+      if (elapsed >= maxSec) {
+        setLiveDuration(maxSec);
+        clearInterval(stopwatchTimer);
+        localNetworkStoreManager.refreshPacketCaptureStatus();
+      } else {
+        setLiveDuration(Math.max(0, elapsed));
+      }
+    }, 50);
+
+    // 1-second live telemetry poller from backend
+    const pollerTimer = setInterval(() => {
+      localNetworkStoreManager.refreshPacketCaptureStatus();
+    }, 1000);
+
+    return () => {
+      clearInterval(stopwatchTimer);
+      clearInterval(pollerTimer);
+    };
+  }, [packetCaptureStatus?.is_active, packetCaptureStatus?.started_at, packetCaptureStatus?.max_duration_seconds]);
+
+  const handleStartCapture = async (durationSec = 60, maxPackets = 100) => {
+    stopwatchStartRef.current = Date.now();
+    setLiveDuration(0);
+    await localNetworkStoreManager.startPacketCapture({ duration_seconds: durationSec, max_packets: maxPackets });
+  };
+
+  const handleStopCapture = async () => {
+    stopwatchStartRef.current = null;
+    await localNetworkStoreManager.stopPacketCapture();
+  };
 
   // Start polling when mounted
   useEffect(() => {
@@ -363,7 +420,7 @@ export const LocalNetworkView: React.FC = () => {
           </div>
           <div style={{ fontSize: "11px", color: "var(--color-text-dim)", marginTop: "2px" }}>
             {flows.filter((f) => f.state.toLowerCase() === "established").length} Established &middot;{" "}
-            {flows.filter((f) => f.state.toLowerCase() === "listen").length} Listeners
+            {flows.filter((f) => f.state.toLowerCase().startsWith("listen")).length} Listeners
           </div>
         </div>
 
@@ -380,8 +437,13 @@ export const LocalNetworkView: React.FC = () => {
             Live Bandwidth Throughput
           </div>
           <div style={{ fontSize: "16px", fontWeight: "bold", fontFamily: "var(--font-mono)", marginTop: "4px" }}>
-            <span style={{ color: "var(--color-success, #10b981)" }}>&darr; {formatRate(totalRxRate)}</span> &middot;{" "}
-            <span style={{ color: "var(--color-accent, #3b82f6)" }}>&uarr; {formatRate(totalTxRate)}</span>
+            <span style={{ color: "var(--color-success, #10b981)" }}>
+              &darr; {formatRate(totalRxRate > 0 ? totalRxRate : (trafficSummary?.total_rx_bytes_per_sec || 0))}
+            </span>{" "}
+            &middot;{" "}
+            <span style={{ color: "var(--color-accent, #3b82f6)" }}>
+              &uarr; {formatRate(totalTxRate > 0 ? totalTxRate : (trafficSummary?.total_tx_bytes_per_sec || 0))}
+            </span>
           </div>
           <div style={{ fontSize: "11px", color: "var(--color-text-dim)", marginTop: "2px" }}>
             Instantaneous Host NIC Aggregate
@@ -1246,7 +1308,7 @@ export const LocalNetworkView: React.FC = () => {
                 {packetCaptureStatus?.is_active ? "● ACTIVE (N8/SIH26117)" : "○ IDLE"}
               </div>
               <div style={{ fontSize: "11px", color: "var(--color-text-muted)", fontFamily: "var(--font-mono)" }}>
-                {packetCaptureStatus?.interface_name ? `Interface: ${packetCaptureStatus.interface_name}` : "All Interfaces"} | Duration: {packetCaptureStatus?.duration_seconds?.toFixed(1) ?? "0.0"}s / {packetCaptureStatus?.max_duration_seconds ?? 60}s
+                {packetCaptureStatus?.interface_name ? `Interface: ${packetCaptureStatus.interface_name}` : "All Interfaces"} | Duration: {packetCaptureStatus?.is_active ? liveDuration.toFixed(1) : (packetCaptureStatus?.duration_seconds?.toFixed(1) ?? "0.0")}s / {packetCaptureStatus?.max_duration_seconds ?? 60}s
               </div>
             </div>
 
@@ -1254,7 +1316,7 @@ export const LocalNetworkView: React.FC = () => {
               {packetCaptureStatus?.is_active ? (
                 <button
                   data-testid="stop-capture-btn"
-                  onClick={() => localNetworkStoreManager.stopPacketCapture()}
+                  onClick={handleStopCapture}
                   style={{
                     padding: "var(--space-1) var(--space-3)",
                     fontSize: "11px",
@@ -1271,7 +1333,7 @@ export const LocalNetworkView: React.FC = () => {
               ) : (
                 <button
                   data-testid="start-capture-btn"
-                  onClick={() => localNetworkStoreManager.startPacketCapture({ duration_seconds: 60, max_packets: 100 })}
+                  onClick={() => handleStartCapture(60, 100)}
                   style={{
                     padding: "var(--space-1) var(--space-3)",
                     fontSize: "11px",
@@ -1336,26 +1398,6 @@ export const LocalNetworkView: React.FC = () => {
                 {packetCaptureStatus?.observations?.length ?? 0} / 200 Max
               </div>
             </div>
-          </div>
-
-          {/* Privacy & Security Invariant Banner */}
-          <div
-            style={{
-              padding: "var(--space-2) var(--space-3)",
-              backgroundColor: "rgba(59, 130, 246, 0.08)",
-              border: "1px solid rgba(59, 130, 246, 0.3)",
-              borderRadius: "var(--radius-sm)",
-              fontSize: "11px",
-              color: "var(--color-text-muted)",
-              display: "flex",
-              alignItems: "center",
-              gap: "var(--space-2)",
-            }}
-          >
-            <ShieldCheckIcon size={14} color="var(--color-accent, #3b82f6)" />
-            <span>
-              <strong>Metadata-Only Invariant:</strong> Captures 5-tuples, timestamps, protocols, and TCP flags for SIH air-gap and egress verification. Application payloads and credentials are never captured or stored.
-            </span>
           </div>
 
           {/* Bounded Packet Metadata Table */}

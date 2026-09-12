@@ -1,0 +1,121 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Click Image - Fluffy Extension</title>
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+  <!-- Header -->
+  <header class="app-header">
+    <div class="brand">
+      <div class="brand-icon">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"/>
+          <circle cx="12" cy="13" r="4"/>
+        </svg>
+      </div>
+      <div class="brand-title">Camera Snapshot & Image Capture</div>
+      <span class="badge" id="cameraStatus">LIVE</span>
+    </div>
+  </header>
+
+  <!-- Main View -->
+  <div class="main-container">
+    <!-- Left: Viewfinder & Capture Controls -->
+    <section class="viewfinder-section">
+      <div class="viewfinder-card">
+        <video id="videoFeed" autoplay playsinline muted></video>
+        <div class="flash-overlay" id="flashOverlay"></div>
+        <div class="countdown-overlay" id="countdownOverlay">3</div>
+        <div class="viewfinder-overlay">
+          <div class="rec-indicator">
+            <div class="rec-dot"></div>
+            <span>FEED READY</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- Controls Panel -->
+      <div class="controls-bar">
+        <div class="controls-row">
+          <div class="control-group">
+            <label for="cameraSelect">Camera:</label>
+            <select id="cameraSelect">
+              <option value="">Default Camera</option>
+            </select>
+          </div>
+
+          <div class="control-group">
+            <label for="filterSelect">Effect:</label>
+            <select id="filterSelect">
+              <option value="filter-none">Normal</option>
+              <option value="filter-bw">Monochrome (B&W)</option>
+              <option value="filter-cyber">Cyber Matrix</option>
+              <option value="filter-contrast">High Contrast</option>
+              <option value="filter-sepia">Vintage Sepia</option>
+              <option value="filter-warm">Warm Glow</option>
+            </select>
+          </div>
+
+          <div class="control-group">
+            <label for="timerSelect">Timer:</label>
+            <select id="timerSelect">
+              <option value="0">Instant (0s)</option>
+              <option value="3">3 Seconds</option>
+              <option value="5">5 Seconds</option>
+            </select>
+          </div>
+        </div>
+
+        <div class="controls-row">
+          <button type="button" class="btn-capture" id="snapBtn">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <circle cx="12" cy="12" r="10"></circle>
+              <circle cx="12" cy="12" r="3"></circle>
+            </svg>
+            <span>Capture Snapshot</span>
+          </button>
+
+          <button type="button" class="btn-secondary" id="mirrorToggle" data-mirrored="true">
+            Mirror: On
+          </button>
+        </div>
+      </div>
+    </section>
+
+    <!-- Right: Captured Photos Gallery -->
+    <section class="gallery-section">
+      <div class="gallery-header">
+        <div class="gallery-title">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <rect x="3" y="3" width="18" height="18" rx="2" ry="2"></rect>
+            <circle cx="8.5" cy="8.5" r="1.5"></circle>
+            <polyline points="21 15 16 10 5 21"></polyline>
+          </svg>
+          <span>Photo Gallery</span>
+          <span class="gallery-count" id="galleryCount">0 captured</span>
+        </div>
+        <div style="display: flex; gap: 6px;">
+          <button type="button" class="btn-secondary" id="downloadAllBtn" style="padding: 4px 8px; font-size: 10px;">
+            Save All
+          </button>
+          <button type="button" class="btn-secondary" id="clearGalleryBtn" style="padding: 4px 8px; font-size: 10px;">
+            Clear
+          </button>
+        </div>
+      </div>
+
+      <div class="gallery-grid" id="galleryGrid">
+        <!-- Rendered by app.js -->
+      </div>
+    </section>
+  </div>
+
+  <!-- Offscreen Canvas for Snapshot Pixel Processing -->
+  <canvas id="captureCanvas" style="display: none;"></canvas>
+
+  <script src="app.js"></script>
+</body>
+</html>

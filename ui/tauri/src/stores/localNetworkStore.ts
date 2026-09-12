@@ -53,6 +53,32 @@ export interface LocalNetworkState {
 
 const LOCAL_NETWORK_POLL_INTERVAL_MS = 5000;
 
+function normalizeInterface(iface: LocalNetworkInterface): LocalNetworkInterface {
+  const isUp = Boolean(
+    iface.is_up ??
+    (iface.status?.toLowerCase() === "up" ||
+     (iface.ipv4_addresses && iface.ipv4_addresses.length > 0) ||
+     (iface.total_received_bytes ?? 0) > 0 ||
+     (iface.total_transmitted_bytes ?? 0) > 0)
+  );
+
+  const rawRates = iface.rates as Record<string, unknown> | null | undefined;
+  const rates = rawRates
+    ? {
+        rx_bytes_per_sec: Number(rawRates.rx_bytes_per_sec ?? rawRates.rx_bytes_per_second ?? 0),
+        tx_bytes_per_sec: Number(rawRates.tx_bytes_per_sec ?? rawRates.tx_bytes_per_second ?? 0),
+        rx_bits_per_sec: Number(rawRates.rx_bits_per_sec ?? rawRates.rx_bits_per_second ?? 0),
+        tx_bits_per_sec: Number(rawRates.tx_bits_per_sec ?? rawRates.tx_bits_per_second ?? 0),
+      }
+    : null;
+
+  return {
+    ...iface,
+    is_up: isUp,
+    rates,
+  };
+}
+
 class LocalNetworkStoreManager {
   private state: LocalNetworkState = {
     interfaces: [],
@@ -68,7 +94,6 @@ class LocalNetworkStoreManager {
     error: null,
     lastPolled: null,
   };
-
 
   private listeners = new Set<() => void>();
   private timerId: ReturnType<typeof setTimeout> | null = null;
@@ -128,7 +153,8 @@ class LocalNetworkStoreManager {
 
   public refreshInterfaces = async (): Promise<void> => {
     try {
-      const interfaces = await fetchLocalInterfaces();
+      const rawInterfaces = await fetchLocalInterfaces();
+      const interfaces = rawInterfaces.map(normalizeInterface);
       this.setState({ interfaces, error: null });
     } catch (err) {
       this.setState({ error: err instanceof Error ? err : new Error(String(err)) });
@@ -213,7 +239,6 @@ class LocalNetworkStoreManager {
     }
   };
 
-
   private scheduleNext(delayMs = LOCAL_NETWORK_POLL_INTERVAL_MS): void {
     if (!this.state.isPolling) {
       return;
@@ -245,10 +270,12 @@ class LocalNetworkStoreManager {
         trafficSummary = null;
       }
 
+      const interfaces = (snapshot.interfaces ?? []).map(normalizeInterface);
+
       this.setState({
         snapshot,
         trafficSummary,
-        interfaces: snapshot.interfaces ?? [],
+        interfaces,
         devices: snapshot.devices ?? [],
         flows: snapshot.active_flows ?? [],
         wifiProfiles: snapshot.wifi_profiles ?? [],

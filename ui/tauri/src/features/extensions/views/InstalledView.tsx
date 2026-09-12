@@ -153,19 +153,6 @@ export const InstalledView: React.FC = () => {
               >
                 Installed Extensions
               </h2>
-              <span
-                style={{
-                  fontSize: "11px",
-                  padding: "2px 8px",
-                  borderRadius: "var(--radius-xs)",
-                  backgroundColor: "var(--color-surface-elevated)",
-                  color: "var(--color-text-muted)",
-                  border: "1px solid var(--color-border)",
-                  fontFamily: "var(--font-mono)",
-                }}
-              >
-                {extensions.length}
-              </span>
             </div>
             <p style={{ fontSize: "var(--font-size-xs)", color: "var(--color-text-muted)", margin: "2px 0 0" }}>
               Operational skills, custom handlers, and tools executed by Python Brain.

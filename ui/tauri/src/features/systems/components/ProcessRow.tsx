@@ -5,7 +5,7 @@
  * Displays PID, process name, CPU% progress meter, memory consumption, and terminate action.
  */
 
-import React, { useState } from "react";
+import React, { useState, useRef, useEffect } from "react";
 import type { ProcessTelemetry } from "../../../types/contracts";
 import { useUiStore, uiStore } from "../../../stores/uiStore";
 import { killProcess } from "../../../services/api/systems";
@@ -37,8 +37,15 @@ export const ProcessRow: React.FC<ProcessRowProps> = ({
 }) => {
   const selectedItem = useUiStore((s) => s.selectedItem);
   const [isKilling, setIsKilling] = useState(false);
+  const rowRef = useRef<HTMLTableRowElement>(null);
 
-  const isSelected = selectedItem?.type === "process" && selectedItem?.id === String(process.pid);
+  const isSelected = selectedItem?.type === "process" && (selectedItem?.id === String(process.pid) || selectedItem?.data?.name === process.name);
+
+  useEffect(() => {
+    if (isSelected && rowRef.current) {
+      rowRef.current.scrollIntoView({ behavior: "smooth", block: "nearest" });
+    }
+  }, [isSelected]);
 
   // Compute effective working set (aggregating child processes for parent tree nodes)
   const effectiveRamMb = hasChildren && totalRamMb !== undefined ? totalRamMb : (process.ram_mb || 0);
@@ -106,11 +113,13 @@ export const ProcessRow: React.FC<ProcessRowProps> = ({
 
   return (
     <tr
+      ref={rowRef}
       onClick={handleSelect}
       style={{
-        backgroundColor: isSelected ? "var(--color-surface-elevated)" : "transparent",
+        backgroundColor: isSelected ? "var(--color-accent-subtle, rgba(99, 102, 241, 0.18))" : "transparent",
+        boxShadow: isSelected ? "inset 4px 0 0 var(--color-accent, #7aa2f7)" : "none",
         cursor: "pointer",
-        transition: "background-color var(--transition-fast)",
+        transition: "all var(--transition-fast)",
         borderBottom: "1px solid var(--color-border-subtle)",
         fontSize: "11px",
         fontFamily: "var(--font-mono)",
@@ -123,12 +132,12 @@ export const ProcessRow: React.FC<ProcessRowProps> = ({
       }}
     >
       {/* PID */}
-      <td style={{ padding: "6px 10px", color: "var(--color-text-muted)", width: "70px" }}>
+      <td style={{ padding: "6px 10px", color: isSelected ? "var(--color-accent)" : "var(--color-text-muted)", width: "70px", fontWeight: isSelected ? 700 : 400 }}>
         {process.pid}
       </td>
 
       {/* Process Name (with collapsible tree indentation and child count) */}
-      <td style={{ padding: "6px 10px", color: "var(--color-text)", fontWeight: "var(--font-weight-medium)" }}>
+      <td style={{ padding: "6px 10px", color: "var(--color-text)", fontWeight: isSelected ? "var(--font-weight-bold)" : "var(--font-weight-medium)" }}>
         <div style={{ display: "flex", alignItems: "center", gap: "4px", paddingLeft: `${indent * 18}px` }}>
           {indent > 0 && <span style={{ color: "var(--color-text-muted)", marginRight: "2px" }}>└─</span>}
 
@@ -163,9 +172,26 @@ export const ProcessRow: React.FC<ProcessRowProps> = ({
             <span style={{ width: "16px", display: "inline-block", flexShrink: 0 }} />
           ) : null}
 
-          <span style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+          <span style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", color: isSelected ? "var(--color-accent)" : "inherit" }}>
             {process.name}
           </span>
+
+          {isSelected && (
+            <span
+              style={{
+                fontSize: "9px",
+                fontWeight: 700,
+                color: "#ffffff",
+                backgroundColor: "var(--color-accent, #7aa2f7)",
+                padding: "1px 5px",
+                borderRadius: "3px",
+                letterSpacing: "0.5px",
+                marginLeft: "4px",
+              }}
+            >
+              TARGET
+            </span>
+          )}
 
           {hasChildren && childCount > 0 && (
             <span

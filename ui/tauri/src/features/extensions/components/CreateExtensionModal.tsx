@@ -64,7 +64,7 @@ class CustomActionHandler:
         # Add your custom logic here
         return {
             "success": True,
-            "message": f"✨ **Custom Action Executed!**\\n\\nParameter received: \`{query}\`",
+            "message": f"**Custom Action Executed!**\\n\\nParameter received: \`{query}\`",
             "data": {
                 "status": "completed",
                 "params": params
@@ -108,7 +108,7 @@ class SystemCheckHandler:
         node = platform.node()
 
         msg = (
-            f"### 💽 Disk & System Storage Report\\n"
+            f"### Disk & System Storage Report\\n"
             f"- **Host**: \`{node}\` ({os_name})\\n"
             f"- **Free Storage**: **{free_gb} GB** / {total_gb} GB\\n"
             f"- **Used Storage**: {used_gb} GB ({used_pct}%)\\n"
@@ -163,13 +163,13 @@ class WebApiHandler:
 
             return {
                 "success": True,
-                "message": f"🌐 **Web Service Response:**\\n\\n> *\\"{zen_quote}\\"*",
+                "message": f"**Web Service Response:**\\n\\n> *\\"{zen_quote}\\"*",
                 "data": {"quote": zen_quote}
             }
         except Exception as e:
             return {
                 "success": False,
-                "message": f"⚠️ Failed to query API: {str(e)}"
+                "message": f"Failed to query API: {str(e)}"
             }
 
 def get_handler():
@@ -197,7 +197,7 @@ try {
   // Return JSON response to stdout
   const result = {
     success: true,
-    message: \`⚡ **JavaScript Extension Executed!**\\n\\nTimestamp: \\\`\${timeStr}\\\`\\nPayload: \\\`\${JSON.stringify(params)}\\\`\`,
+    message: \`**JavaScript Extension Executed!**\\n\\nTimestamp: \\\`\${timeStr}\\\`\\nPayload: \\\`\${JSON.stringify(params)}\\\`\`,
     data: {
       runtime: "Node.js " + process.version,
       timestamp: timeStr,
@@ -888,7 +888,7 @@ def get_handler():
                       onChange={() => setLanguage("python")}
                       style={{ display: "none" }}
                     />
-                    <span style={{ fontWeight: language === "python" ? "bold" : "normal" }}>🐍 Python</span>
+                    <span style={{ fontWeight: language === "python" ? "bold" : "normal" }}>Python</span>
                   </label>
 
                   <label
@@ -913,7 +913,7 @@ def get_handler():
                       onChange={() => setLanguage("javascript")}
                       style={{ display: "none" }}
                     />
-                    <span style={{ fontWeight: language === "javascript" ? "bold" : "normal" }}>⚡ Node.js (JS)</span>
+                    <span style={{ fontWeight: language === "javascript" ? "bold" : "normal" }}>Node.js (JS)</span>
                   </label>
                 </div>
               </div>

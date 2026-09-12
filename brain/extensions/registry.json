@@ -1,4 +1,34 @@
 {
+  "click_image": {
+    "name": "Click Image",
+    "intent": "click_image",
+    "patterns": [
+      "(?i)\\b(click|take|capture|snap)\\s+(an?\\s+)?(image|photo|picture|camera|snapshot)\\b",
+      "(?i)\\bopen\\s+camera\\b",
+      "(?i)\\bcamera\\s+capture\\b"
+    ],
+    "triggers": [
+      "click image",
+      "take photo",
+      "capture photo",
+      "snap picture",
+      "open camera"
+    ],
+    "aliases": [
+      "camera snap",
+      "webcam photo",
+      "photo capture"
+    ],
+    "description": "Interactive Web camera tool to preview live webcam feed, click snapshots, apply filters, and download or save photos.",
+    "directory": "click_image",
+    "created": "2026-09-13T03:43:00.000000",
+    "version": "1.0.0",
+    "enabled": true,
+    "language": "python",
+    "has_ui": true,
+    "logo": "logo.svg",
+    "author": "Fluffy AI"
+  },
   "bluetooth_control": {
     "name": "Bluetooth Control",
     "intent": "bluetooth_control",
@@ -139,7 +169,7 @@
     "aliases": [],
     "description": "Sample tool v2 updated",
     "directory": "sample_tool",
-    "created": "2026-09-11T04:19:06.692993",
+    "created": "2026-09-12T12:46:21.354425",
     "version": "1.0.1",
     "enabled": true,
     "language": "python",

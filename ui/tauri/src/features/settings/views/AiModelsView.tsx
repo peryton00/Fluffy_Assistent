@@ -303,7 +303,7 @@ export const AiModelsView: React.FC = () => {
             )}
             {llmModels.map((m) => (
               <option key={m.id} value={m.id}>
-                {m.name || m.id} {m.recommended ? "★ Recommended" : ""} {m.cost ? `(${m.cost})` : ""}
+                {m.name || m.id} {m.recommended ? "(Recommended)" : ""} {m.cost ? `(${m.cost})` : ""}
               </option>
             ))}
           </select>

@@ -18,6 +18,7 @@ import {
   MoonIcon,
   ShieldIcon,
   CheckIcon,
+  CloseIcon,
   SparklesIcon,
 } from "../../../components/common/Icons";
 
@@ -462,9 +463,11 @@ export const AppearanceView: React.FC = () => {
                 gap: "var(--space-2)",
               }}
             >
-              <span style={{ flexShrink: 0, marginTop: "1px" }}>✕</span>
+              <CloseIcon size={14} style={{ flexShrink: 0, marginTop: "1px" }} />
               <span style={{ flex: 1 }}>{importError}</span>
-              <button type="button" onClick={dismissFeedback} style={{ background: "none", border: "none", color: "inherit", cursor: "pointer", padding: 0, fontSize: "12px", lineHeight: 1 }}>✕</button>
+              <button type="button" onClick={dismissFeedback} style={{ background: "none", border: "none", color: "inherit", cursor: "pointer", padding: 0, display: "flex", alignItems: "center" }}>
+                <CloseIcon size={12} />
+              </button>
             </div>
           )}
           {importSuccess && (
@@ -481,9 +484,11 @@ export const AppearanceView: React.FC = () => {
                 gap: "var(--space-2)",
               }}
             >
-              <span>✓</span>
+              <CheckIcon size={14} style={{ flexShrink: 0 }} />
               <span style={{ flex: 1 }}>{importSuccess}</span>
-              <button type="button" onClick={dismissFeedback} style={{ background: "none", border: "none", color: "inherit", cursor: "pointer", padding: 0, fontSize: "12px", lineHeight: 1 }}>✕</button>
+              <button type="button" onClick={dismissFeedback} style={{ background: "none", border: "none", color: "inherit", cursor: "pointer", padding: 0, display: "flex", alignItems: "center" }}>
+                <CloseIcon size={12} />
+              </button>
             </div>
           )}
 

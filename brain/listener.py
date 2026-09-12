@@ -397,10 +397,20 @@ def handle_message(raw_msg, monitor):
                 details_str = f"Guardian Alert: {v['reason']}\n{v['explanation']}\n\nThis process has exceeded the safety threshold (Score: {risk_score:.1f}). Should Fluffy terminate it?"
                 state.add_confirmation(
                     cmd_id=f"kill_{pid}_{int(time.time())}",
-                    cmd_name="Terminate Suspicious Process",
-                    details=details_str
+                    cmd_name=f"Terminate Suspicious Process: {name}",
+                    details={
+                        "process_name": name,
+                        "pid": pid,
+                        "risk_score": round(risk_score, 1),
+                        "reason": v.get("reason", "Anomalous Resource Usage"),
+                        "explanation": v.get("explanation", ""),
+                        "anomalies": anomalies,
+                        "ram_mb": round(ram, 1),
+                        "cpu_percent": round(cpu, 1),
+                        "message": details_str
+                    }
                 )
-                add_execution_log(f"Guardian requesting confirmation to terminate {name}", "action")
+                add_execution_log(f"Guardian requesting confirmation to terminate {name} (PID: {pid})", "action")
         else:
             state.ACTIVE_VERDICTS.pop(pid, None)
 

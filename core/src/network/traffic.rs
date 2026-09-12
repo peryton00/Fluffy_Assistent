@@ -39,11 +39,16 @@ pub fn calculate_rates(prev: Option<InterfaceSample>, curr: InterfaceSample) -> 
     let rx_bytes_per_sec = rx_delta as f64 / elapsed_secs;
     let tx_bytes_per_sec = tx_delta as f64 / elapsed_secs;
 
+    let rx_round = (rx_bytes_per_sec * 100.0).round() / 100.0;
+    let tx_round = (tx_bytes_per_sec * 100.0).round() / 100.0;
+
     TrafficRates {
-        rx_bytes_per_second: (rx_bytes_per_sec * 100.0).round() / 100.0,
-        tx_bytes_per_second: (tx_bytes_per_sec * 100.0).round() / 100.0,
+        rx_bytes_per_second: rx_round,
+        tx_bytes_per_second: tx_round,
         rx_bits_per_second: (rx_bytes_per_sec * 8.0 * 100.0).round() / 100.0,
         tx_bits_per_second: (tx_bytes_per_sec * 8.0 * 100.0).round() / 100.0,
+        rx_bytes_per_sec: rx_round,
+        tx_bytes_per_sec: tx_round,
     }
 }
 

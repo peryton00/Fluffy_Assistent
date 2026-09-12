@@ -61,6 +61,10 @@ pub struct TrafficRates {
     pub tx_bytes_per_second: f64,
     pub rx_bits_per_second: f64,
     pub tx_bits_per_second: f64,
+    #[serde(default)]
+    pub rx_bytes_per_sec: f64,
+    #[serde(default)]
+    pub tx_bytes_per_sec: f64,
 }
 
 /// Discrete counter sample at a specific timestamp for rate computations.
@@ -86,6 +90,9 @@ pub struct NetworkInterfaceInfo {
     pub interface_type: InterfaceType,
     /// Current operational status
     pub status: OperationalStatus,
+    /// True if the interface is operationally up and active
+    #[serde(default)]
+    pub is_up: bool,
     /// True if backed by physical hardware (false for virtual/tun/tap/loopback)
     pub is_physical: bool,
     /// True if this is a loopback interface
@@ -382,6 +389,7 @@ mod tests {
             mac_address: Some("00:11:22:33:44:55".into()),
             interface_type: InterfaceType::Wifi,
             status: OperationalStatus::Up,
+            is_up: true,
             is_physical: true,
             is_loopback: false,
             is_default_gateway: true,
@@ -398,6 +406,8 @@ mod tests {
                 tx_bytes_per_second: 5120.0,
                 rx_bits_per_second: 81920.0,
                 tx_bits_per_second: 40960.0,
+                rx_bytes_per_sec: 10240.0,
+                tx_bytes_per_sec: 5120.0,
             }),
         };
 
@@ -405,6 +415,7 @@ mod tests {
         assert!(json.contains("\"name\":\"Wi-Fi\""));
         assert!(json.contains("\"interface_type\":\"wifi\""));
         assert!(json.contains("\"status\":\"up\""));
+        assert!(json.contains("\"is_up\":true"));
         assert!(json.contains("\"rx_bits_per_second\":81920.0"));
 
         let deserialized: NetworkInterfaceInfo = serde_json::from_str(&json).unwrap();
@@ -422,6 +433,7 @@ mod tests {
             mac_address: None,
             interface_type: InterfaceType::Loopback,
             status: OperationalStatus::Up,
+            is_up: true,
             is_physical: false,
             is_loopback: true,
             is_default_gateway: false,

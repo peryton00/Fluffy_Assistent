@@ -105,9 +105,12 @@ export const Inspector: React.FC = () => {
       case "startup":
         return <LayersIcon size={16} />;
       case "machine":
+      case "networkDevice":
       case "agentNode":
       case "terminalNode":
         return <ServerIcon size={16} />;
+      case "networkService":
+        return <WifiIcon size={16} />;
       case "hardware":
         return <CpuIcon size={16} />;
       case "alert":
@@ -835,6 +838,105 @@ export const Inspector: React.FC = () => {
             <CheckIcon size={12} />
             <span>Copy Telemetry JSON</span>
           </button>
+        </div>
+      );
+    }
+
+    if (type === "networkService") {
+      const pid = typeof data.pid === "number" ? data.pid : Number(data.pid);
+      const serviceName = String(data.service_name || selectedItem.title);
+
+      return (
+        <div style={{ display: "flex", flexDirection: "column", gap: "var(--space-2)", marginTop: "var(--space-2)" }}>
+          {pid > 0 && (
+            <>
+              <button
+                type="button"
+                onClick={() => {
+                  uiStore.setActiveDomain("systems");
+                  uiStore.setActiveSidebarView("processes");
+                  uiStore.setSelectedItem({
+                    type: "process",
+                    id: String(pid),
+                    title: `${serviceName} (PID ${pid})`,
+                    data: { pid, name: data.process_name || serviceName, highlight_alert: true },
+                  }, true);
+                }}
+                style={{
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "center",
+                  gap: "var(--space-2)",
+                  padding: "7px 12px",
+                  backgroundColor: "var(--color-accent)",
+                  border: "none",
+                  color: "var(--color-background)",
+                  borderRadius: "var(--radius-sm)",
+                  fontSize: "11px",
+                  fontWeight: "var(--font-weight-medium)",
+                  cursor: "pointer",
+                }}
+              >
+                <ActivityIcon size={12} />
+                <span>Inspect Process in Systems</span>
+              </button>
+
+              <button
+                type="button"
+                onClick={() => handleKillProcess(pid)}
+                disabled={actionInProgress}
+                style={{
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "center",
+                  gap: "var(--space-2)",
+                  padding: "6px 12px",
+                  backgroundColor: "var(--color-danger-subtle)",
+                  border: "1px solid var(--color-danger-border)",
+                  color: "var(--color-danger)",
+                  borderRadius: "var(--radius-sm)",
+                  fontSize: "11px",
+                  cursor: actionInProgress ? "wait" : "pointer",
+                }}
+              >
+                <TrashIcon size={12} />
+                <span>{actionInProgress ? "Terminating..." : "Terminate Owning Process"}</span>
+              </button>
+            </>
+          )}
+        </div>
+      );
+    }
+
+    if (type === "networkDevice") {
+      const ip = String(data.ip_addresses || "").split(",")[0]?.trim();
+      return (
+        <div style={{ display: "flex", flexDirection: "column", gap: "var(--space-2)", marginTop: "var(--space-2)" }}>
+          {ip && (
+            <button
+              type="button"
+              onClick={() => {
+                navigator.clipboard.writeText(ip);
+                setActionFeedback(`Copied IP: ${ip}`);
+              }}
+              style={{
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "center",
+                gap: "var(--space-2)",
+                padding: "6px 12px",
+                backgroundColor: "var(--color-surface-subtle)",
+                border: "1px solid var(--color-border)",
+                color: "var(--color-text)",
+                borderRadius: "var(--radius-sm)",
+                fontSize: "11px",
+                cursor: "pointer",
+              }}
+            >
+              <CheckIcon size={12} />
+              <span>Copy IP Address ({ip})</span>
+            </button>
+          )}
         </div>
       );
     }
