@@ -1,172 +1,279 @@
-# Fluffy Integrated Assistant System 🐰
+# Fluffy Integrated Assistant System
 
-**Fluffy Integrated Assistant System** is a lightweight, privacy-focused system monitor and security guardian for **Windows and Linux (Kali Linux)**. It combines high-performance native system monitoring (Rust), intelligent behavioral analysis (Python), and a modern, responsive dashboard (Tauri/TypeScript).
+**Fluffy Integrated Assistant System** is a lightweight, privacy-focused system monitor, anomaly detection guardian, and intelligent operations workbench for **Windows and Linux**. It combines high-performance native system monitoring and capability execution (Rust Core), intelligent behavioral analysis and autonomous agent orchestration (Python Brain), and a modern desktop operations workbench (Tauri v2 / React 18 / TypeScript).
 
-The goal is to provide users with real-time insights into their system's health, detect suspicious behavior (malware-like patterns), and offer quick "normalization" tools to optimize their environment.
+The platform provides real-time system observability, detects suspicious process behavior using baseline anomaly scoring, manages system health and resources, offers hands-free voice and multi-provider LLM interaction, and enables remote multi-machine administration over local networks.
 
-## 🚀 Features
+---
 
-- **Cross-Platform**: Works on Windows and Linux (Kali Linux) with a unified codebase.
-- **Premium "Industrial" UI**: A high-fidelity, theme-aware dashboard built with Tauri and vectorized Lucide icons.
-- **Security Guardian**: Real-time behavioral analysis detecting suspicious process chains, spikes, and persistence.
-- **Memory System**: Persistent user preferences and trusted processes that survive restarts.
-- **Voice & LLM Chat**: Offline voice commands (Vosk STT, Piper TTS) + multi-provider LLM (OpenAI, Anthropic, Groq, Ollama).
-- **Self-Improving Extensions**: AI-generated plugins with syntax validation loop.
-- **Admin-Client Networking**: Remote monitoring of multiple machines over LAN.
-- **FTP File Sharing**: Built-in FTP server with QR code pairing and client management.
-- **Multi-Step Commands**: Chain multiple actions (e.g., "open notepad and write hello world").
-- **Interrupt Commands**: Cancel pending actions with natural commands (stop, cancel, abort, etc.).
-- **Hybrid Telemetry**: Professional network tracking using high-precision Kbps for live monitoring and Mbps for broadband benchmarking.
-- **Process Hierarchy**: Advanced process tree visualization with pinning, sorting, running indicators, and deep-link actions.
-- **Enhanced Normalization**: Cache cleaning, RAM optimization, temp purge, security scan.
-- **Privacy-First**: 100% local processing; no cloud dependencies or data exfiltration.
+## Key Features
 
-## 🏗️ Architecture
+- **Cross-Platform**: Unified codebase supporting Windows (with native ETW, Win32 registry hooks, and PowerShell integrations) and Linux (procfs, freedesktop, systemd).
+- **Industrial Operations Workbench**: High-density, theme-aware desktop interface built with Tauri v2, React 18, Vite, TypeScript, and vector SVG iconography.
+- **Security Guardian**: Signature-less behavioral anomaly engine establishing rolling baselines, evaluating process execution chains, detecting unauthorized spikes/persistence, and generating real-time risk verdicts.
+- **Autonomous Agent & Tool Runtime**: Multi-stage intent parsing, tool execution runtime, policy validation, safe sandboxing, and dynamic self-improving plugin creation.
+- **Multi-Provider AI Intelligence**: Local and cloud LLM routing (Groq, OpenRouter, OpenAI, Anthropic, Ollama) with SSE real-time streaming and parameter clarification.
+- **Offline Voice Integration**: 100% local Speech-to-Text (Vosk) and Text-to-Speech (Piper) for hands-free queries and voice alert notifications.
+- **Dual-Layer Memory**: Session memory for conversational context alongside persistent storage for user profiles, preferences, and trusted process whitelists.
+- **LAN Remote Administration & Terminal**: Interactive terminal REPL with WebSocket streaming (Port 9003) and reverse TCP client administration (Port 9000) for managing remote nodes.
+- **FTP File Sharing**: Built-in FTP server (Port 2121) with dynamic authentication, QR code pairing, active transfer metrics, and client session management.
+- **System Normalization**: One-click cleanup operations, cache purging, RAM optimization, and comprehensive security re-scans.
+- **Privacy-First**: 100% local processing by default with zero mandatory cloud telemetry or data exfiltration.
 
-The application follows a Hexagonal Architecture split into three services:
+---
 
-1.  **Core (Rust)**: Handles low-level system interactions (monitoring, process management, volume/brightness).
-2.  **Brain (Python)**: The intelligence layer. Analyzes telemetry for threats, manages state, and exposes a Web API.
-3.  **Frontend (Tauri/TypeScript)**: The user interface. Displays data and sends user commands to the Brain.
+## System Architecture
 
-For a deep dive into the architecture, please refer to [`agent.md`](./documentation/agent.md).
+The application is structured into three integrated tiers communicating via strict local IPC and network protocols:
 
-## 🛠️ Prerequisites
+```
++-------------------------------------------------------------------+
+|               Tauri Desktop Operations Workbench                  |
+|               (React 18 + TypeScript + Vite UI)                  |
++---------------------------------^---------------------------------+
+                                  |
+              HTTP REST & SSE Stream (Port 5123)
+              WebSocket Terminal Bridge (Port 9003)
+                                  |
++---------------------------------v---------------------------------+
+|                      Python Brain Daemon                          |
+|  (Guardian Engine, Agent, Knowledge, Tools, Memory, Web API)     |
++---------------------------------^---------------------------------+
+                                  |
+              Telemetry Ingestion TCP (Port 9001)
+              Command Execution TCP (Port 9002)
+                                  |
++---------------------------------v---------------------------------+
+|                       Rust Native Core                            |
+| (System Telemetry, Capability Dispatch, Safety, Terminal REPL)   |
++-------------------------------------------------------------------+
+```
 
-Ensure you have the following installed:
+### 1. Rust Native Core (`core/`)
+- Samples OS telemetry (CPU, RAM, per-process trees, network throughput, battery, bluetooth, startup registry keys) every 2 seconds.
+- Broadcasts telemetry JSON payloads over TCP Port `9001`.
+- Listens for command execution requests over TCP Port `9002` and enforces path and PID safety policies (`policy.rs`).
+- Hosts the interactive Terminal REPL, WebSocket bridge (`ws://127.0.0.1:9003`), and LAN admin listener (TCP Port `9000`).
+- Provides first-class capability dispatch for filesystem operations, application launching, process termination, and system normalization sweeps.
 
-- **Rust**: [Install Rust](https://www.rust-lang.org/tools/install)
-- **Python**: [Install Python](https://www.python.org/downloads/) (3.8+)
-- **Node.js & npm**: [Install Node.js](https://nodejs.org/)
-- **Tauri CLI**: `npm install -g @tauri-apps/cli` (Optional, but recommended)
+### 2. Python Brain Intelligence (`brain/`)
+- Connects to Core telemetry on Port `9001` and evaluates system pressure signals.
+- Runs the **Guardian Engine** (`brain/guardian/`): rolling baselines, anomaly detection, process fingerprinting, attack chain analysis, risk scoring, and audit logging.
+- Runs the **Autonomous Agent & Tool Runtime** (`brain/agent/`, `brain/tools/`): two-stage intent classification, parameter extraction, and sandboxed tool execution.
+- Manages **Semantic Memory & Knowledge** (`brain/memory/`, `brain/knowledge/`): session context, user preferences, trusted process memory, and vector retrieval.
+- Serves the **Web API & SSE Server** on Port `5123` (`brain/web_api.py`) with token-based authentication (`X-Fluffy-Token`).
+- Houses dynamic plugin self-improvement routines (`brain/extensions/`).
 
-## 📦 Installation & Setup
+### 3. Tauri Desktop UI (`ui/tauri/`)
+- Desktop client built with Tauri v2, React 18, TypeScript, and modular CSS/Tailwind tokens.
+- Organizes features into dedicated operational workspaces:
+  - **Systems Overview & Hardware**: Live CPU/RAM/Disk metrics, battery state, process tree hierarchy, startup entries.
+  - **Guardian & Security**: Behavioral risk scores, anomaly detections, incident audit history, and learning phase status.
+  - **Operations & Normalization**: Process management, cache cleaning, RAM optimization, application launcher.
+  - **Terminal & Remote Cluster**: Interactive console, remote client nodes management, and client binary deployment.
+  - **Chat & Voice**: Multi-modal AI conversation, voice interaction controls, tool execution artifacts, and session history.
+  - **Knowledge & Artifacts**: Generated code viewing, RAG query inspection, and persistent document storage.
+  - **Extensions & Tools**: Dynamic plugin status, manifest inspection, and capability hot-reloading.
+  - **Analytics & Observability**: Real-time throughput metrics, historical utilization charts, and network logs.
+  - **Settings & Sovereignty**: API keys configuration, model selection, voice model settings, FTP server controls.
 
-### One-Click Setup (Recommended)
+---
 
-Clone the repository and run the appropriate setup script:
+## Workspace Directory Map
 
-**Windows:**
+```text
+FluffyAssistent/
+|-- .agents/                    # Workspace agent guidelines and workflow rules
+|-- .env / .env.example         # System credentials, ports, and model configurations
+|-- assets/                     # Icons, Piper TTS binaries, Vosk speech models
+|-- brain/                      # Python Intelligence, Guardian, Agent & API Layer
+|   |-- agent/                  # Intent classification, parser, planner, dispatcher
+|   |-- ai/                     # Multi-provider LLM clients, prompt schemas, router
+|   |-- context/                # Context injection and conversation window managers
+|   |-- extensions/             # Dynamic plugin runtime, self-improver, code generator
+|   |-- guardian/               # Anomaly detection, baselines, risk scorer, audit logs
+|   |-- knowledge/              # Embeddings, vector storage, document ingestion
+|   |-- mcp/                    # Model Context Protocol registry, client, transports
+|   |-- memory/                 # Session history, user profiles, trusted entities
+|   |-- routes/                 # Flask Blueprints (voice, ftp, cluster, terminal, etc.)
+|   |-- runtime/                # Ingest daemon (listener.py), global state, TCP clients
+|   |-- sandbox/                # Restricted Python execution sandbox
+|   |-- security/               # ActionValidator policy guards and auth decorators
+|   |-- tools/                  # Tool registry, filesystem/app tools, interrupt handler
+|   |-- listener.py             # Brain daemon entrypoint
+|   `-- web_api.py              # REST API and SSE stream server (Port 5123)
+|-- core/                       # Rust Native Core Engine
+|   |-- Cargo.toml              # Dependencies (sysinfo, tokio, windows-sys, tungstenite)
+|   `-- src/
+|       |-- actions/            # Native OS execution actions (files, launcher, safety)
+|       |-- capabilities/       # First-class system capability registry and dispatch
+|       |-- ipc/                # TCP 9001 broadcaster and TCP 9002 command receiver
+|       |-- permissions/        # Safety policies and path traversal guards
+|       |-- terminal/           # WS 9003 bridge, TCP 9000 admin listener, REPL
+|       `-- main.rs             # Core entrypoint and telemetry loop
+|-- docs/                       # Comprehensive Architecture & Subsystem Documentation
+|   |-- ai/                     # Local AI runtime and model router specifications
+|   |-- architecture/           # Agent orchestration, contracts, capability runtime
+|   |-- development/            # Developer setup, IPC debugging, contribution guide
+|   |-- security/               # Guardian threat models, sandbox limitations, policies
+|   |-- sih/                    # SIH project blueprint and capability matrix
+|   `-- *.md                    # Workspace-specific specifications
+|-- fluffy/                     # Distributed networking and LAN role management
+|-- installer/                  # Inno Setup scripts and Windows installer build pipeline
+|-- services/                   # Background services (FTP server, QR code generator)
+|-- ui/tauri/                   # Tauri v2 + React 18 Desktop Application
+|   |-- src/                    # React components, features, stores, services, styles
+|   `-- src-tauri/              # Rust Tauri shell configuration and window hooks
+|-- voice/                      # Offline Vosk STT engine and Piper TTS speaker pipeline
+`-- agent.md                    # Master developer and AI agent technical guide
+```
 
-```bash
-setup_env.bat
-# or
+---
+
+## Prerequisites
+
+Ensure the following prerequisites are installed on your system:
+
+- **Rust toolchain** (Cargo & rustc 1.75+): [Install Rust](https://www.rust-lang.org/tools/install)
+- **Python** (3.10 or 3.11 recommended): [Install Python](https://www.python.org/downloads/)
+- **Node.js** (v18 or v20 LTS) & npm: [Install Node.js](https://nodejs.org/)
+- **C++ Build Tools**: Required on Windows for compiling native dependencies.
+
+---
+
+## Installation & Setup
+
+### Automated Setup (Recommended)
+
+Run the setup script for your operating system from the repository root:
+
+**Windows (PowerShell):**
+```powershell
 powershell -File setup_env.ps1
 ```
 
-**Linux (Kali/Debian/Ubuntu):**
+**Windows (Command Prompt):**
+```cmd
+setup_env.bat
+```
 
+**Linux (Debian / Ubuntu / Kali):**
 ```bash
 chmod +x setup_env.sh && ./setup_env.sh
 ```
 
-The setup script handles everything: Python venv, pip dependencies, Node.js modules, Rust toolchain check, and `.env` configuration.
+The script configures the Python virtual environment (`.venv`), installs all backend dependencies, installs frontend Node modules in `ui/tauri`, verifies the Rust toolchain, and initializes your `.env` configuration.
 
 ### Manual Setup
 
-If you prefer manual setup:
+If you prefer step-by-step installation:
 
 ```bash
-# 1. Python venv + dependencies
+# 1. Initialize Python virtual environment & install requirements
 python -m venv .venv
-.venv/Scripts/activate   # Windows
-source .venv/bin/activate # Linux
+# On Windows:
+.venv\Scripts\activate
+# On Linux:
+source .venv/bin/activate
 pip install -r brain/requirements.txt
 
-# 2. Node.js dependencies (Tauri UI)
-cd ui/tauri && npm install && cd ../..
+# 2. Install Frontend Node modules
+cd ui/tauri
+npm install
+cd ../..
 
-# 3. Rust core
-cd core && cargo build --release && cd ..
+# 3. Verify Rust Core build
+cd core
+cargo check
+cd ..
 ```
 
-## 🚀 Running the Application
+---
 
-Start all three components (or let the Core auto-spawn Brain + UI):
+## Running the Application
 
-**Terminal 1: Start Core**
+### Option A: Standard Launch (Rust Core Auto-Spawn)
+
+Starting the Rust Core automatically initializes the background Python daemon and the Tauri desktop dashboard:
 
 ```bash
-cd core && cargo run
+cd core
+cargo run
 ```
 
-_Listens on port 9002 for commands, broadcasts telemetry on port 9001, auto-spawns Brain + UI._
+- Telemetry Broadcaster runs on TCP `127.0.0.1:9001`.
+- Command Receiver listens on TCP `127.0.0.1:9002`.
+- WebSocket Bridge listens on WS `127.0.0.1:9003`.
+- Admin LAN server listens on TCP `0.0.0.0:9000`.
+- Python Brain auto-spawns and serves Web API on HTTP `127.0.0.1:5123`.
+- Tauri Desktop Workbench opens automatically.
 
-**Terminal 2: Start Brain** (if not auto-spawned)
+### Option B: Multi-Terminal Launch (Development Mode)
 
+For granular debugging, run each component in a separate terminal:
+
+**Terminal 1: Rust Core**
 ```bash
-cd brain && python listener.py
+cd core
+cargo run
 ```
 
-_Connects to Core, starts Security Monitor, serves Web API on port 5123._
-
-**Terminal 3: Start UI** (if not auto-spawned)
-
+**Terminal 2: Python Brain**
 ```bash
-cd ui/tauri && npm run tauri dev
+# Activate virtual environment first
+.venv\Scripts\activate   # Windows
+source .venv/bin/activate # Linux
+cd brain
+python listener.py
 ```
 
-_Launches the desktop application window._
+**Terminal 3: Tauri React Workbench**
+```bash
+cd ui/tauri
+npm run tauri dev
+```
 
-## ✨ Key Features (February 2026)
+---
 
-### Cross-Platform Support
+## Configuration & Environment Variables
 
-- Full Windows + Linux (Kali Linux) compatibility
-- Platform abstraction layer (`brain/platform_utils.py`) centralizes all OS-specific operations
-- Rust core uses `#[cfg(target_os)]` for conditional compilation
-- One-click setup scripts for both platforms
+Copy `.env.example` to `.env` in the root directory to configure services:
 
-### Core Reverse TCP Terminal (New!)
+```env
+# System Token for IPC Authentication
+FLUFFY_TOKEN=your_secure_random_token_here
 
-- **Tauri Terminal View:** Launch an interactive, real-time command terminal directly from the UI dashboard.
-- **WebSocket Bridge:** Low-latency communication bridge (Port 9003) connecting the frontend with the Rust REPL.
-- **Remote Client Administration:** Compile and deploy `fluffy-client` to other local machines on the LAN (communicates over default Port 9000). Control and query them (e.g. `sysinfo`, `ls`, `kill`) from the admin interface.
-- **Standalone TUI Dashboard:** A separate terminal-based controller (`terminal_for_fluffy/fluffy-admin`) built in Rust using `ratatui` for direct keyboard-driven LAN administration.
+# Python Runtime Path
+PYTHON_PATH=.venv/Scripts/python.exe
 
-### Admin-Client Remote Monitoring
+# LLM Providers (Optional for cloud models)
+GROQ_API_KEY=gsk_...
+OPENROUTER_API_KEY=sk-or-...
+OPENAI_API_KEY=sk-...
+ANTHROPIC_API_KEY=sk-ant-...
 
-- Connect to and monitor multiple machines over LAN
-- Full process list view and system metrics from remote machines
-- Standardized port configuration: uses Port 9000 for LAN communication
+# Local Ollama Configuration (Optional)
+OLLAMA_BASE_URL=http://127.0.0.1:11434
+```
 
-### FTP File Sharing
+---
 
-- Built-in FTP server with secure password generation
-- QR code for mobile pairing
-- Client disconnect management
+## Documentation Index
 
-### Self-Improving Extensions
+Comprehensive documentation for all subsystems is maintained in the [`docs/`](./docs/) directory and [`agent.md`](./agent.md):
 
-- AI-generated plugins with syntax validation loop
-- Created: Bluetooth control (Windows + Linux), WiFi scanner
+- [**Master Developer & Agent Guide**](./agent.md): Complete architectural breakdown, function-to-file mappings, IPC contracts, and execution flows.
+- [**Development & Debugging Guide**](./docs/development/README.md): Environment setup, IPC tracing, testing strategies, and build guidelines.
+- [**Security & Guardian Architecture**](./docs/security/README.md): Threat models, anomaly scoring algorithms, sandbox constraints, and policy enforcement.
+- [**AI & LLM Architecture**](./docs/ai/README.md): Model routing, local runtime specs, and prompt pipelines.
+- [**System Workspaces**](./docs/systems-workspace.md): Specifications for hardware, process hierarchy, and telemetry.
+- [**Terminal & Remote Administration**](./docs/terminal-workspace.md): Reverse TCP shell, WebSocket bridge, and LAN node clustering.
+- [**Operations & Normalization**](./docs/operations-workspace.md): Normalization sweeps, application discovery, and file operations.
+- [**Chat & Voice Subsystem**](./docs/chat-voice-workspace.md): Multi-modal conversational interface and offline STT/TTS.
+- [**SIH Project Blueprint**](./docs/sih/README.md): Innovation overview, system capabilities matrix, and roadmap.
 
-### Memory System
+---
 
-- Persistent preferences and trusted processes across restarts
-- Session memory for multi-step conversations
+## License
 
-### Multi-Step Commands
-
-- Chain actions: "open notepad and write hello world"
-- Sequential execution with configurable delays
-
-For detailed documentation, see the [`documentation/`](./documentation/) folder:
-
-- [**Ultimate Information Dossier**](./documentation/information.md) — Architecture overview & AI agent briefing
-- [**LLM System Guide**](./documentation/LLM_SYSTEM.md) — Multi-provider AI & Configuration
-- [**Voice System Guide**](./documentation/VOICE_SYSTEM.md) — Offline STT (Vosk) & TTS (Piper)
-- [`FUNCTIONALITY_GUIDE.md`](./documentation/FUNCTIONALITY_GUIDE.md) — Core features
-- [`CODE_EXPLANATIONS.md`](./documentation/CODE_EXPLANATIONS.md) — Line-by-line implementation details
-
-## 📝 Development Notes
-
-- **API Security**: Uses a token-based handshake (`X-Fluffy-Token`) for all inter-service communication.
-- **Platform Utils**: Always use `brain/platform_utils.py` for OS-specific operations — never add bare `taskkill`, `explorer`, or `os.startfile()` calls.
-- **Precision Telemetry**: The "Internet Speed Test" runs for a rigorous 10 seconds to ensure ISP-grade Mbps accuracy.
-- **Theme Engine**: Automatically detects system theme preferences while offering a manual override.
-
-> [!TIP]
-> **Complete Project Dossier**: For a single, consolidated document, refer to [**`documentation/information.md`**](./documentation/information.md).
-
-## 📄 License
+This project is licensed under the MIT License.
