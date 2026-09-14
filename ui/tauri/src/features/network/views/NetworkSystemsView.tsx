@@ -9,25 +9,107 @@
  * - Read-only: Connect/pair workflows are strictly deferred to Phase N10.
  */
 
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import {
   useNetworkWorkspaceStore,
   networkWorkspaceStore,
 } from "../../../stores/networkWorkspaceStore";
-import { CpuIcon, WifiIcon } from "../../../components/common/Icons";
-import type { AdminBatchCommandResult } from "../../../types/contracts";
+import { useNetworkStore, networkStore } from "../../../stores/networkStore";
+import {
+  CpuIcon,
+  WifiIcon,
+  ServerIcon,
+  RadioIcon,
+  PlusIcon,
+  CopyIcon,
+  CheckIcon,
+  CloseIcon,
+  RefreshCwIcon,
+} from "../../../components/common/Icons";
+import type { AdminBatchCommandResult, NetworkRole } from "../../../types/contracts";
 
 export const NetworkSystemsView: React.FC = () => {
   const nodes = useNetworkWorkspaceStore((s) => s.nodes);
   const devices = useNetworkWorkspaceStore((s) => s.devices);
+  const interfaces = useNetworkWorkspaceStore((s) => s.interfaces);
   const status = useNetworkWorkspaceStore((s) => s.status);
   const selectedEntity = useNetworkWorkspaceStore((s) => s.selectedEntity);
   const connectingNodeIds = useNetworkWorkspaceStore((s) => s.connectingNodeIds);
   const executingNodeIds = useNetworkWorkspaceStore((s) => s.executingCommandNodeIds);
 
+  const role = useNetworkStore((s) => s.role);
+  const networkStoreLoading = useNetworkStore((s) => s.loading);
+
   const [selectedBatchNodeIds, setSelectedBatchNodeIds] = useState<Set<string>>(new Set());
   const [batchExecuting, setBatchExecuting] = useState<boolean>(false);
   const [batchResult, setBatchResult] = useState<AdminBatchCommandResult | null>(null);
+
+  // Add Node Modal state
+  const [isAddModalOpen, setIsAddModalOpen] = useState<boolean>(false);
+  const [nodeIp, setNodeIp] = useState<string>("");
+  const [nodePort, setNodePort] = useState<string>("9000");
+  const [nodeName, setNodeName] = useState<string>("");
+  const [formError, setFormError] = useState<string | null>(null);
+  const [isSubmitting, setIsSubmitting] = useState<boolean>(false);
+  const [copiedField, setCopiedField] = useState<string | null>(null);
+
+  // Keep network discovery polled and synced while on Systems view
+  useEffect(() => {
+    networkStore.startPolling();
+    return () => {
+      networkStore.stopPolling();
+    };
+  }, []);
+
+  const handleRoleChange = async (newRole: NetworkRole) => {
+    if (newRole === role) return;
+    await networkStore.changeRole(newRole);
+    await networkWorkspaceStore.resync();
+  };
+
+  const handleAddSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!nodeIp.trim()) {
+      setFormError("IP address or hostname is required.");
+      return;
+    }
+
+    const portNum = parseInt(nodePort, 10);
+    if (isNaN(portNum) || portNum < 1 || portNum > 65535) {
+      setFormError("Port must be a valid number between 1 and 65535.");
+      return;
+    }
+
+    setIsSubmitting(true);
+    setFormError(null);
+    try {
+      await networkStore.addNode(nodeIp.trim(), portNum, nodeName.trim() || undefined);
+      await networkWorkspaceStore.resync();
+      setIsAddModalOpen(false);
+      setNodeIp("");
+      setNodeName("");
+      setNodePort("9000");
+    } catch (err: unknown) {
+      setFormError(err instanceof Error ? err.message : "Failed to add network node.");
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
+  const handleCopy = (text: string, fieldKey: string) => {
+    navigator.clipboard.writeText(text);
+    setCopiedField(fieldKey);
+    setTimeout(() => {
+      setCopiedField((prev) => (prev === fieldKey ? null : prev));
+    }, 2000);
+  };
+
+  // Find active LAN IP address from interfaces
+  const activeInterface = interfaces.find(
+    (i) => i.is_up && !i.is_loopback && i.ipv4_addresses.length > 0
+  ) || interfaces.find((i) => i.ipv4_addresses.length > 0);
+  const detectedIp = activeInterface?.ipv4_addresses[0] || "127.0.0.1";
+  const broadcastUri = `fluffy://${detectedIp}:9000`;
 
   const toggleSelectAllConnected = () => {
     const connectedNodeIds = nodes.filter((n) => n.availability === "connected").map((n) => n.id);
@@ -97,6 +179,434 @@ export const NetworkSystemsView: React.FC = () => {
 
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: "var(--space-6)" }}>
+      {/* 0. Local Node Role & Mesh Identity Control */}
+      <div
+        style={{
+          padding: "var(--space-4)",
+          backgroundColor: "var(--color-surface)",
+          border: "1px solid var(--color-border)",
+          borderRadius: "var(--radius-sm)",
+          display: "flex",
+          flexDirection: "column",
+          gap: "var(--space-4)",
+        }}
+      >
+        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: "var(--space-3)" }}>
+          <div style={{ display: "flex", alignItems: "center", gap: "var(--space-3)" }}>
+            <div
+              style={{
+                width: "36px",
+                height: "36px",
+                borderRadius: "var(--radius-sm)",
+                backgroundColor: "var(--color-surface-elevated)",
+                border: "1px solid var(--color-border)",
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "center",
+                color: "var(--color-accent)",
+              }}
+            >
+              <ServerIcon size={20} />
+            </div>
+            <div>
+              <div style={{ display: "flex", alignItems: "center", gap: "var(--space-2)" }}>
+                <span style={{ fontSize: "var(--font-size-sm)", fontWeight: "var(--font-weight-bold)" }}>
+                  Local Node Role
+                </span>
+                <span
+                  style={{
+                    padding: "2px 8px",
+                    borderRadius: "var(--radius-xs)",
+                    fontSize: "11px",
+                    fontWeight: "var(--font-weight-bold)",
+                    fontFamily: "var(--font-mono)",
+                    textTransform: "uppercase",
+                    backgroundColor:
+                      role === "available"
+                        ? "rgba(34, 197, 94, 0.15)"
+                        : role === "admin"
+                        ? "rgba(59, 130, 246, 0.15)"
+                        : "var(--color-surface-elevated)",
+                    color:
+                      role === "available"
+                        ? "var(--color-success)"
+                        : role === "admin"
+                        ? "var(--color-accent)"
+                        : "var(--color-text-muted)",
+                    border: `1px solid ${
+                      role === "available"
+                        ? "rgba(34, 197, 94, 0.3)"
+                        : role === "admin"
+                        ? "rgba(59, 130, 246, 0.3)"
+                        : "var(--color-border)"
+                    }`,
+                  }}
+                >
+                  {role}
+                </span>
+              </div>
+              <p style={{ fontSize: "var(--font-size-xs)", color: "var(--color-text-muted)", margin: 0, marginTop: "2px" }}>
+                {role === "available"
+                  ? "Broadcasting availability on local LAN. Admin instances can connect to this machine."
+                  : role === "admin"
+                  ? "Cluster controller mode. Discovering, connecting, and managing distributed cluster nodes."
+                  : "Isolated standalone mode. Not broadcasting availability or controlling remote nodes."}
+              </p>
+            </div>
+          </div>
+
+          {/* Role Switcher Pills & Admin Action */}
+          <div style={{ display: "flex", alignItems: "center", gap: "var(--space-2)" }}>
+            <div
+              style={{
+                display: "flex",
+                backgroundColor: "var(--color-surface-subtle)",
+                borderRadius: "var(--radius-sm)",
+                padding: "2px",
+                border: "1px solid var(--color-border-subtle)",
+              }}
+            >
+              {(["standalone", "available", "admin"] as const).map((r) => (
+                <button
+                  key={r}
+                  type="button"
+                  onClick={() => handleRoleChange(r)}
+                  disabled={networkStoreLoading}
+                  style={{
+                    padding: "4px 10px",
+                    fontSize: "11px",
+                    fontWeight: "var(--font-weight-medium)",
+                    textTransform: "uppercase",
+                    letterSpacing: "0.04em",
+                    border: "none",
+                    borderRadius: "var(--radius-xs)",
+                    backgroundColor: role === r ? "var(--color-surface-elevated)" : "transparent",
+                    color: role === r ? "var(--color-accent)" : "var(--color-text-muted)",
+                    cursor: networkStoreLoading ? "wait" : "pointer",
+                    transition: "all var(--transition-fast)",
+                  }}
+                >
+                  {r}
+                </button>
+              ))}
+            </div>
+
+            {role === "admin" && (
+              <button
+                type="button"
+                onClick={() => {
+                  setFormError(null);
+                  setIsAddModalOpen(true);
+                }}
+                style={{
+                  display: "flex",
+                  alignItems: "center",
+                  gap: "var(--space-1)",
+                  padding: "5px 12px",
+                  fontSize: "11px",
+                  fontWeight: "var(--font-weight-medium)",
+                  backgroundColor: "var(--color-accent)",
+                  color: "var(--color-background)",
+                  border: "none",
+                  borderRadius: "var(--radius-sm)",
+                  cursor: "pointer",
+                }}
+              >
+                <PlusIcon size={13} />
+                <span>Add Node Manually</span>
+              </button>
+            )}
+
+            <button
+              type="button"
+              onClick={async () => {
+                await networkStore.refreshNow();
+                await networkWorkspaceStore.resync();
+              }}
+              disabled={networkStoreLoading}
+              title="Refresh LAN Nodes & Authoritative State"
+              style={{
+                display: "flex",
+                alignItems: "center",
+                gap: "var(--space-1)",
+                padding: "5px 10px",
+                fontSize: "11px",
+                backgroundColor: "var(--color-surface-elevated)",
+                color: "var(--color-text)",
+                border: "1px solid var(--color-border)",
+                borderRadius: "var(--radius-sm)",
+                cursor: networkStoreLoading ? "wait" : "pointer",
+              }}
+            >
+              <RefreshCwIcon size={12} />
+            </button>
+          </div>
+        </div>
+
+        {/* Detailed Available Machine Connection Card */}
+        {role === "available" && (
+          <div
+            style={{
+              padding: "var(--space-4)",
+              backgroundColor: "var(--color-surface-elevated)",
+              border: "1px solid rgba(34, 197, 94, 0.3)",
+              borderRadius: "var(--radius-sm)",
+              display: "flex",
+              flexDirection: "column",
+              gap: "var(--space-3)",
+            }}
+          >
+            <div style={{ display: "flex", alignItems: "center", gap: "var(--space-2)" }}>
+              <RadioIcon size={16} style={{ color: "var(--color-success)" }} />
+              <span style={{ fontSize: "var(--font-size-xs)", fontWeight: "var(--font-weight-bold)", color: "var(--color-success)" }}>
+                Machine Availability Details (Share with Admin)
+              </span>
+            </div>
+
+            <div
+              style={{
+                display: "grid",
+                gridTemplateColumns: "repeat(auto-fit, minmax(200px, 1fr))",
+                gap: "var(--space-3)",
+                fontSize: "12px",
+              }}
+            >
+              <div style={{ backgroundColor: "var(--color-surface)", padding: "var(--space-2) var(--space-3)", borderRadius: "var(--radius-xs)", border: "1px solid var(--color-border)" }}>
+                <span style={{ color: "var(--color-text-muted)", fontSize: "11px" }}>Local LAN IPv4:</span>
+                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginTop: "2px" }}>
+                  <strong style={{ fontFamily: "var(--font-mono)" }}>{detectedIp}</strong>
+                  <button
+                    type="button"
+                    onClick={() => handleCopy(detectedIp, "ip")}
+                    style={{ background: "none", border: "none", color: "var(--color-accent)", cursor: "pointer", padding: "2px" }}
+                    title="Copy IP"
+                  >
+                    {copiedField === "ip" ? <CheckIcon size={14} style={{ color: "var(--color-success)" }} /> : <CopyIcon size={14} />}
+                  </button>
+                </div>
+              </div>
+
+              <div style={{ backgroundColor: "var(--color-surface)", padding: "var(--space-2) var(--space-3)", borderRadius: "var(--radius-xs)", border: "1px solid var(--color-border)" }}>
+                <span style={{ color: "var(--color-text-muted)", fontSize: "11px" }}>Discovery / RPC Port:</span>
+                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginTop: "2px" }}>
+                  <strong style={{ fontFamily: "var(--font-mono)" }}>9000 / 5124</strong>
+                  <button
+                    type="button"
+                    onClick={() => handleCopy("9000", "port")}
+                    style={{ background: "none", border: "none", color: "var(--color-accent)", cursor: "pointer", padding: "2px" }}
+                    title="Copy Port"
+                  >
+                    {copiedField === "port" ? <CheckIcon size={14} style={{ color: "var(--color-success)" }} /> : <CopyIcon size={14} />}
+                  </button>
+                </div>
+              </div>
+
+              <div style={{ backgroundColor: "var(--color-surface)", padding: "var(--space-2) var(--space-3)", borderRadius: "var(--radius-xs)", border: "1px solid var(--color-border)" }}>
+                <span style={{ color: "var(--color-text-muted)", fontSize: "11px" }}>Connection URI:</span>
+                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginTop: "2px" }}>
+                  <span style={{ fontFamily: "var(--font-mono)", fontSize: "11px", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                    {broadcastUri}
+                  </span>
+                  <button
+                    type="button"
+                    onClick={() => handleCopy(broadcastUri, "uri")}
+                    style={{ background: "none", border: "none", color: "var(--color-accent)", cursor: "pointer", padding: "2px", flexShrink: 0 }}
+                    title="Copy Connection URI"
+                  >
+                    {copiedField === "uri" ? <CheckIcon size={14} style={{ color: "var(--color-success)" }} /> : <CopyIcon size={14} />}
+                  </button>
+                </div>
+              </div>
+            </div>
+
+            <div style={{ fontSize: "11px", color: "var(--color-text-secondary)", lineHeight: "1.4" }}>
+              <strong>Admin Connection Instructions:</strong> To connect from another machine, open Fluffy on that machine, set its role to <strong>Admin</strong>, click <strong>"Add Node Manually"</strong>, and enter IP: <span style={{ fontFamily: "var(--font-mono)" }}>{detectedIp}</span> with Port: <span style={{ fontFamily: "var(--font-mono)" }}>9000</span>.
+            </div>
+          </div>
+        )}
+      </div>
+
+      {/* Add Node Modal (Admin Only) */}
+      {isAddModalOpen && (
+        <div
+          style={{
+            position: "fixed",
+            top: 0,
+            left: 0,
+            right: 0,
+            bottom: 0,
+            backgroundColor: "rgba(0, 0, 0, 0.6)",
+            backdropFilter: "blur(4px)",
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            zIndex: 1000,
+          }}
+        >
+          <div
+            style={{
+              backgroundColor: "var(--color-surface)",
+              border: "1px solid var(--color-border)",
+              borderRadius: "var(--radius-md)",
+              width: "420px",
+              maxWidth: "90vw",
+              padding: "var(--space-5)",
+              boxShadow: "0 12px 36px rgba(0,0,0,0.4)",
+              display: "flex",
+              flexDirection: "column",
+              gap: "var(--space-4)",
+            }}
+          >
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+              <h3 style={{ margin: 0, fontSize: "var(--font-size-md)", fontWeight: "var(--font-weight-bold)" }}>
+                Add Network Node
+              </h3>
+              <button
+                type="button"
+                onClick={() => setIsAddModalOpen(false)}
+                style={{
+                  background: "none",
+                  border: "none",
+                  color: "var(--color-text-muted)",
+                  cursor: "pointer",
+                  padding: "4px",
+                }}
+              >
+                <CloseIcon size={16} />
+              </button>
+            </div>
+
+            <p style={{ fontSize: "12px", color: "var(--color-text-muted)", margin: 0 }}>
+              Enter the IP address and port of the available Fluffy node you want to connect to.
+            </p>
+
+            {formError && (
+              <div
+                style={{
+                  padding: "var(--space-2) var(--space-3)",
+                  backgroundColor: "rgba(239, 68, 68, 0.15)",
+                  border: "1px solid var(--color-danger)",
+                  borderRadius: "var(--radius-xs)",
+                  color: "var(--color-danger)",
+                  fontSize: "12px",
+                }}
+              >
+                {formError}
+              </div>
+            )}
+
+            <form onSubmit={handleAddSubmit} style={{ display: "flex", flexDirection: "column", gap: "var(--space-3)" }}>
+              <div>
+                <label style={{ display: "block", fontSize: "11px", fontWeight: "var(--font-weight-medium)", color: "var(--color-text-muted)", marginBottom: "4px" }}>
+                  IP Address or Hostname *
+                </label>
+                <input
+                  type="text"
+                  placeholder="e.g. 192.168.1.105"
+                  value={nodeIp}
+                  onChange={(e) => setNodeIp(e.target.value)}
+                  disabled={isSubmitting}
+                  autoFocus
+                  style={{
+                    width: "100%",
+                    padding: "8px 10px",
+                    backgroundColor: "var(--color-surface-elevated)",
+                    border: "1px solid var(--color-border)",
+                    borderRadius: "var(--radius-sm)",
+                    color: "var(--color-text)",
+                    fontSize: "12px",
+                    fontFamily: "var(--font-mono)",
+                    boxSizing: "border-box",
+                  }}
+                />
+              </div>
+
+              <div>
+                <label style={{ display: "block", fontSize: "11px", fontWeight: "var(--font-weight-medium)", color: "var(--color-text-muted)", marginBottom: "4px" }}>
+                  Port *
+                </label>
+                <input
+                  type="number"
+                  placeholder="9000"
+                  value={nodePort}
+                  onChange={(e) => setNodePort(e.target.value)}
+                  disabled={isSubmitting}
+                  style={{
+                    width: "100%",
+                    padding: "8px 10px",
+                    backgroundColor: "var(--color-surface-elevated)",
+                    border: "1px solid var(--color-border)",
+                    borderRadius: "var(--radius-sm)",
+                    color: "var(--color-text)",
+                    fontSize: "12px",
+                    fontFamily: "var(--font-mono)",
+                    boxSizing: "border-box",
+                  }}
+                />
+              </div>
+
+              <div>
+                <label style={{ display: "block", fontSize: "11px", fontWeight: "var(--font-weight-medium)", color: "var(--color-text-muted)", marginBottom: "4px" }}>
+                  Node Name (Optional)
+                </label>
+                <input
+                  type="text"
+                  placeholder="e.g. Worker-Node-1"
+                  value={nodeName}
+                  onChange={(e) => setNodeName(e.target.value)}
+                  disabled={isSubmitting}
+                  style={{
+                    width: "100%",
+                    padding: "8px 10px",
+                    backgroundColor: "var(--color-surface-elevated)",
+                    border: "1px solid var(--color-border)",
+                    borderRadius: "var(--radius-sm)",
+                    color: "var(--color-text)",
+                    fontSize: "12px",
+                    boxSizing: "border-box",
+                  }}
+                />
+              </div>
+
+              <div style={{ display: "flex", justifyContent: "flex-end", gap: "var(--space-2)", marginTop: "var(--space-2)" }}>
+                <button
+                  type="button"
+                  onClick={() => setIsAddModalOpen(false)}
+                  disabled={isSubmitting}
+                  style={{
+                    padding: "6px 14px",
+                    fontSize: "12px",
+                    backgroundColor: "var(--color-surface-elevated)",
+                    border: "1px solid var(--color-border)",
+                    borderRadius: "var(--radius-sm)",
+                    color: "var(--color-text)",
+                    cursor: "pointer",
+                  }}
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  disabled={isSubmitting}
+                  style={{
+                    padding: "6px 16px",
+                    fontSize: "12px",
+                    fontWeight: "var(--font-weight-medium)",
+                    backgroundColor: "var(--color-accent)",
+                    border: "none",
+                    borderRadius: "var(--radius-sm)",
+                    color: "var(--color-background)",
+                    cursor: isSubmitting ? "wait" : "pointer",
+                  }}
+                >
+                  {isSubmitting ? "Connecting..." : "Add & Connect"}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
       {/* 1. Cluster Nodes Section */}
       <div style={{ display: "flex", flexDirection: "column", gap: "var(--space-3)" }}>
         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>

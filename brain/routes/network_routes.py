@@ -428,11 +428,64 @@ def get_network_snapshot():
         import time
         now_ms = int(time.time() * 1000)
 
+        _ensure_network_path()
+        nodes = []
+        try:
+            from client import get_admin_client
+            admin_client = get_admin_client()
+            for m in admin_client.get_all_machines():
+                nodes.append({
+                    "id": m.get("machine_id", f"node_{m.get('ip')}"),
+                    "name": m.get("name", m.get("ip", "Remote Node")),
+                    "hostname": m.get("name"),
+                    "os": "unknown",
+                    "arch": "unknown",
+                    "role": "worker",
+                    "availability": "connected" if m.get("online") else "available",
+                    "auth_state": "authenticated" if m.get("online") else "unauthenticated",
+                    "pairing_state": "paired" if m.get("online") else "unpaired",
+                    "ip_addresses": [m.get("ip")] if m.get("ip") else [],
+                    "cluster_port": m.get("port", 9000),
+                    "last_seen_epoch": now_ms / 1000,
+                })
+        except Exception:
+            pass
+
+        try:
+            from server import get_availability_server
+            avail_server = get_availability_server()
+            if avail_server.is_running():
+                import socket
+                local_ip = "127.0.0.1"
+                try:
+                    s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+                    s.connect(("8.8.8.8", 80))
+                    local_ip = s.getsockname()[0]
+                    s.close()
+                except Exception:
+                    pass
+                nodes.append({
+                    "id": f"local_node_{local_ip.replace('.', '_')}",
+                    "name": f"Local Host ({local_ip})",
+                    "hostname": socket.gethostname(),
+                    "os": sys.platform,
+                    "arch": "x86_64",
+                    "role": "available",
+                    "availability": "available",
+                    "auth_state": "unauthenticated",
+                    "pairing_state": "unpaired",
+                    "ip_addresses": [local_ip],
+                    "cluster_port": getattr(avail_server, "_port", 9000),
+                    "last_seen_epoch": now_ms / 1000,
+                })
+        except Exception:
+            pass
+
         # Build standardized NetworkStateSnapshot envelope
         snapshot = {
             "revision": 1,
             "captured_at_epoch_ms": now_ms,
-            "nodes": [],
+            "nodes": nodes,
             "devices": local_snap.get("devices", []),
             "connections": local_snap.get("flows", []),
             "interfaces": local_snap.get("interfaces", []),

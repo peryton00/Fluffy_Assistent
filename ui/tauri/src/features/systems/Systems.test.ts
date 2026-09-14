@@ -341,10 +341,6 @@ describe("Systems Domain Test Suite", () => {
     html = renderToStaticMarkup(React.createElement(SystemsWorkspace));
     expect(html).toContain("Network Intelligence (N9)");
 
-    uiStore.setActiveSidebarView("network");
-    html = renderToStaticMarkup(React.createElement(SystemsWorkspace));
-    expect(html).toContain("Distributed LAN &amp; Peer Nodes");
-
     uiStore.setActiveSidebarView("hardware");
     html = renderToStaticMarkup(React.createElement(SystemsWorkspace));
     expect(html).toContain("Hardware &amp; Device Telemetry");

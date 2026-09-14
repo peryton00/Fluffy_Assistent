@@ -134,10 +134,8 @@ export const DOMAIN_DEFINITIONS: Record<ActiveDomain, DomainDefinition> = {
       { id: "startup", label: "Startup" },
       { id: "local_network", label: "Local Network" },
       { id: "network_intelligence", label: "Network Intelligence" },
-      { id: "network", label: "Cluster Network" },
       { id: "hardware", label: "Hardware" },
     ],
-
   },
   memory: {
     id: "memory",
