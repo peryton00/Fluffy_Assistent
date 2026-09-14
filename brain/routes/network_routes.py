@@ -360,11 +360,27 @@ def get_network_snapshot():
             "last_seen_epoch": now_ms / 1000,
         })
 
+    raw_devices = local_snap.get("devices", [])
+    devices = []
+    for d in raw_devices:
+        ip = d.get("ip_address", "")
+        mac = d.get("mac_address")
+        dev_id = d.get("id") or (f"dev_{mac.replace(':', '').replace('-', '').lower()}" if mac else (f"dev_{ip.replace('.', '_')}" if ip else None))
+        if not dev_id:
+            continue
+        dev = dict(d)
+        dev["id"] = dev_id
+        dev["category"] = dev.get("category") or ("infrastructure" if dev.get("is_gateway") else "endpoint")
+        dev["state"] = dev.get("state") or "reachable"
+        dev["source"] = dev.get("source") or "discovery"
+        dev["is_fluffy_node"] = dev.get("is_fluffy_node", False)
+        devices.append(dev)
+
     snapshot = {
         "revision": 1,
         "captured_at_epoch_ms": now_ms,
         "nodes": nodes,
-        "devices": local_snap.get("devices", []),
+        "devices": devices,
         "connections": local_snap.get("flows", []),
         "interfaces": local_snap.get("interfaces", []),
         "traffic": {

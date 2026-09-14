@@ -209,17 +209,18 @@ export function projectTopology(
   // B. Discovered Network Devices (omitted in "cluster" mode to keep cluster pure)
   if (mode !== "cluster") {
     for (const d of devices) {
-      const topoId = `device:${d.id}`;
+      const devId = d.id || (d.mac_address ? `dev_${d.mac_address.replace(/[: -]/g, "").toLowerCase()}` : (d.ip_address ? `dev_${d.ip_address.replace(/[\.:]/g, "_")}` : `dev_${Math.random().toString(36).slice(2, 8)}`));
+      const topoId = `device:${devId}`;
       const status: TopologyNodeStatus = d.state === "reachable" ? "reachable" : "unknown";
-      const secCount = securityEventCounts.get(d.id) ?? 0;
-      const tt = topTalkersMap.get(d.id) ?? (d.ip_address ? topTalkersMap.get(d.ip_address) : undefined);
+      const secCount = securityEventCounts.get(devId) ?? (d.id ? (securityEventCounts.get(d.id) ?? 0) : 0);
+      const tt = (d.id ? topTalkersMap.get(d.id) : undefined) ?? topTalkersMap.get(devId) ?? (d.ip_address ? topTalkersMap.get(d.ip_address) : undefined);
 
       const topoNode: TopologyNode = {
         id: topoId,
         entityType: "device",
-        sourceId: d.id,
+        sourceId: devId,
         label: d.hostname || d.ip_address,
-        sublabel: `Device • ${d.category}`,
+        sublabel: `Device • ${d.category || "endpoint"}`,
         ip: d.ip_address,
         mac: d.mac_address ?? null,
         status,
@@ -236,7 +237,10 @@ export function projectTopology(
       };
 
       rawNodes.push(topoNode);
-      nodeLookupById.set(d.id, topoId);
+      if (d.id) {
+        nodeLookupById.set(d.id, topoId);
+      }
+      nodeLookupById.set(devId, topoId);
       nodeLookupById.set(topoId, topoId);
       if (d.ip_address) {
         nodeLookupByIp.set(d.ip_address, topoId);
