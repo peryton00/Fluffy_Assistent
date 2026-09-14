@@ -208,9 +208,22 @@ export function projectTopology(
 
   // B. Discovered Network Devices (omitted in "cluster" mode to keep cluster pure)
   if (mode !== "cluster") {
+    const seenTopoIds = new Set<string>();
     for (const d of devices) {
-      const devId = d.id || (d.mac_address ? `dev_${d.mac_address.replace(/[: -]/g, "").toLowerCase()}` : (d.ip_address ? `dev_${d.ip_address.replace(/[\.:]/g, "_")}` : `dev_${Math.random().toString(36).slice(2, 8)}`));
-      const topoId = `device:${devId}`;
+      let devId = d.id || (d.mac_address ? `dev_${d.mac_address.replace(/[: -]/g, "").toLowerCase()}` : (d.ip_address ? `dev_${d.ip_address.replace(/[\.:]/g, "_")}` : `dev_${Math.random().toString(36).slice(2, 8)}`));
+      let topoId = `device:${devId}`;
+
+      if (seenTopoIds.has(topoId)) {
+        if (d.ip_address) {
+          devId = `${devId}_${d.ip_address.replace(/[\.:]/g, "_")}`;
+          topoId = `device:${devId}`;
+        }
+        if (seenTopoIds.has(topoId)) {
+          continue;
+        }
+      }
+      seenTopoIds.add(topoId);
+
       const status: TopologyNodeStatus = d.state === "reachable" ? "reachable" : "unknown";
       const secCount = securityEventCounts.get(devId) ?? (d.id ? (securityEventCounts.get(d.id) ?? 0) : 0);
       const tt = (d.id ? topTalkersMap.get(d.id) : undefined) ?? topTalkersMap.get(devId) ?? (d.ip_address ? topTalkersMap.get(d.ip_address) : undefined);
@@ -490,8 +503,7 @@ export function computeDeterministicLayout(
   if (nodes.length === 0) return;
 
   const centerX = canvasWidth / 2;
-  const centerY = canvasHeight / 2;
-  const minDim = Math.min(canvasWidth, canvasHeight);
+  const centerY = canvasHeight / 2 - 20;
 
   // Group nodes by entity tier
   const clusterNodes = nodes.filter((n) => n.entityType === "node").sort((a, b) => a.id.localeCompare(b.id));
@@ -504,7 +516,7 @@ export function computeDeterministicLayout(
     clusterNodes[0].x = centerX;
     clusterNodes[0].y = centerY;
   } else if (clusterNodes.length > 1) {
-    const clusterRadius = minDim * 0.18;
+    const clusterRadius = Math.max(120, clusterNodes.length * 35);
     clusterNodes.forEach((node, idx) => {
       const angle = (2 * Math.PI * idx) / clusterNodes.length - Math.PI / 2;
       node.x = Math.round(centerX + clusterRadius * Math.cos(angle));
@@ -512,29 +524,46 @@ export function computeDeterministicLayout(
     });
   }
 
-  // Tier 2: Subnet Devices (Inner orbit ring)
+  // Tier 2: Subnet Devices (Multi-ring with anti-collision spacing)
   if (deviceNodes.length > 0) {
-    const deviceRadius = minDim * 0.32;
+    const nodesPerRing = 8;
+    const baseRadius = clusterNodes.length > 0 ? 190 : 130;
+    const ringSpacing = 100;
+
     deviceNodes.forEach((dev, idx) => {
-      const angle = (2 * Math.PI * idx) / deviceNodes.length - Math.PI / 4;
-      dev.x = Math.round(centerX + deviceRadius * Math.cos(angle));
-      dev.y = Math.round(centerY + deviceRadius * Math.sin(angle));
+      const ringIdx = Math.floor(idx / nodesPerRing);
+      const posInRing = idx % nodesPerRing;
+      const countInThisRing = Math.min(nodesPerRing, deviceNodes.length - ringIdx * nodesPerRing);
+      const ringRadius = baseRadius + ringIdx * ringSpacing;
+      const angleOffset = (ringIdx % 2) * (Math.PI / Math.max(1, countInThisRing));
+      const angle = (2 * Math.PI * posInRing) / countInThisRing - Math.PI / 4 + angleOffset;
+      dev.x = Math.round(centerX + ringRadius * Math.cos(angle));
+      dev.y = Math.round(centerY + ringRadius * Math.sin(angle));
     });
   }
 
-  // Tier 3: External Endpoints (Outer orbit ring)
+  // Tier 3: External Endpoints (Outer tiered rings with anti-collision spacing)
   if (externalNodes.length > 0) {
-    const externalRadius = minDim * 0.44;
+    const nodesPerRing = 10;
+    const devRings = deviceNodes.length > 0 ? Math.ceil(deviceNodes.length / 8) : 0;
+    const baseRadius = (clusterNodes.length > 0 ? 190 : 130) + devRings * 100 + 40;
+    const ringSpacing = 110;
+
     externalNodes.forEach((ext, idx) => {
-      const angle = (2 * Math.PI * idx) / externalNodes.length + Math.PI / 6;
-      ext.x = Math.round(centerX + externalRadius * Math.cos(angle));
-      ext.y = Math.round(centerY + externalRadius * Math.sin(angle));
+      const ringIdx = Math.floor(idx / nodesPerRing);
+      const posInRing = idx % nodesPerRing;
+      const countInThisRing = Math.min(nodesPerRing, externalNodes.length - ringIdx * nodesPerRing);
+      const ringRadius = baseRadius + ringIdx * ringSpacing;
+      const angleOffset = (ringIdx % 2) * (Math.PI / Math.max(1, countInThisRing));
+      const angle = (2 * Math.PI * posInRing) / countInThisRing + Math.PI / 6 + angleOffset;
+      ext.x = Math.round(centerX + ringRadius * Math.cos(angle));
+      ext.y = Math.round(centerY + ringRadius * Math.sin(angle));
     });
   }
 
-  // Tier 4: Interfaces (Bottom dedicated band)
+  // Tier 4: Interfaces (Bottom dedicated shelf)
   if (interfaceNodes.length > 0) {
-    const ifaceSpacing = Math.min(160, (canvasWidth - 100) / (interfaceNodes.length + 1));
+    const ifaceSpacing = Math.min(160, Math.max(140, (canvasWidth - 100) / (interfaceNodes.length + 1)));
     const startX = centerX - ((interfaceNodes.length - 1) * ifaceSpacing) / 2;
     const ifaceY = canvasHeight - 70;
     interfaceNodes.forEach((iface, idx) => {

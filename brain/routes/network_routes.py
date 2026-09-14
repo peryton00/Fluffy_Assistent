@@ -314,16 +314,62 @@ def admin_switch_machine():
     return jsonify({"ok": True})
 
 
+def _normalize_remote_telemetry(raw: dict) -> dict:
+    """Ensure remote worker telemetry conforms strictly to RemoteMachineData schema."""
+    if not isinstance(raw, dict):
+        return {}
+    sys_obj = raw.get("system", {}) if isinstance(raw.get("system"), dict) else {}
+
+    cpu = raw.get("cpu") or sys_obj.get("cpu") or {"usage_percent": 0.0}
+    ram = raw.get("ram") or sys_obj.get("ram") or {"total_mb": 0, "used_mb": 0, "free_mb": 0}
+    processes = raw.get("processes") or sys_obj.get("processes") or {"top_ram": []}
+    net = raw.get("network") or sys_obj.get("network") or {"status": "online"}
+
+    return {
+        "timestamp": raw.get("timestamp"),
+        "system": {
+            "hostname": sys_obj.get("hostname") or raw.get("hostname") or "Remote Host",
+            "os": sys_obj.get("os") or raw.get("os") or "unknown",
+            "os_version": sys_obj.get("os_version") or raw.get("os_version") or "",
+            "arch": sys_obj.get("arch") or raw.get("arch") or "",
+            "uptime": sys_obj.get("uptime") or raw.get("uptime") or "",
+            **sys_obj,
+        },
+        "cpu": cpu,
+        "ram": ram,
+        "processes": processes,
+        "network": net,
+        **raw,
+    }
+
+
 @network_bp.route("/network/admin/data/<machine_id>", methods=["GET"])
 @token_required
 def get_machine_data(machine_id):
-    """Get latest polled data for a specific remote machine."""
-    # Rust pushes remote_telemetry into LATEST_STATE.remote_machines keyed by machine_id
+    """Get latest polled data for a specific remote machine with live HTTP fallback."""
     try:
         latest = state.LATEST_STATE or {}
         remote_machines = latest.get("remote_machines", {})
-        if machine_id in remote_machines:
-            return jsonify({"ok": True, "data": remote_machines[machine_id]})
+        if machine_id in remote_machines and remote_machines[machine_id]:
+            return jsonify({"ok": True, "data": _normalize_remote_telemetry(remote_machines[machine_id])})
+
+        # Try live HTTP query to remote node
+        machine = next((m for m in latest.get("admin_machines", []) if m.get("machine_id") == machine_id), None)
+        if machine:
+            import urllib.request
+            import json
+            ip = machine.get("ip")
+            port = machine.get("port", 9010)
+            try:
+                req = urllib.request.Request(f"http://{ip}:{port}/data")
+                with urllib.request.urlopen(req, timeout=2.0) as resp:
+                    body = json.loads(resp.read().decode())
+                    if body.get("ok") and body.get("data"):
+                        snap_data = body["data"]
+                        state.update_remote_telemetry(machine_id, snap_data)
+                        return jsonify({"ok": True, "data": _normalize_remote_telemetry(snap_data)})
+            except Exception:
+                pass
 
         # Fallback: TCP terminal client
         if machine_id.startswith("tcp_"):
@@ -364,13 +410,14 @@ def get_machine_data(machine_id):
 @network_bp.route("/network/admin/action", methods=["POST"])
 @token_required
 def admin_machine_action():
-    """Execute an action on a remote machine."""
+    """Execute an action on a remote machine and return structured output."""
     data = request.get_json(silent=True)
     if not data or "machine_id" not in data or "action" not in data:
         return jsonify({"error": "Missing machine_id or action"}), 400
 
     machine_id = data["machine_id"]
-    action_name = data["action"]
+    action_name = str(data["action"]).strip()
+    params = data.get("params") or {}
 
     if machine_id.startswith("tcp_"):
         tag = machine_id.replace("tcp_", "")
@@ -412,7 +459,42 @@ def admin_machine_action():
             machine["online"] = False
             return jsonify({"ok": False, "error": f"Node unreachable: {e}"}), 502
 
-    if action_name in ["diagnostic_scan", "refresh", "telemetry", "System.GetHardware"]:
+    # Send action to worker node via POST /action
+    try:
+        post_payload = json.dumps({"action": action_name, "params": params}).encode("utf-8")
+        req = urllib.request.Request(
+            f"http://{ip}:{port}/action",
+            data=post_payload,
+            headers={"Content-Type": "application/json"},
+            method="POST"
+        )
+        with urllib.request.urlopen(req, timeout=4.0) as resp:
+            body = json.loads(resp.read().decode())
+            snap_data = body.get("data")
+            if snap_data:
+                state.update_remote_telemetry(machine_id, snap_data)
+                machine["online"] = True
+                machine["last_seen"] = int(time.time())
+
+            res_text = body.get("result") or f"Executed '{action_name}' on node {machine_id}"
+            if snap_data and isinstance(snap_data, dict):
+                norm_snap = _normalize_remote_telemetry(snap_data)
+                res_text += "\n" + json.dumps({
+                    "host": norm_snap["system"]["hostname"],
+                    "os": f"{norm_snap['system']['os']} ({norm_snap['system']['arch']})",
+                    "cpu_usage": f"{norm_snap['cpu'].get('usage_percent', 0)}%",
+                    "ram_used_mb": norm_snap['ram'].get('used_mb', 0),
+                    "ram_total_mb": norm_snap['ram'].get('total_mb', 0),
+                }, indent=2)
+
+            state.add_execution_log(f"Admin: command '{action_name}' on {ip}:{port}", "system")
+            return jsonify({
+                "ok": True,
+                "result": res_text,
+                "data": snap_data
+            })
+    except Exception as e:
+        # Fallback to GET /data if /action POST fails
         try:
             req = urllib.request.Request(f"http://{ip}:{port}/data")
             with urllib.request.urlopen(req, timeout=3.0) as resp:
@@ -422,19 +504,22 @@ def admin_machine_action():
                     state.update_remote_telemetry(machine_id, snap_data)
                     machine["online"] = True
                     machine["last_seen"] = int(time.time())
+                norm_snap = _normalize_remote_telemetry(snap_data) if snap_data else {}
+                res_text = f"Action '{action_name}' executed. Live telemetry updated for {ip}:{port}"
+                if norm_snap:
+                    res_text += "\n" + json.dumps({
+                        "host": norm_snap.get("system", {}).get("hostname"),
+                        "cpu_usage": f"{norm_snap.get('cpu', {}).get('usage_percent', 0)}%",
+                        "ram_used_mb": norm_snap.get("ram", {}).get("used_mb", 0),
+                        "ram_total_mb": norm_snap.get("ram", {}).get("total_mb", 0),
+                    }, indent=2)
                 return jsonify({
                     "ok": True,
-                    "result": f"Diagnostic scan succeeded for {ip}:{port}",
+                    "result": res_text,
                     "data": snap_data
                 })
-        except Exception as e:
-            return jsonify({"ok": False, "error": f"Scan failed: {e}"}), 502
-
-    state.add_execution_log(f"Admin: command '{action_name}' dispatched to {ip}:{port}", "system")
-    return jsonify({
-        "ok": True,
-        "result": f"Action '{action_name}' executed on node {machine_id} ({ip}:{port})"
-    })
+        except Exception as err:
+            return jsonify({"ok": False, "error": f"Action failed: {err}"}), 502
 
 
 @network_bp.route("/network/connect", methods=["POST"])
@@ -746,12 +831,29 @@ def _build_network_snapshot() -> dict:
 
     raw_devices = local_snap.get("devices", [])
     devices = []
+    seen_dev_ids = set()
     for d in raw_devices:
         ip = d.get("ip_address", "")
         mac = d.get("mac_address")
-        dev_id = d.get("id") or (f"dev_{mac.replace(':', '').replace('-', '').lower()}" if mac else (f"dev_{ip.replace('.', '_')}" if ip else None))
-        if not dev_id:
+        if mac and mac.lower() in ("ff:ff:ff:ff:ff:ff", "00:00:00:00:00:00") and ip:
+            dev_id = f"dev_bcast_{ip.replace('.', '_')}"
+        elif mac:
+            dev_id = f"dev_{mac.replace(':', '').replace('-', '').lower()}"
+        elif ip:
+            dev_id = f"dev_{ip.replace('.', '_')}"
+        else:
             continue
+
+        if d.get("id"):
+            dev_id = d["id"]
+
+        if dev_id in seen_dev_ids:
+            if ip:
+                dev_id = f"{dev_id}_{ip.replace('.', '_')}"
+            if dev_id in seen_dev_ids:
+                continue
+
+        seen_dev_ids.add(dev_id)
         dev = dict(d)
         dev["id"] = dev_id
         dev["category"] = dev.get("category") or ("infrastructure" if dev.get("is_gateway") else "endpoint")

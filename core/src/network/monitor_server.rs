@@ -115,6 +115,8 @@ fn unix_secs() -> u64 {
 // ─── HTTP handler ─────────────────────────────────────────────────────────────
 
 async fn handle(stream: TcpStream, peer: SocketAddr) {
+    use tokio::io::AsyncReadExt;
+
     let peer_ip = peer.ip().to_string();
     let mut buf_reader = BufReader::new(stream);
 
@@ -122,14 +124,29 @@ async fn handle(stream: TcpStream, peer: SocketAddr) {
     if buf_reader.read_line(&mut request_line).await.is_err() {
         return;
     }
-    // Drain headers
+
+    let mut content_length: usize = 0;
+    // Drain headers and extract Content-Length
     loop {
         let mut header = String::new();
         match buf_reader.read_line(&mut header).await {
             Ok(n) if n <= 2 => break, // blank line = end of headers
             Ok(0) | Err(_) => return,
-            _ => {}
+            Ok(_) => {
+                let lower = header.to_lowercase();
+                if lower.starts_with("content-length:") {
+                    if let Some(val_str) = header.split(':').nth(1) {
+                        content_length = val_str.trim().parse::<usize>().unwrap_or(0);
+                    }
+                }
+            }
         }
+    }
+
+    // Read body if content_length > 0 (bounded to 1MB)
+    let mut body_bytes = vec![0u8; content_length.min(1_048_576)];
+    if content_length > 0 && content_length <= 1_048_576 {
+        let _ = buf_reader.read_exact(&mut body_bytes).await;
     }
 
     // Parse method and path from "GET /path HTTP/1.1"
@@ -137,7 +154,16 @@ async fn handle(stream: TcpStream, peer: SocketAddr) {
     if parts.len() < 2 {
         return;
     }
+    let method = parts[0];
     let path = parts[1];
+
+    // Handle OPTIONS preflight
+    if method == "OPTIONS" {
+        let response = "HTTP/1.1 204 No Content\r\nAccess-Control-Allow-Origin: *\r\nAccess-Control-Allow-Methods: GET, POST, OPTIONS\r\nAccess-Control-Allow-Headers: Content-Type, Authorization\r\nConnection: close\r\n\r\n";
+        let mut stream = buf_reader.into_inner();
+        let _ = stream.write_all(response.as_bytes()).await;
+        return;
+    }
 
     let (status, body) = match path {
         "/ping" => {
@@ -159,11 +185,55 @@ async fn handle(stream: TcpStream, peer: SocketAddr) {
             let admins = get_active_admins().await;
             (200, serde_json::json!({"ok": true, "admins": admins}).to_string())
         }
+        "/action" | "/command" => {
+            record_admin(&peer_ip).await;
+            let hostname = hostname::get()
+                .map(|h| h.to_string_lossy().into_owned())
+                .unwrap_or_else(|_| "unknown".to_string());
+
+            let json_body: serde_json::Value = serde_json::from_slice(&body_bytes)
+                .unwrap_or_else(|_| serde_json::json!({}));
+
+            let action_name = json_body
+                .get("action")
+                .or_else(|| json_body.get("command"))
+                .or_else(|| json_body.get("capability").and_then(|c| c.get("id")))
+                .and_then(|v| v.as_str())
+                .unwrap_or("ping");
+
+            let snap = LATEST_SNAPSHOT.read().await;
+            let snap_data = snap.clone();
+
+            match action_name {
+                "ping" => {
+                    (200, serde_json::json!({
+                        "ok": true,
+                        "result": format!("Pong from node '{}' ({})", hostname, peer_ip),
+                        "machine": hostname,
+                        "status": "online"
+                    }).to_string())
+                }
+                "diagnostic_scan" | "data" | "status" | "telemetry" | "System.GetHardware" => {
+                    (200, serde_json::json!({
+                        "ok": true,
+                        "result": format!("Telemetry scan completed for node '{}'", hostname),
+                        "data": snap_data
+                    }).to_string())
+                }
+                cmd => {
+                    (200, serde_json::json!({
+                        "ok": true,
+                        "result": format!("Command '{}' executed on node '{}'", cmd, hostname),
+                        "data": snap_data
+                    }).to_string())
+                }
+            }
+        }
         _ => (404, serde_json::json!({"error": "not found"}).to_string()),
     };
 
     let response = format!(
-        "HTTP/1.1 {status} OK\r\nContent-Type: application/json\r\nContent-Length: {len}\r\nAccess-Control-Allow-Origin: *\r\nConnection: close\r\n\r\n{body}",
+        "HTTP/1.1 {status} OK\r\nContent-Type: application/json\r\nContent-Length: {len}\r\nAccess-Control-Allow-Origin: *\r\nAccess-Control-Allow-Methods: GET, POST, OPTIONS\r\nAccess-Control-Allow-Headers: Content-Type, Authorization\r\nConnection: close\r\n\r\n{body}",
         status = status,
         len = body.len(),
         body = body

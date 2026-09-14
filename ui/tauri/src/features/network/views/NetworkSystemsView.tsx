@@ -25,7 +25,6 @@ import {
   CheckIcon,
   CloseIcon,
   RefreshCwIcon,
-  ActivityIcon,
 } from "../../../components/common/Icons";
 import type { AdminBatchCommandResult, NetworkRole } from "../../../types/contracts";
 

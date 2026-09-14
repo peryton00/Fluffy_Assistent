@@ -139,8 +139,10 @@ class NetworkStoreManager {
         const machinesRes = await getAdminMachines().catch(() => ({ ok: false, machines: [] as NetworkMachine[], active_machine: undefined }));
         if (machinesRes.ok) {
           machines = machinesRes.machines;
-          if (machinesRes.active_machine !== undefined) {
+          if (machinesRes.active_machine !== undefined && machinesRes.active_machine !== null) {
             activeMachineId = machinesRes.active_machine;
+          } else if ((!activeMachineId || !machines.some((m) => m.machine_id === activeMachineId)) && machines.length > 0) {
+            activeMachineId = machines[0].machine_id;
           }
         }
       }
