@@ -3,19 +3,23 @@ export * from "./fluffyLight";
 export * from "./transparent";
 export * from "./highContrast";
 export * from "./vscodeThemeImporter";
+export * from "./themeCatalog";
 
 import { fluffyDarkTheme } from "./fluffyDark";
 import { fluffyLightTheme } from "./fluffyLight";
 import { transparentTheme } from "./transparent";
 import { highContrastTheme } from "./highContrast";
+import { THEME_CATALOG } from "./themeCatalog";
 import type { ThemeMode } from "../types/ui";
+import type { ThemeDefinition } from "./fluffyDark";
 
-export const THEMES = {
+export const THEMES: Record<string, ThemeDefinition> = {
   fluffyDark: fluffyDarkTheme,
   fluffyLight: fluffyLightTheme,
   transparent: transparentTheme,
   highContrast: highContrastTheme,
-} as const;
+  ...Object.fromEntries(THEME_CATALOG.map((t) => [t.id, t])),
+};
 
 export function applyTheme(theme: ThemeMode): void {
   if (typeof document !== "undefined" && document.documentElement) {

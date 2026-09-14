@@ -15,7 +15,6 @@ app = Flask(__name__)
 # Register feature Blueprints (lazy-loaded modules)
 from routes.voice_routes import voice_bp
 from routes.ftp_routes import ftp_bp
-from routes.cluster_routes import cluster_bp
 from routes.network_routes import network_bp
 from routes.extension_routes import extension_bp
 from routes.terminal_routes import terminal_bp
@@ -23,11 +22,11 @@ from routes.local_network_routes import local_network_bp
 
 app.register_blueprint(voice_bp)
 app.register_blueprint(ftp_bp)
-app.register_blueprint(cluster_bp)
 app.register_blueprint(network_bp)
 app.register_blueprint(extension_bp)
 app.register_blueprint(terminal_bp)
 app.register_blueprint(local_network_bp)
+
 
 
 @app.before_request
@@ -504,7 +503,7 @@ def execute_command():
         if project_root not in sys.path:
             sys.path.insert(0, project_root)
 
-        from ai.src.llm_service import get_service
+        from brain.ai.llm_service import get_service
         from voice import speak_custom, stop_speech
         
         # Stop any ongoing speech
@@ -692,7 +691,7 @@ def chat_message():
         if project_root not in sys.path:
             sys.path.insert(0, project_root)
         
-        from ai.src.llm_service import get_service
+        from brain.ai.llm_service import get_service
         from voice import speak_custom, speak_stream, stop_speech
         
         # Stop any ongoing speech
@@ -864,7 +863,7 @@ def chat_stream():
             "timestamp": __import__('time').time()
         })
         
-        from ai.src.llm_service import get_service
+        from brain.ai.llm_service import get_service
         from flask import Response, stream_with_context
         from voice import speak_stream, stop_speech
         
@@ -957,7 +956,7 @@ def get_llm_config():
         if project_root not in sys.path:
             sys.path.insert(0, project_root)
         
-        from ai.src.llm_config import get_config
+        from brain.ai.llm_config import get_config
         
         config = get_config()
         return jsonify({
@@ -985,7 +984,7 @@ def update_llm_config():
         if project_root not in sys.path:
             sys.path.insert(0, project_root)
         
-        from ai.src.llm_config import get_config
+        from brain.ai.llm_config import get_config
         
         config = get_config()
         success = config.update_config(api_key=api_key, model=model)

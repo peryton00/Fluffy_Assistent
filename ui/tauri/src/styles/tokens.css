@@ -256,4 +256,755 @@
   box-shadow: 0 8px 32px rgba(0, 0, 0, 0.35), inset 0 1px 0 rgba(255, 255, 255, 0.16);
 }
 
+/* ============================================================================
+   1. Minimalism (Ultra-restrained monochrome, hairline borders, calm whitespace)
+   ============================================================================ */
+[data-theme="minimalism"] {
+  --color-bg: #09090b;
+  --color-surface-subtle: #0f0f12;
+  --color-surface: #141418;
+  --color-surface-elevated: #1a1a20;
+  --color-surface-hover: #22222a;
+  --color-surface-active: #2a2a34;
+
+  --color-border-subtle: #1c1c22;
+  --color-border: #272730;
+  --color-border-strong: #3f3f4e;
+  --color-border-focus: #e4e4e7;
+
+  --color-text: #fafafa;
+  --color-text-secondary: #a1a1aa;
+  --color-text-muted: #71717a;
+  --color-text-disabled: #3f3f46;
+
+  --color-accent: #f4f4f5;
+  --color-accent-hover: #ffffff;
+  --color-accent-muted: rgba(244, 244, 245, 0.1);
+
+  --color-success: #10b981;
+  --color-success-muted: rgba(16, 185, 129, 0.1);
+  --color-success-text: #34d399;
+
+  --color-warning: #f59e0b;
+  --color-warning-muted: rgba(245, 158, 11, 0.1);
+  --color-warning-text: #fbbf24;
+
+  --color-danger: #ef4444;
+  --color-danger-muted: rgba(239, 68, 68, 0.1);
+  --color-danger-text: #f87171;
+
+  --color-info: #06b6d4;
+  --color-info-muted: rgba(6, 182, 212, 0.1);
+
+  --radius-xs: 1px;
+  --radius-sm: 2px;
+  --radius-md: 4px;
+  --radius-lg: 4px;
+
+  --shadow-sm: none;
+  --shadow-md: 0 2px 4px rgba(0, 0, 0, 0.4);
+  --shadow-lg: 0 4px 12px rgba(0, 0, 0, 0.6);
+}
+
+/* ============================================================================
+   2. Maximalism (Vibrant high-contrast energy, electric violet/magenta)
+   ============================================================================ */
+[data-theme="maximalism"] {
+  --color-bg: #0b0818;
+  --color-surface-subtle: #130e28;
+  --color-surface: #1a1438;
+  --color-surface-elevated: #261d50;
+  --color-surface-hover: #372b6f;
+  --color-surface-active: #4a3a94;
+
+  --color-border-subtle: #332663;
+  --color-border: #4d3a94;
+  --color-border-strong: #ff007f;
+  --color-border-focus: #00f0ff;
+
+  --color-text: #ffffff;
+  --color-text-secondary: #f0d4ff;
+  --color-text-muted: #af9ecc;
+  --color-text-disabled: #67538c;
+
+  --color-accent: #ff007f;
+  --color-accent-hover: #ff3399;
+  --color-accent-muted: rgba(255, 0, 127, 0.22);
+
+  --color-success: #00ff88;
+  --color-success-muted: rgba(0, 255, 136, 0.2);
+  --color-success-text: #00ff88;
+
+  --color-warning: #ffea00;
+  --color-warning-muted: rgba(255, 234, 0, 0.2);
+  --color-warning-text: #ffea00;
+
+  --color-danger: #ff0055;
+  --color-danger-muted: rgba(255, 0, 85, 0.22);
+  --color-danger-text: #ff3377;
+
+  --color-info: #00f0ff;
+  --color-info-muted: rgba(0, 240, 255, 0.22);
+
+  --shadow-sm: 0 2px 8px rgba(255, 0, 127, 0.25);
+  --shadow-md: 0 8px 24px rgba(11, 8, 24, 0.6), 0 0 12px rgba(255, 0, 127, 0.2);
+  --shadow-lg: 0 16px 40px rgba(11, 8, 24, 0.8), 0 0 24px rgba(0, 240, 255, 0.25);
+}
+
+/* ============================================================================
+   3. Glassmorphism (Frosted specular translucency, refraction blur)
+   ============================================================================ */
+[data-theme="glassmorphism"] {
+  --color-bg: rgba(10, 14, 26, 0.82);
+  --color-surface-subtle: rgba(16, 23, 42, 0.45);
+  --color-surface: rgba(22, 32, 56, 0.58);
+  --color-surface-elevated: rgba(30, 44, 76, 0.72);
+  --color-surface-hover: rgba(56, 189, 248, 0.2);
+  --color-surface-active: rgba(56, 189, 248, 0.32);
+
+  --color-border-subtle: rgba(255, 255, 255, 0.08);
+  --color-border: rgba(255, 255, 255, 0.16);
+  --color-border-strong: rgba(255, 255, 255, 0.35);
+  --color-border-focus: #38bdf8;
+
+  --color-text: #f8fafc;
+  --color-text-secondary: #cbd5e1;
+  --color-text-muted: #94a3b8;
+  --color-text-disabled: #64748b;
+
+  --color-accent: #38bdf8;
+  --color-accent-hover: #0ea5e9;
+  --color-accent-muted: rgba(56, 189, 248, 0.2);
+
+  --color-success: #10e59a;
+  --color-success-muted: rgba(16, 229, 154, 0.2);
+  --color-success-text: #34d399;
+
+  --color-warning: #facc15;
+  --color-warning-muted: rgba(250, 204, 21, 0.2);
+  --color-warning-text: #fde047;
+
+  --color-danger: #f43f5e;
+  --color-danger-muted: rgba(244, 63, 94, 0.2);
+  --color-danger-text: #fb7185;
+
+  --color-info: #818cf8;
+  --color-info-muted: rgba(129, 140, 248, 0.2);
+
+  --shadow-sm: 0 2px 8px rgba(0, 0, 0, 0.25), inset 0 1px 0 rgba(255, 255, 255, 0.14);
+  --shadow-md: 0 8px 24px rgba(0, 0, 0, 0.38), inset 0 1px 0 rgba(255, 255, 255, 0.2);
+  --shadow-lg: 0 16px 48px rgba(0, 0, 0, 0.55), 0 0 25px rgba(56, 189, 248, 0.18), inset 0 1px 0 rgba(255, 255, 255, 0.28);
+}
+
+[data-theme="glassmorphism"] header,
+[data-theme="glassmorphism"] aside,
+[data-theme="glassmorphism"] footer,
+[data-theme="glassmorphism"] [role="banner"],
+[data-theme="glassmorphism"] [role="navigation"] {
+  backdrop-filter: blur(20px) saturate(180%);
+  -webkit-backdrop-filter: blur(20px) saturate(180%);
+}
+
+/* ============================================================================
+   4. Neumorphism (Soft extruded tactile surfaces, balanced dual drop shadows)
+   ============================================================================ */
+[data-theme="neumorphism"] {
+  --color-bg: #21252f;
+  --color-surface-subtle: #1c2029;
+  --color-surface: #21252f;
+  --color-surface-elevated: #242934;
+  --color-surface-hover: #272c38;
+  --color-surface-active: #1d212a;
+
+  --color-border-subtle: #1a1d25;
+  --color-border: #1a1d25;
+  --color-border-strong: #2c3240;
+  --color-border-focus: #60a5fa;
+
+  --color-text: #e2e8f0;
+  --color-text-secondary: #94a3b8;
+  --color-text-muted: #64748b;
+  --color-text-disabled: #475569;
+
+  --color-accent: #60a5fa;
+  --color-accent-hover: #3b82f6;
+  --color-accent-muted: rgba(96, 165, 250, 0.16);
+
+  --color-success: #34d399;
+  --color-success-muted: rgba(52, 211, 153, 0.16);
+  --color-success-text: #34d399;
+
+  --color-warning: #fbbf24;
+  --color-warning-muted: rgba(251, 191, 36, 0.16);
+  --color-warning-text: #fbbf24;
+
+  --color-danger: #f87171;
+  --color-danger-muted: rgba(248, 113, 113, 0.16);
+  --color-danger-text: #f87171;
+
+  --color-info: #38bdf8;
+  --color-info-muted: rgba(56, 189, 248, 0.16);
+
+  --radius-xs: 4px;
+  --radius-sm: 8px;
+  --radius-md: 12px;
+  --radius-lg: 16px;
+
+  --shadow-sm: 3px 3px 6px #171a21, -3px -3px 6px #2b303d;
+  --shadow-md: 6px 6px 14px #161820, -6px -6px 14px #2c3240;
+  --shadow-lg: 10px 10px 24px #14161c, -10px -10px 24px #2e3442;
+}
+
+/* ============================================================================
+   5. Claymorphism (Rounded volumetric 3D clay, pill radii, soft inner highlight)
+   ============================================================================ */
+[data-theme="claymorphism"] {
+  --color-bg: #181b2c;
+  --color-surface-subtle: #1f2339;
+  --color-surface: #272d47;
+  --color-surface-elevated: #313858;
+  --color-surface-hover: #3d466e;
+  --color-surface-active: #475280;
+
+  --color-border-subtle: rgba(255, 255, 255, 0.08);
+  --color-border: rgba(255, 255, 255, 0.15);
+  --color-border-strong: rgba(255, 255, 255, 0.28);
+  --color-border-focus: #a78bfa;
+
+  --color-text: #f8fafc;
+  --color-text-secondary: #cbd5e1;
+  --color-text-muted: #94a3b8;
+  --color-text-disabled: #64748b;
+
+  --color-accent: #a78bfa;
+  --color-accent-hover: #8b5cf6;
+  --color-accent-muted: rgba(167, 139, 250, 0.2);
+
+  --color-success: #34d399;
+  --color-success-muted: rgba(52, 211, 153, 0.2);
+  --color-success-text: #34d399;
+
+  --color-warning: #facc15;
+  --color-warning-muted: rgba(250, 204, 21, 0.2);
+  --color-warning-text: #fde047;
+
+  --color-danger: #fb7185;
+  --color-danger-muted: rgba(251, 113, 133, 0.2);
+  --color-danger-text: #fb7185;
+
+  --color-info: #67e8f9;
+  --color-info-muted: rgba(103, 232, 249, 0.2);
+
+  --radius-xs: 6px;
+  --radius-sm: 10px;
+  --radius-md: 16px;
+  --radius-lg: 22px;
+
+  --shadow-sm: inset 1px 1px 2px rgba(255, 255, 255, 0.2), inset -2px -2px 4px rgba(0, 0, 0, 0.35), 0 4px 10px rgba(0, 0, 0, 0.35);
+  --shadow-md: inset 2px 2px 4px rgba(255, 255, 255, 0.25), inset -3px -3px 6px rgba(0, 0, 0, 0.4), 0 8px 20px rgba(0, 0, 0, 0.45);
+  --shadow-lg: inset 3px 3px 6px rgba(255, 255, 255, 0.3), inset -4px -4px 8px rgba(0, 0, 0, 0.45), 0 14px 32px rgba(0, 0, 0, 0.55);
+}
+
+/* ============================================================================
+   6. Brutalism (Raw architectural utilitarianism, zero radius, bold 2px borders)
+   ============================================================================ */
+[data-theme="brutalism"] {
+  --color-bg: #050505;
+  --color-surface-subtle: #0f0f0f;
+  --color-surface: #141414;
+  --color-surface-elevated: #1f1f1f;
+  --color-surface-hover: #2b2b2b;
+  --color-surface-active: #383838;
+
+  --color-border-subtle: #555555;
+  --color-border: #ffffff;
+  --color-border-strong: #ffffff;
+  --color-border-focus: #ffffff;
+
+  --color-text: #ffffff;
+  --color-text-secondary: #d4d4d8;
+  --color-text-muted: #a1a1aa;
+  --color-text-disabled: #71717a;
+
+  --color-accent: #ffffff;
+  --color-accent-hover: #e4e4e7;
+  --color-accent-muted: rgba(255, 255, 255, 0.15);
+
+  --color-success: #22c55e;
+  --color-success-muted: rgba(34, 197, 94, 0.2);
+  --color-success-text: #4ade80;
+
+  --color-warning: #eab308;
+  --color-warning-muted: rgba(234, 179, 8, 0.2);
+  --color-warning-text: #facc15;
+
+  --color-danger: #ef4444;
+  --color-danger-muted: rgba(239, 68, 68, 0.2);
+  --color-danger-text: #f87171;
+
+  --color-info: #06b6d4;
+  --color-info-muted: rgba(6, 182, 212, 0.2);
+
+  --radius-xs: 0px;
+  --radius-sm: 0px;
+  --radius-md: 0px;
+  --radius-lg: 0px;
+  --radius-full: 0px;
+
+  --shadow-sm: none;
+  --shadow-md: none;
+  --shadow-lg: 4px 4px 0px #ffffff;
+}
+
+/* ============================================================================
+   7. Neo-Brutalism (Punchy neon lime/yellow contrast, hard offset drop shadows)
+   ============================================================================ */
+[data-theme="neoBrutalism"] {
+  --color-bg: #121316;
+  --color-surface-subtle: #191a1f;
+  --color-surface: #1e2027;
+  --color-surface-elevated: #262933;
+  --color-surface-hover: #323543;
+  --color-surface-active: #3e4253;
+
+  --color-border-subtle: #3a3e4e;
+  --color-border: #e2f952;
+  --color-border-strong: #e2f952;
+  --color-border-focus: #e2f952;
+
+  --color-text: #ffffff;
+  --color-text-secondary: #e2f952;
+  --color-text-muted: #9aa1b8;
+  --color-text-disabled: #5a5f73;
+
+  --color-accent: #e2f952;
+  --color-accent-hover: #ccee22;
+  --color-accent-muted: rgba(226, 249, 82, 0.2);
+
+  --color-success: #00ff88;
+  --color-success-muted: rgba(0, 255, 136, 0.2);
+  --color-success-text: #00ff88;
+
+  --color-warning: #ffb800;
+  --color-warning-muted: rgba(255, 184, 0, 0.2);
+  --color-warning-text: #ffb800;
+
+  --color-danger: #ff3366;
+  --color-danger-muted: rgba(255, 51, 102, 0.2);
+  --color-danger-text: #ff3366;
+
+  --color-info: #00e5ff;
+  --color-info-muted: rgba(0, 229, 255, 0.2);
+
+  --radius-xs: 2px;
+  --radius-sm: 4px;
+  --radius-md: 6px;
+  --radius-lg: 8px;
+
+  --shadow-sm: 2px 2px 0px #e2f952;
+  --shadow-md: 4px 4px 0px #e2f952;
+  --shadow-lg: 6px 6px 0px #e2f952;
+}
+
+/* ============================================================================
+   8. Skeuomorphism (Physical hardware simulation, bevel highlights, brass accents)
+   ============================================================================ */
+[data-theme="skeuomorphism"] {
+  --color-bg: #1a1c20;
+  --color-surface-subtle: #202228;
+  --color-surface: #272a31;
+  --color-surface-elevated: #323640;
+  --color-surface-hover: #3d424e;
+  --color-surface-active: #22252c;
+
+  --color-border-subtle: #2e323b;
+  --color-border: #444a57;
+  --color-border-strong: #5a6273;
+  --color-border-focus: #d4a24c;
+
+  --color-text: #f0f2f5;
+  --color-text-secondary: #c4c9d4;
+  --color-text-muted: #8890a0;
+  --color-text-disabled: #555c6b;
+
+  --color-accent: #d4a24c;
+  --color-accent-hover: #e0b05b;
+  --color-accent-muted: rgba(212, 162, 76, 0.2);
+
+  --color-success: #2ea043;
+  --color-success-muted: rgba(46, 160, 67, 0.2);
+  --color-success-text: #3fb950;
+
+  --color-warning: #d29922;
+  --color-warning-muted: rgba(210, 153, 34, 0.2);
+  --color-warning-text: #e3b341;
+
+  --color-danger: #f85149;
+  --color-danger-muted: rgba(248, 81, 73, 0.2);
+  --color-danger-text: #ff7b72;
+
+  --color-info: #58a6ff;
+  --color-info-muted: rgba(88, 166, 255, 0.2);
+
+  --radius-xs: 3px;
+  --radius-sm: 5px;
+  --radius-md: 8px;
+  --radius-lg: 12px;
+
+  --shadow-sm: inset 0 1px 0 rgba(255, 255, 255, 0.16), 0 2px 4px rgba(0, 0, 0, 0.5);
+  --shadow-md: inset 0 1px 0 rgba(255, 255, 255, 0.2), 0 4px 12px rgba(0, 0, 0, 0.65);
+  --shadow-lg: inset 0 1px 0 rgba(255, 255, 255, 0.25), 0 8px 24px rgba(0, 0, 0, 0.75);
+}
+
+/* ============================================================================
+   9. Flat Design (Zero gradients, zero shadows, solid chromatic planes)
+   ============================================================================ */
+[data-theme="flatDesign"] {
+  --color-bg: #1e293b;
+  --color-surface-subtle: #172033;
+  --color-surface: #0f172a;
+  --color-surface-elevated: #1e293b;
+  --color-surface-hover: #334155;
+  --color-surface-active: #475569;
+
+  --color-border-subtle: #243044;
+  --color-border: #334155;
+  --color-border-strong: #475569;
+  --color-border-focus: #0ea5e9;
+
+  --color-text: #f8fafc;
+  --color-text-secondary: #cbd5e1;
+  --color-text-muted: #94a3b8;
+  --color-text-disabled: #64748b;
+
+  --color-accent: #0ea5e9;
+  --color-accent-hover: #0284c7;
+  --color-accent-muted: rgba(14, 165, 233, 0.18);
+
+  --color-success: #10b981;
+  --color-success-muted: rgba(16, 185, 129, 0.18);
+  --color-success-text: #34d399;
+
+  --color-warning: #f59e0b;
+  --color-warning-muted: rgba(245, 158, 11, 0.18);
+  --color-warning-text: #fbbf24;
+
+  --color-danger: #ef4444;
+  --color-danger-muted: rgba(239, 68, 68, 0.18);
+  --color-danger-text: #f87171;
+
+  --color-info: #06b6d4;
+  --color-info-muted: rgba(6, 182, 212, 0.18);
+
+  --radius-xs: 0px;
+  --radius-sm: 2px;
+  --radius-md: 4px;
+  --radius-lg: 4px;
+
+  --shadow-sm: none;
+  --shadow-md: none;
+  --shadow-lg: none;
+}
+
+/* ============================================================================
+   10. Material Design (Material 3 tonal elevations, calibrated shadows, lavender)
+   ============================================================================ */
+[data-theme="materialDesign"] {
+  --color-bg: #141218;
+  --color-surface-subtle: #19171e;
+  --color-surface: #1d1b20;
+  --color-surface-elevated: #2b2930;
+  --color-surface-hover: #36343b;
+  --color-surface-active: #413f47;
+
+  --color-border-subtle: #36343b;
+  --color-border: #49454f;
+  --color-border-strong: #79747e;
+  --color-border-focus: #d0bcff;
+
+  --color-text: #e6e1e5;
+  --color-text-secondary: #cac4d0;
+  --color-text-muted: #938f99;
+  --color-text-disabled: #605d66;
+
+  --color-accent: #d0bcff;
+  --color-accent-hover: #e8def8;
+  --color-accent-muted: rgba(208, 188, 255, 0.18);
+
+  --color-success: #b4eeb4;
+  --color-success-muted: rgba(180, 238, 180, 0.18);
+  --color-success-text: #81c784;
+
+  --color-warning: #ffe082;
+  --color-warning-muted: rgba(255, 224, 130, 0.18);
+  --color-warning-text: #ffd54f;
+
+  --color-danger: #f2b8b5;
+  --color-danger-muted: rgba(242, 184, 181, 0.18);
+  --color-danger-text: #e57373;
+
+  --color-info: #a5d8ff;
+  --color-info-muted: rgba(165, 216, 255, 0.18);
+
+  --radius-xs: 4px;
+  --radius-sm: 8px;
+  --radius-md: 12px;
+  --radius-lg: 16px;
+
+  --shadow-sm: 0 1px 3px rgba(0, 0, 0, 0.3), 0 1px 2px rgba(0, 0, 0, 0.4);
+  --shadow-md: 0 4px 8px rgba(0, 0, 0, 0.35), 0 2px 4px rgba(0, 0, 0, 0.4);
+  --shadow-lg: 0 8px 16px rgba(0, 0, 0, 0.45), 0 4px 8px rgba(0, 0, 0, 0.5);
+}
+
+/* ============================================================================
+   11. Bento UI (Modular card geometry, charcoal graphite, sleek micro-glow)
+   ============================================================================ */
+[data-theme="bentoUi"] {
+  --color-bg: #090a0f;
+  --color-surface-subtle: #0e1017;
+  --color-surface: #141620;
+  --color-surface-elevated: #1b1e2b;
+  --color-surface-hover: #242839;
+  --color-surface-active: #2f344a;
+
+  --color-border-subtle: #1c202e;
+  --color-border: #272d40;
+  --color-border-strong: #3d4560;
+  --color-border-focus: #6366f1;
+
+  --color-text: #f1f5f9;
+  --color-text-secondary: #cbd5e1;
+  --color-text-muted: #8391a7;
+  --color-text-disabled: #4e586b;
+
+  --color-accent: #6366f1;
+  --color-accent-hover: #4f46e5;
+  --color-accent-muted: rgba(99, 102, 241, 0.18);
+
+  --color-success: #10b981;
+  --color-success-muted: rgba(16, 185, 129, 0.16);
+  --color-success-text: #34d399;
+
+  --color-warning: #f59e0b;
+  --color-warning-muted: rgba(245, 158, 11, 0.16);
+  --color-warning-text: #fbbf24;
+
+  --color-danger: #ef4444;
+  --color-danger-muted: rgba(239, 68, 68, 0.16);
+  --color-danger-text: #f87171;
+
+  --color-info: #06b6d4;
+  --color-info-muted: rgba(6, 182, 212, 0.16);
+
+  --radius-xs: 4px;
+  --radius-sm: 8px;
+  --radius-md: 12px;
+  --radius-lg: 16px;
+
+  --shadow-sm: 0 2px 6px rgba(0, 0, 0, 0.35);
+  --shadow-md: 0 6px 18px rgba(0, 0, 0, 0.45), inset 0 1px 0 rgba(255, 255, 255, 0.05);
+  --shadow-lg: 0 12px 32px rgba(0, 0, 0, 0.6), inset 0 1px 0 rgba(255, 255, 255, 0.08);
+}
+
+/* ============================================================================
+   12. Y2K Design (Turn-of-millennium cyber silver, electric cyan & bubblegum pink)
+   ============================================================================ */
+[data-theme="y2kDesign"] {
+  --color-bg: #0a0e17;
+  --color-surface-subtle: #101726;
+  --color-surface: #162035;
+  --color-surface-elevated: #1e2c49;
+  --color-surface-hover: #293c63;
+  --color-surface-active: #354e80;
+
+  --color-border-subtle: #1c3554;
+  --color-border: #00ffff;
+  --color-border-strong: #ff00a0;
+  --color-border-focus: #00ffff;
+
+  --color-text: #e0f7ff;
+  --color-text-secondary: #9ee3ff;
+  --color-text-muted: #67a2bd;
+  --color-text-disabled: #3d677a;
+
+  --color-accent: #ff00a0;
+  --color-accent-hover: #ff33b5;
+  --color-accent-muted: rgba(255, 0, 160, 0.22);
+
+  --color-success: #00ffcc;
+  --color-success-muted: rgba(0, 255, 204, 0.2);
+  --color-success-text: #00ffcc;
+
+  --color-warning: #ffe600;
+  --color-warning-muted: rgba(255, 230, 0, 0.2);
+  --color-warning-text: #ffe600;
+
+  --color-danger: #ff0055;
+  --color-danger-muted: rgba(255, 0, 85, 0.22);
+  --color-danger-text: #ff3377;
+
+  --color-info: #00ffff;
+  --color-info-muted: rgba(0, 255, 255, 0.22);
+
+  --radius-xs: 2px;
+  --radius-sm: 6px;
+  --radius-md: 10px;
+  --radius-lg: 14px;
+
+  --shadow-sm: 0 0 8px rgba(0, 255, 255, 0.3);
+  --shadow-md: 0 0 16px rgba(0, 255, 255, 0.35), 0 0 8px rgba(255, 0, 160, 0.25);
+  --shadow-lg: 0 0 28px rgba(0, 255, 255, 0.45), 0 0 14px rgba(255, 0, 160, 0.35);
+}
+
+/* ============================================================================
+   13. Retro Design (1980s monochrome CRT terminal, phosphor green glow)
+   ============================================================================ */
+[data-theme="retroDesign"] {
+  --color-bg: #070d07;
+  --color-surface-subtle: #0c140c;
+  --color-surface: #111c11;
+  --color-surface-elevated: #172717;
+  --color-surface-hover: #1f341f;
+  --color-surface-active: #294429;
+
+  --color-border-subtle: #183318;
+  --color-border: #265526;
+  --color-border-strong: #39ff14;
+  --color-border-focus: #39ff14;
+
+  --color-text: #39ff14;
+  --color-text-secondary: #2ecc11;
+  --color-text-muted: #1f8a0c;
+  --color-text-disabled: #145508;
+
+  --color-accent: #39ff14;
+  --color-accent-hover: #5aff3b;
+  --color-accent-muted: rgba(57, 255, 20, 0.18);
+
+  --color-success: #39ff14;
+  --color-success-muted: rgba(57, 255, 20, 0.18);
+  --color-success-text: #39ff14;
+
+  --color-warning: #ffb000;
+  --color-warning-muted: rgba(255, 176, 0, 0.18);
+  --color-warning-text: #ffb000;
+
+  --color-danger: #ff3b30;
+  --color-danger-muted: rgba(255, 59, 48, 0.18);
+  --color-danger-text: #ff3b30;
+
+  --color-info: #00e5ff;
+  --color-info-muted: rgba(0, 229, 255, 0.18);
+
+  --radius-xs: 1px;
+  --radius-sm: 2px;
+  --radius-md: 3px;
+  --radius-lg: 4px;
+
+  --shadow-sm: 0 0 6px rgba(57, 255, 20, 0.25);
+  --shadow-md: 0 0 14px rgba(57, 255, 20, 0.35);
+  --shadow-lg: 0 0 24px rgba(57, 255, 20, 0.45);
+}
+
+/* ============================================================================
+   14. Cyberpunk (High-tech neon dystopia, electric cyan, yellow, and magenta)
+   ============================================================================ */
+[data-theme="cyberpunk"] {
+  --color-bg: #040408;
+  --color-surface-subtle: #080912;
+  --color-surface: #0e101c;
+  --color-surface-elevated: #161a2c;
+  --color-surface-hover: #222742;
+  --color-surface-active: #2f3659;
+
+  --color-border-subtle: #251230;
+  --color-border: #ff0055;
+  --color-border-strong: #00f0ff;
+  --color-border-focus: #fee801;
+
+  --color-text: #fcee0a;
+  --color-text-secondary: #00f0ff;
+  --color-text-muted: #7b88aa;
+  --color-text-disabled: #434a60;
+
+  --color-accent: #00f0ff;
+  --color-accent-hover: #50f5ff;
+  --color-accent-muted: rgba(0, 240, 255, 0.22);
+
+  --color-success: #00ff66;
+  --color-success-muted: rgba(0, 255, 102, 0.22);
+  --color-success-text: #00ff66;
+
+  --color-warning: #fcee0a;
+  --color-warning-muted: rgba(252, 238, 10, 0.22);
+  --color-warning-text: #fcee0a;
+
+  --color-danger: #ff0055;
+  --color-danger-muted: rgba(255, 0, 85, 0.24);
+  --color-danger-text: #ff0055;
+
+  --color-info: #00f0ff;
+  --color-info-muted: rgba(0, 240, 255, 0.22);
+
+  --radius-xs: 0px;
+  --radius-sm: 2px;
+  --radius-md: 4px;
+  --radius-lg: 4px;
+
+  --shadow-sm: 0 0 8px rgba(0, 240, 255, 0.35);
+  --shadow-md: 0 0 18px rgba(255, 0, 85, 0.32), 0 0 10px rgba(0, 240, 255, 0.3);
+  --shadow-lg: 0 0 32px rgba(255, 0, 85, 0.4), 0 0 16px rgba(0, 240, 255, 0.35);
+}
+
+/* ============================================================================
+   15. Editorial Design (Quiet luxury broadsheet, warm parchment & terracotta)
+   ============================================================================ */
+[data-theme="editorialDesign"] {
+  --color-bg: #121215;
+  --color-surface-subtle: #17171b;
+  --color-surface: #1e1e24;
+  --color-surface-elevated: #272730;
+  --color-surface-hover: #32323e;
+  --color-surface-active: #3e3e4c;
+
+  --color-border-subtle: #292934;
+  --color-border: #383847;
+  --color-border-strong: #54546a;
+  --color-border-focus: #d96547;
+
+  --color-text: #f4f0e8;
+  --color-text-secondary: #d8d2c4;
+  --color-text-muted: #918b7e;
+  --color-text-disabled: #58544c;
+
+  --color-accent: #d96547;
+  --color-accent-hover: #e5775a;
+  --color-accent-muted: rgba(217, 101, 71, 0.18);
+
+  --color-success: #3da66a;
+  --color-success-muted: rgba(61, 166, 106, 0.18);
+  --color-success-text: #4dbb7c;
+
+  --color-warning: #d99b38;
+  --color-warning-muted: rgba(217, 155, 56, 0.18);
+  --color-warning-text: #e6ab4a;
+
+  --color-danger: #d94b4b;
+  --color-danger-muted: rgba(217, 75, 75, 0.18);
+  --color-danger-text: #e66060;
+
+  --color-info: #5a8bd8;
+  --color-info-muted: rgba(90, 139, 216, 0.18);
+
+  --radius-xs: 1px;
+  --radius-sm: 2px;
+  --radius-md: 4px;
+  --radius-lg: 6px;
+
+  --shadow-sm: 0 1px 3px rgba(0, 0, 0, 0.3);
+  --shadow-md: 0 4px 14px rgba(0, 0, 0, 0.45);
+  --shadow-lg: 0 10px 28px rgba(0, 0, 0, 0.6);
+}
+
+
 

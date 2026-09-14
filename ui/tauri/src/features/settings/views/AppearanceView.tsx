@@ -15,56 +15,23 @@ import { parseVscodeTheme } from "../../../themes/vscodeThemeImporter";
 import { uiStore } from "../../../stores/uiStore";
 import {
   SunIcon,
-  MoonIcon,
-  ShieldIcon,
   CheckIcon,
   CloseIcon,
-  SparklesIcon,
 } from "../../../components/common/Icons";
 
-type BuiltInTheme = "fluffyDark" | "fluffyLight" | "transparent" | "highContrast";
+import type { ThemeMode } from "../../../types/ui";
+import { THEME_CATALOG } from "../../../themes/themeCatalog";
 
-const BUILT_IN_THEMES: Array<{
-  id: BuiltInTheme;
-  name: string;
-  description: string;
-  icon: React.ReactNode;
-  bgPreview: string;
-  borderPreview: string;
-}> = [
-  {
-    id: "fluffyDark",
-    name: "Fluffy Dark",
-    description: "Industrial dark palette with restrained purple accents. Optimized for low-light operator workstations.",
-    icon: <MoonIcon size={16} />,
-    bgPreview: "#12141c",
-    borderPreview: "#2d3348",
-  },
-  {
-    id: "transparent",
-    name: "Aero Glass (Transparent)",
-    description: "Ultra-sleek frosted glassmorphism with dynamic ambient glow, crystal border speculars, and deep translucency.",
-    icon: <SparklesIcon size={16} />,
-    bgPreview: "linear-gradient(135deg, rgba(56,189,248,0.22) 0%, rgba(129,140,248,0.22) 100%)",
-    borderPreview: "#38bdf8",
-  },
-  {
-    id: "fluffyLight",
-    name: "Fluffy Light",
-    description: "Crisp studio light mode with high clarity for bright operational environments.",
-    icon: <SunIcon size={16} />,
-    bgPreview: "#f8fafc",
-    borderPreview: "#cbd5e1",
-  },
-  {
-    id: "highContrast",
-    name: "High Contrast",
-    description: "Maximum visual separation and stark border contrast for enhanced accessibility.",
-    icon: <ShieldIcon size={16} />,
-    bgPreview: "#000000",
-    borderPreview: "#ffffff",
-  },
-];
+const THEME_CATEGORIES = [
+  "All",
+  "Core",
+  "Structural & Raw",
+  "Tactile & 3D",
+  "Modern & Editorial",
+  "Futuristic & Retro",
+] as const;
+
+type ThemeCategory = typeof THEME_CATEGORIES[number];
 
 // ─── Small inline icons ───────────────────────────────────────────────────────
 
@@ -209,9 +176,15 @@ export const AppearanceView: React.FC = () => {
   const [importError, setImportError] = useState<string | null>(null);
   const [importSuccess, setImportSuccess] = useState<string | null>(null);
 
-  const handleSelectTheme = (selectedTheme: BuiltInTheme) => {
+  const [selectedCategory, setSelectedCategory] = useState<ThemeCategory>("All");
+
+  const handleSelectTheme = (selectedTheme: ThemeMode) => {
     settingsStore.updateGeneralSettings({ theme: selectedTheme });
   };
+
+  const displayedThemes = selectedCategory === "All"
+    ? THEME_CATALOG
+    : THEME_CATALOG.filter((t) => t.category === selectedCategory);
 
   const handleToggleReducedMotion = (reduced: boolean) => {
     settingsStore.updateGeneralSettings({ reducedMotion: reduced });
@@ -307,16 +280,53 @@ export const AppearanceView: React.FC = () => {
       </header>
 
       {/* Main Settings Body */}
-      <div style={{ flex: 1, overflowY: "auto", padding: "var(--space-5) var(--space-6)", maxWidth: "680px", display: "flex", flexDirection: "column", gap: "var(--space-6)" }}>
+      <div style={{ flex: 1, overflowY: "auto", padding: "var(--space-5) var(--space-6)", maxWidth: "880px", display: "flex", flexDirection: "column", gap: "var(--space-6)" }}>
 
-        {/* ── Built-in Theme Cards ── */}
-        <div style={{ display: "flex", flexDirection: "column", gap: "var(--space-3)" }}>
-          <h3 style={{ fontSize: "11px", fontWeight: "var(--font-weight-semibold)", color: "var(--color-text-muted)", textTransform: "uppercase", letterSpacing: "0.05em", margin: 0 }}>
-            Workbench Theme
-          </h3>
+        {/* ── Workbench Themes Grid ── */}
+        <div style={{ display: "flex", flexDirection: "column", gap: "var(--space-4)" }}>
+          <div style={{ display: "flex", flexWrap: "wrap", alignItems: "center", justifyContent: "space-between", gap: "var(--space-3)" }}>
+            <div>
+              <h3 style={{ fontSize: "11px", fontWeight: "var(--font-weight-semibold)", color: "var(--color-text-muted)", textTransform: "uppercase", letterSpacing: "0.05em", margin: 0 }}>
+                Workbench Theme ({THEME_CATALOG.length} Available)
+              </h3>
+              <p style={{ fontSize: "var(--font-size-xs)", color: "var(--color-text-muted)", margin: "2px 0 0" }}>
+                Select an aesthetic design paradigm for your operator workspace.
+              </p>
+            </div>
 
-          <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(180px, 1fr))", gap: "var(--space-3)" }}>
-            {BUILT_IN_THEMES.map((t) => {
+            {/* Category Filter Pills */}
+            <div style={{ display: "flex", flexWrap: "wrap", gap: "var(--space-2)" }}>
+              {THEME_CATEGORIES.map((cat) => {
+                const isCatActive = selectedCategory === cat;
+                return (
+                  <button
+                    key={cat}
+                    type="button"
+                    onClick={() => setSelectedCategory(cat)}
+                    style={{
+                      padding: "3px 9px",
+                      fontSize: "11px",
+                      fontWeight: isCatActive ? "var(--font-weight-semibold)" : "var(--font-weight-normal)",
+                      borderRadius: "var(--radius-xs)",
+                      backgroundColor: isCatActive
+                        ? "color-mix(in srgb, var(--color-accent) 20%, transparent)"
+                        : "var(--color-surface-elevated)",
+                      border: "1px solid",
+                      borderColor: isCatActive ? "var(--color-accent)" : "var(--color-border)",
+                      color: isCatActive ? "var(--color-accent)" : "var(--color-text-muted)",
+                      cursor: "pointer",
+                      transition: "all 0.12s ease",
+                    }}
+                  >
+                    {cat}
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+
+          <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(240px, 1fr))", gap: "var(--space-3)" }}>
+            {displayedThemes.map((t) => {
               const isSelected = theme === t.id;
               return (
                 <div
@@ -337,56 +347,95 @@ export const AppearanceView: React.FC = () => {
                     backgroundColor: isSelected ? "var(--color-surface-elevated)" : "var(--color-surface)",
                     display: "flex",
                     flexDirection: "column",
-                    gap: "var(--space-2)",
+                    gap: "var(--space-3)",
                     cursor: "pointer",
                     textAlign: "left",
                     transition: "all 0.15s ease",
                     boxShadow: isSelected ? "0 0 0 1px var(--color-accent)" : "none",
                   }}
                 >
-                  <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+                  <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: "var(--space-2)" }}>
                     <div style={{ display: "flex", alignItems: "center", gap: "6px" }}>
-                      <span style={{ color: isSelected ? "var(--color-accent)" : "var(--color-text-muted)" }}>{t.icon}</span>
+                      <span
+                        style={{
+                          width: "8px",
+                          height: "8px",
+                          borderRadius: "50%",
+                          backgroundColor: t.accentPreview,
+                          display: "inline-block",
+                        }}
+                      />
                       <span style={{ fontSize: "var(--font-size-xs)", fontWeight: "var(--font-weight-semibold)", color: "var(--color-text)" }}>
                         {t.name}
                       </span>
                     </div>
-                    {isSelected && (
+                    {isSelected ? (
                       <span
                         style={{
-                          width: "16px",
-                          height: "16px",
-                          borderRadius: "50%",
-                          backgroundColor: "var(--color-accent)",
-                          color: "#ffffff",
-                          display: "flex",
+                          display: "inline-flex",
                           alignItems: "center",
-                          justifyContent: "center",
+                          gap: "3px",
+                          fontSize: "10px",
+                          fontWeight: "var(--font-weight-bold)",
+                          color: "var(--color-accent)",
+                          backgroundColor: "color-mix(in srgb, var(--color-accent) 15%, transparent)",
+                          padding: "2px 6px",
+                          borderRadius: "var(--radius-xs)",
                         }}
                       >
-                        <CheckIcon size={10} />
+                        <CheckIcon size={10} /> Active
+                      </span>
+                    ) : (
+                      <span
+                        style={{
+                          fontSize: "10px",
+                          color: "var(--color-text-muted)",
+                          backgroundColor: "var(--color-surface-subtle)",
+                          padding: "1px 5px",
+                          borderRadius: "var(--radius-xs)",
+                        }}
+                      >
+                        {t.tag}
                       </span>
                     )}
                   </div>
 
-                  {/* Swatch Preview */}
+                  {/* Swatch Preview Box */}
                   <div
                     style={{
-                      height: "36px",
+                      height: "42px",
                       borderRadius: "var(--radius-xs)",
                       border: `1px solid ${t.borderPreview}`,
-                      backgroundColor: t.bgPreview,
+                      background: t.bgPreview,
                       display: "flex",
                       alignItems: "center",
-                      justifyContent: "center",
+                      justifyContent: "space-between",
+                      padding: "0 var(--space-3)",
                     }}
                   >
-                    <span style={{ fontSize: "10px", fontFamily: "var(--font-mono)", color: "#888888" }}>
+                    <span
+                      style={{
+                        fontSize: "11px",
+                        fontFamily: "var(--font-mono)",
+                        color: t.textPreview,
+                        fontWeight: 500,
+                      }}
+                    >
                       Aa Bb 123
                     </span>
+                    <span
+                      style={{
+                        width: "12px",
+                        height: "12px",
+                        borderRadius: "2px",
+                        backgroundColor: t.accentPreview,
+                        border: "1px solid rgba(255,255,255,0.2)",
+                      }}
+                      title="Accent color"
+                    />
                   </div>
 
-                  <p style={{ fontSize: "11px", color: "var(--color-text-muted)", lineHeight: 1.4, margin: 0 }}>
+                  <p style={{ fontSize: "11px", color: "var(--color-text-muted)", lineHeight: 1.4, margin: 0, minHeight: "32px" }}>
                     {t.description}
                   </p>
                 </div>

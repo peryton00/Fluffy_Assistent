@@ -28,14 +28,31 @@ export const TopBar: React.FC = () => {
   const totalNotifications = pendingApprovalsCount + securityAlertsCount + notificationsCount;
 
   const handleNextTheme = () => {
-    const cycle: Record<ThemeMode, ThemeMode> = {
-      fluffyDark: "fluffyLight",
-      fluffyLight: "transparent",
-      transparent: "highContrast",
-      highContrast: "fluffyDark",
-      custom: "fluffyDark",
-    };
-    uiStore.setTheme(cycle[theme]);
+    const themeOrder: ThemeMode[] = [
+      "fluffyDark",
+      "fluffyLight",
+      "highContrast",
+      "minimalism",
+      "maximalism",
+      "glassmorphism",
+      "neumorphism",
+      "claymorphism",
+      "brutalism",
+      "neoBrutalism",
+      "skeuomorphism",
+      "flatDesign",
+      "materialDesign",
+      "bentoUi",
+      "y2kDesign",
+      "retroDesign",
+      "cyberpunk",
+      "editorialDesign",
+    ];
+    const currentIndex = themeOrder.indexOf(theme);
+    const nextTheme = currentIndex >= 0 && currentIndex < themeOrder.length - 1
+      ? themeOrder[currentIndex + 1]
+      : themeOrder[0];
+    uiStore.setTheme(nextTheme);
   };
 
   const getConnectionDotColor = (state: ConnectionState): string => {

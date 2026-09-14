@@ -25,6 +25,7 @@ import {
   CheckIcon,
   CloseIcon,
   RefreshCwIcon,
+  ActivityIcon,
 } from "../../../components/common/Icons";
 import type { AdminBatchCommandResult, NetworkRole } from "../../../types/contracts";
 
@@ -40,6 +41,17 @@ export const NetworkSystemsView: React.FC = () => {
   const role = useNetworkStore((s) => s.role);
   const connectedAdmins = useNetworkStore((s) => s.connectedAdmins);
   const networkStoreLoading = useNetworkStore((s) => s.loading);
+  const machines = useNetworkStore((s) => s.machines);
+  const activeMachineId = useNetworkStore((s) => s.activeMachineId);
+  const activeMachineData = useNetworkStore((s) => s.activeMachineData);
+
+  const [adminCommandInput, setAdminCommandInput] = useState<string>("");
+  const [adminCommandOutput, setAdminCommandOutput] = useState<{
+    text: string;
+    isError?: boolean;
+    timestamp: string;
+  } | null>(null);
+  const [isAdminExecuting, setIsAdminExecuting] = useState<boolean>(false);
 
   const [selectedBatchNodeIds, setSelectedBatchNodeIds] = useState<Set<string>>(new Set());
   const [batchExecuting, setBatchExecuting] = useState<boolean>(false);
@@ -61,6 +73,79 @@ export const NetworkSystemsView: React.FC = () => {
       networkStore.stopPolling();
     };
   }, []);
+
+  const selectedTargetMachine =
+    machines.find((m) => m.machine_id === activeMachineId) ||
+    machines[0] ||
+    null;
+
+  const handleAdminSendCommand = async (e: React.FormEvent, machineId: string) => {
+    e.preventDefault();
+    if (!adminCommandInput.trim() || isAdminExecuting) return;
+    const cmd = adminCommandInput.trim();
+    setIsAdminExecuting(true);
+    setAdminCommandOutput(null);
+    try {
+      const res = await networkStore.sendAction(machineId, cmd);
+      setAdminCommandOutput({
+        text: res.result || JSON.stringify(res, null, 2),
+        isError: !res.ok,
+        timestamp: new Date().toLocaleTimeString(),
+      });
+      await networkStore.refreshNow();
+    } catch (err: unknown) {
+      setAdminCommandOutput({
+        text: err instanceof Error ? err.message : "Command execution failed.",
+        isError: true,
+        timestamp: new Date().toLocaleTimeString(),
+      });
+    } finally {
+      setIsAdminExecuting(false);
+    }
+  };
+
+  const handleAdminPing = async (machineId: string) => {
+    setIsAdminExecuting(true);
+    try {
+      const res = await networkStore.sendAction(machineId, "ping");
+      setAdminCommandOutput({
+        text: res.result || "Ping completed.",
+        isError: !res.ok,
+        timestamp: new Date().toLocaleTimeString(),
+      });
+      await networkStore.refreshNow();
+    } catch (err: unknown) {
+      setAdminCommandOutput({
+        text: err instanceof Error ? err.message : "Ping failed.",
+        isError: true,
+        timestamp: new Date().toLocaleTimeString(),
+      });
+    } finally {
+      setIsAdminExecuting(false);
+    }
+  };
+
+  const handleAdminScan = async (machineId: string) => {
+    setIsAdminExecuting(true);
+    try {
+      const res = await networkStore.sendAction(machineId, "diagnostic_scan");
+      setAdminCommandOutput({
+        text: res.result || "Diagnostic scan completed.",
+        isError: !res.ok,
+        timestamp: new Date().toLocaleTimeString(),
+      });
+      await networkStore.refreshNow();
+      await networkWorkspaceStore.resync();
+    } catch (err: unknown) {
+      setAdminCommandOutput({
+        text: err instanceof Error ? err.message : "Diagnostic scan failed.",
+        isError: true,
+        timestamp: new Date().toLocaleTimeString(),
+      });
+    } finally {
+      setIsAdminExecuting(false);
+    }
+  };
 
   const handleRoleChange = async (newRole: NetworkRole) => {
     if (newRole === role) return;
@@ -196,8 +281,10 @@ export const NetworkSystemsView: React.FC = () => {
   };
 
   const handleDisconnect = async (e: React.MouseEvent, nodeId: string) => {
-    e.stopPropagation();
+    if (e) e.stopPropagation();
     await networkWorkspaceStore.disconnectNode(nodeId);
+    await networkStore.removeNode(nodeId);
+    await networkWorkspaceStore.resync();
   };
 
   const connectedNodes = nodes.filter((n) => n.availability === "connected");
@@ -479,6 +566,370 @@ export const NetworkSystemsView: React.FC = () => {
             <div style={{ fontSize: "11px", color: "var(--color-text-secondary)", lineHeight: "1.4" }}>
               <strong>Admin Connection Instructions:</strong> To connect from another machine, open Fluffy on that machine, set its role to <strong>Admin</strong>, click <strong>"Add Node Manually"</strong>, and enter IP: <span style={{ fontFamily: "var(--font-mono)" }}>{detectedIp}</span> with Port: <span style={{ fontFamily: "var(--font-mono)" }}>9010</span>.
             </div>
+          </div>
+        )}
+
+        {/* Detailed Admin Cluster Nodes & Command Console Card */}
+        {role === "admin" && (
+          <div
+            style={{
+              padding: "var(--space-4)",
+              backgroundColor: "var(--color-surface-elevated)",
+              border: "1px solid rgba(59, 130, 246, 0.3)",
+              borderRadius: "var(--radius-sm)",
+              display: "flex",
+              flexDirection: "column",
+              gap: "var(--space-4)",
+            }}
+          >
+            {/* Header */}
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: "var(--space-2)" }}>
+              <div style={{ display: "flex", alignItems: "center", gap: "var(--space-2)" }}>
+                <ServerIcon size={16} style={{ color: "var(--color-info, #3b82f6)" }} />
+                <span style={{ fontSize: "var(--font-size-xs)", fontWeight: "var(--font-weight-bold)", color: "var(--color-info, #3b82f6)" }}>
+                  Admin Cluster Controller & Node Telemetry
+                </span>
+              </div>
+              <div style={{ display: "flex", alignItems: "center", gap: "var(--space-2)" }}>
+                <span
+                  style={{
+                    padding: "2px 8px",
+                    borderRadius: "var(--radius-xs)",
+                    fontSize: "11px",
+                    fontWeight: "var(--font-weight-bold)",
+                    backgroundColor: machines.some((m) => m.online)
+                      ? "rgba(34, 197, 94, 0.15)"
+                      : "var(--color-surface)",
+                    color: machines.some((m) => m.online)
+                      ? "var(--color-success)"
+                      : "var(--color-text-muted)",
+                    border: "1px solid var(--color-border)",
+                  }}
+                >
+                  {machines.length > 0
+                    ? `${machines.filter((m) => m.online).length} of ${machines.length} Node(s) Online`
+                    : "No Remote Nodes Connected"}
+                </span>
+              </div>
+            </div>
+
+            {machines.length === 0 ? (
+              <div
+                style={{
+                  padding: "var(--space-3)",
+                  backgroundColor: "var(--color-surface)",
+                  borderRadius: "var(--radius-xs)",
+                  border: "1px dashed var(--color-border)",
+                  fontSize: "12px",
+                  color: "var(--color-text-muted)",
+                  lineHeight: "1.5",
+                }}
+              >
+                No remote cluster nodes attached yet. To connect a worker machine:
+                <br />
+                1. Ensure Fluffy is running on the worker machine with Role set to <strong>Available</strong>.
+                <br />
+                2. Click <strong>Add Node Manually</strong> above (or select <strong>Connect Node</strong> from Discovered Devices below) and enter its LAN IP.
+              </div>
+            ) : (
+              <div style={{ display: "flex", flexDirection: "column", gap: "var(--space-3)" }}>
+                {/* Node Selector Pills */}
+                <div style={{ display: "flex", gap: "var(--space-2)", flexWrap: "wrap" }}>
+                  {machines.map((m) => {
+                    const isTarget = selectedTargetMachine?.machine_id === m.machine_id;
+                    return (
+                      <button
+                        key={m.machine_id}
+                        type="button"
+                        onClick={() => networkStore.switchTarget(m.machine_id)}
+                        style={{
+                          display: "flex",
+                          alignItems: "center",
+                          gap: "var(--space-2)",
+                          padding: "4px 10px",
+                          borderRadius: "var(--radius-xs)",
+                          backgroundColor: isTarget ? "var(--color-surface)" : "transparent",
+                          border: `1px solid ${isTarget ? "var(--color-accent)" : "var(--color-border)"}`,
+                          color: "var(--color-text)",
+                          fontSize: "11px",
+                          fontWeight: isTarget ? "bold" : "normal",
+                          cursor: "pointer",
+                        }}
+                      >
+                        <span
+                          style={{
+                            width: "8px",
+                            height: "8px",
+                            borderRadius: "50%",
+                            backgroundColor: m.online ? "var(--color-success)" : "var(--color-danger)",
+                          }}
+                        />
+                        <span>{m.name || m.ip}</span>
+                        <span style={{ fontSize: "10px", color: "var(--color-text-muted)", fontFamily: "var(--font-mono)" }}>
+                          ({m.ip}:{m.port})
+                        </span>
+                      </button>
+                    );
+                  })}
+                </div>
+
+                {/* Selected Node Real Telemetry Cards */}
+                {selectedTargetMachine && (
+                  <div
+                    style={{
+                      padding: "var(--space-3)",
+                      backgroundColor: "var(--color-surface)",
+                      border: "1px solid var(--color-border)",
+                      borderRadius: "var(--radius-xs)",
+                      display: "flex",
+                      flexDirection: "column",
+                      gap: "var(--space-3)",
+                    }}
+                  >
+                    <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", fontSize: "12px", flexWrap: "wrap", gap: "var(--space-2)" }}>
+                      <div style={{ display: "flex", alignItems: "center", gap: "var(--space-2)" }}>
+                        <strong style={{ color: "var(--color-text)" }}>
+                          {selectedTargetMachine.name || selectedTargetMachine.ip}
+                        </strong>
+                        <span style={{ fontFamily: "var(--font-mono)", fontSize: "11px", color: "var(--color-text-muted)" }}>
+                          [{selectedTargetMachine.machine_id}] • {selectedTargetMachine.ip}:{selectedTargetMachine.port}
+                        </span>
+                      </div>
+                      <div style={{ display: "flex", gap: "var(--space-2)" }}>
+                        <button
+                          type="button"
+                          onClick={() => handleAdminPing(selectedTargetMachine.machine_id)}
+                          disabled={isAdminExecuting}
+                          style={{
+                            padding: "3px 8px",
+                            fontSize: "11px",
+                            backgroundColor: "var(--color-surface-elevated)",
+                            border: "1px solid var(--color-border)",
+                            borderRadius: "var(--radius-xs)",
+                            color: "var(--color-text)",
+                            cursor: isAdminExecuting ? "not-allowed" : "pointer",
+                          }}
+                        >
+                          Ping Node
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => handleAdminScan(selectedTargetMachine.machine_id)}
+                          disabled={isAdminExecuting}
+                          style={{
+                            padding: "3px 8px",
+                            fontSize: "11px",
+                            backgroundColor: "var(--color-surface-elevated)",
+                            border: "1px solid var(--color-border)",
+                            borderRadius: "var(--radius-xs)",
+                            color: "var(--color-text)",
+                            cursor: isAdminExecuting ? "not-allowed" : "pointer",
+                          }}
+                        >
+                          Diagnostic Scan
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => handleDisconnect(null as any, selectedTargetMachine.machine_id)}
+                          disabled={isAdminExecuting}
+                          style={{
+                            padding: "3px 8px",
+                            fontSize: "11px",
+                            backgroundColor: "rgba(239, 68, 68, 0.15)",
+                            color: "var(--color-danger)",
+                            border: "1px solid rgba(239, 68, 68, 0.3)",
+                            borderRadius: "var(--radius-xs)",
+                            cursor: isAdminExecuting ? "not-allowed" : "pointer",
+                          }}
+                        >
+                          Disconnect
+                        </button>
+                      </div>
+                    </div>
+
+                    {/* Live Metric KPIs */}
+                    <div
+                      style={{
+                        display: "grid",
+                        gridTemplateColumns: "repeat(auto-fit, minmax(180px, 1fr))",
+                        gap: "var(--space-2)",
+                        fontSize: "11px",
+                      }}
+                    >
+                      <div style={{ padding: "var(--space-2)", backgroundColor: "var(--color-surface-elevated)", borderRadius: "var(--radius-xs)", border: "1px solid var(--color-border)" }}>
+                        <div style={{ color: "var(--color-text-muted)" }}>Host / Platform</div>
+                        <div style={{ fontWeight: "bold", marginTop: "2px", color: "var(--color-text)" }}>
+                          {activeMachineData?.system?.hostname || selectedTargetMachine.name}
+                        </div>
+                        <div style={{ color: "var(--color-text-secondary)", fontSize: "10px" }}>
+                          {activeMachineData?.system?.os || "unknown"} ({activeMachineData?.system?.arch || "unknown"})
+                        </div>
+                      </div>
+
+                      <div style={{ padding: "var(--space-2)", backgroundColor: "var(--color-surface-elevated)", borderRadius: "var(--radius-xs)", border: "1px solid var(--color-border)" }}>
+                        <div style={{ display: "flex", justifyContent: "space-between", color: "var(--color-text-muted)" }}>
+                          <span>CPU Usage</span>
+                          <span style={{ fontWeight: "bold", color: "var(--color-text)" }}>
+                            {activeMachineData?.cpu?.usage_percent !== undefined
+                              ? `${activeMachineData.cpu.usage_percent.toFixed(1)}%`
+                              : "0.0%"}
+                          </span>
+                        </div>
+                        <div style={{ width: "100%", height: "6px", backgroundColor: "var(--color-surface)", borderRadius: "3px", overflow: "hidden", marginTop: "6px" }}>
+                          <div
+                            style={{
+                              width: `${Math.min(100, Math.max(0, activeMachineData?.cpu?.usage_percent || 0))}%`,
+                              height: "100%",
+                              backgroundColor: "var(--color-accent)",
+                              transition: "width 0.3s ease",
+                            }}
+                          />
+                        </div>
+                      </div>
+
+                      <div style={{ padding: "var(--space-2)", backgroundColor: "var(--color-surface-elevated)", borderRadius: "var(--radius-xs)", border: "1px solid var(--color-border)" }}>
+                        <div style={{ display: "flex", justifyContent: "space-between", color: "var(--color-text-muted)" }}>
+                          <span>RAM Allocation</span>
+                          <span style={{ fontWeight: "bold", color: "var(--color-text)" }}>
+                            {activeMachineData?.ram?.used_mb !== undefined
+                              ? `${activeMachineData.ram.used_mb} MB`
+                              : "0 MB"}
+                          </span>
+                        </div>
+                        <div style={{ width: "100%", height: "6px", backgroundColor: "var(--color-surface)", borderRadius: "3px", overflow: "hidden", marginTop: "6px" }}>
+                          <div
+                            style={{
+                              width: `${Math.min(100, Math.max(0, (activeMachineData?.ram?.used_mb && activeMachineData?.ram?.total_mb) ? (activeMachineData.ram.used_mb / activeMachineData.ram.total_mb) * 100 : 0))}%`,
+                              height: "100%",
+                              backgroundColor: "var(--color-success)",
+                              transition: "width 0.3s ease",
+                            }}
+                          />
+                        </div>
+                        <div style={{ fontSize: "10px", color: "var(--color-text-muted)", marginTop: "2px" }}>
+                          Total: {activeMachineData?.ram?.total_mb || 0} MB • Free: {activeMachineData?.ram?.free_mb || 0} MB
+                        </div>
+                      </div>
+
+                      <div style={{ padding: "var(--space-2)", backgroundColor: "var(--color-surface-elevated)", borderRadius: "var(--radius-xs)", border: "1px solid var(--color-border)" }}>
+                        <div style={{ color: "var(--color-text-muted)" }}>Transport Status</div>
+                        <div style={{ display: "flex", alignItems: "center", gap: "var(--space-1)", marginTop: "2px" }}>
+                          <span
+                            style={{
+                              width: "6px",
+                              height: "6px",
+                              borderRadius: "50%",
+                              backgroundColor: selectedTargetMachine.online ? "var(--color-success)" : "var(--color-danger)",
+                            }}
+                          />
+                          <span style={{ fontWeight: "bold", color: selectedTargetMachine.online ? "var(--color-success)" : "var(--color-danger)" }}>
+                            {selectedTargetMachine.online ? "ESTABLISHED" : "DISCONNECTED"}
+                          </span>
+                        </div>
+                        <div style={{ fontSize: "10px", color: "var(--color-text-muted)" }}>
+                          Monitor Port: {selectedTargetMachine.port}
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Top RAM Processes on Remote Machine */}
+                    {activeMachineData?.processes?.top_ram && activeMachineData.processes.top_ram.length > 0 && (
+                      <div style={{ fontSize: "11px" }}>
+                        <span style={{ color: "var(--color-text-muted)", fontWeight: "bold" }}>Active Node Processes:</span>
+                        <div style={{ display: "flex", gap: "var(--space-2)", flexWrap: "wrap", marginTop: "4px" }}>
+                          {activeMachineData.processes.top_ram.slice(0, 4).map((p, idx) => (
+                            <span
+                              key={`${p.pid || idx}-${p.name}`}
+                              style={{
+                                padding: "2px 6px",
+                                borderRadius: "var(--radius-xs)",
+                                backgroundColor: "var(--color-surface-elevated)",
+                                border: "1px solid var(--color-border)",
+                                fontFamily: "var(--font-mono)",
+                                fontSize: "10px",
+                              }}
+                            >
+                              {p.name} ({p.ram_mb} MB)
+                            </span>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+
+                    {/* Direct Command Executor Console */}
+                    <form
+                      onSubmit={(e) => handleAdminSendCommand(e, selectedTargetMachine.machine_id)}
+                      style={{
+                        display: "flex",
+                        gap: "var(--space-2)",
+                        alignItems: "center",
+                        marginTop: "var(--space-1)",
+                      }}
+                    >
+                      <input
+                        type="text"
+                        placeholder="Send command or capability (e.g. ping, status, diagnostic_scan, System.GetHardware)..."
+                        value={adminCommandInput}
+                        onChange={(e) => setAdminCommandInput(e.target.value)}
+                        disabled={isAdminExecuting}
+                        style={{
+                          flex: 1,
+                          padding: "6px 10px",
+                          backgroundColor: "var(--color-surface-elevated)",
+                          border: "1px solid var(--color-border)",
+                          borderRadius: "var(--radius-xs)",
+                          color: "var(--color-text)",
+                          fontSize: "12px",
+                          fontFamily: "var(--font-mono)",
+                        }}
+                      />
+                      <button
+                        type="submit"
+                        disabled={isAdminExecuting || !adminCommandInput.trim()}
+                        style={{
+                          padding: "6px 14px",
+                          fontSize: "11px",
+                          fontWeight: "var(--font-weight-bold)",
+                          backgroundColor: "var(--color-accent)",
+                          color: "var(--color-background)",
+                          border: "none",
+                          borderRadius: "var(--radius-xs)",
+                          cursor: isAdminExecuting || !adminCommandInput.trim() ? "not-allowed" : "pointer",
+                          opacity: isAdminExecuting || !adminCommandInput.trim() ? 0.6 : 1,
+                        }}
+                      >
+                        {isAdminExecuting ? "Sending..." : "Send Command"}
+                      </button>
+                    </form>
+
+                    {/* Command Output Box */}
+                    {adminCommandOutput && (
+                      <div
+                        style={{
+                          padding: "var(--space-2) var(--space-3)",
+                          backgroundColor: "var(--color-surface-elevated)",
+                          border: `1px solid ${adminCommandOutput.isError ? "var(--color-danger)" : "var(--color-border)"}`,
+                          borderRadius: "var(--radius-xs)",
+                          fontSize: "11px",
+                          fontFamily: "var(--font-mono)",
+                          display: "flex",
+                          flexDirection: "column",
+                          gap: "2px",
+                        }}
+                      >
+                        <div style={{ display: "flex", justifyContent: "space-between", color: "var(--color-text-muted)", fontSize: "10px" }}>
+                          <span>Console Output • Node {selectedTargetMachine.machine_id}</span>
+                          <span>{adminCommandOutput.timestamp}</span>
+                        </div>
+                        <pre style={{ margin: 0, whiteSpace: "pre-wrap", color: adminCommandOutput.isError ? "var(--color-danger)" : "var(--color-text)" }}>
+                          {adminCommandOutput.text}
+                        </pre>
+                      </div>
+                    )}
+                  </div>
+                )}
+              </div>
+            )}
           </div>
         )}
       </div>
@@ -903,24 +1354,50 @@ export const NetworkSystemsView: React.FC = () => {
                         </span>
                       </td>
                       <td style={{ padding: "var(--space-2) var(--space-3)", textAlign: "right" }}>
-                        {isConnected ? (
-                          <button
-                            onClick={(e) => handleDisconnect(e, n.id)}
-                            disabled={isConnecting || isExecuting}
-                            style={{
-                              padding: "3px 10px",
-                              fontSize: "11px",
-                              fontWeight: "var(--font-weight-semibold)",
-                              backgroundColor: "rgba(239, 68, 68, 0.15)",
-                              color: "var(--color-danger)",
-                              border: "1px solid rgba(239, 68, 68, 0.3)",
-                              borderRadius: "var(--radius-xs)",
-                              cursor: isConnecting || isExecuting ? "not-allowed" : "pointer",
-                              opacity: isConnecting || isExecuting ? 0.6 : 1,
-                            }}
-                          >
-                            {isConnecting ? "Disconnecting..." : isExecuting ? "Executing..." : "Disconnect"}
-                          </button>
+                        {n.id === "node_local" ? (
+                          <span style={{ fontSize: "11px", color: "var(--color-text-muted)", fontStyle: "italic" }}>
+                            Current Host (Self)
+                          </span>
+                        ) : isConnected ? (
+                          <div style={{ display: "flex", gap: "var(--space-1)", justifyContent: "flex-end" }}>
+                            <button
+                              type="button"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                networkStore.switchTarget(n.id);
+                              }}
+                              style={{
+                                padding: "3px 8px",
+                                fontSize: "11px",
+                                fontWeight: "var(--font-weight-medium)",
+                                backgroundColor: "var(--color-surface-elevated)",
+                                border: "1px solid var(--color-border)",
+                                borderRadius: "var(--radius-xs)",
+                                color: "var(--color-text)",
+                                cursor: "pointer",
+                              }}
+                            >
+                              Select
+                            </button>
+                            <button
+                              type="button"
+                              onClick={(e) => handleDisconnect(e, n.id)}
+                              disabled={isConnecting || isExecuting}
+                              style={{
+                                padding: "3px 8px",
+                                fontSize: "11px",
+                                fontWeight: "var(--font-weight-semibold)",
+                                backgroundColor: "rgba(239, 68, 68, 0.15)",
+                                color: "var(--color-danger)",
+                                border: "1px solid rgba(239, 68, 68, 0.3)",
+                                borderRadius: "var(--radius-xs)",
+                                cursor: isConnecting || isExecuting ? "not-allowed" : "pointer",
+                                opacity: isConnecting || isExecuting ? 0.6 : 1,
+                              }}
+                            >
+                              {isConnecting ? "Disconnecting..." : isExecuting ? "Executing..." : "Disconnect"}
+                            </button>
+                          </div>
                         ) : isPairingOrAuth ? (
                           <span
                             style={{

@@ -180,17 +180,6 @@ if (Test-Path $ServicesSrc) {
     Write-Host "  OK: services/ copied." -ForegroundColor Green
 }
 
-# ---- Step J: Copy fluffy/ directory -----------------------------------------
-$FluffySrc  = Join-Path $ProjectRoot "fluffy"
-$FluffyDist = Join-Path $DistDir "fluffy"
-
-if (Test-Path $FluffySrc) {
-    Write-Host "  Copying fluffy/ to dist\fluffy\..." -ForegroundColor Gray
-    if (Test-Path $FluffyDist) { Remove-Item $FluffyDist -Recurse -Force }
-    robocopy $FluffySrc $FluffyDist /E /XD "__pycache__" /XF "*.pyc" /NFL /NDL /NJH /NJS | Out-Null
-    Write-Host "  OK: fluffy/ copied." -ForegroundColor Green
-}
-
 Write-Host ""
 Write-Host "  OK: Python Brain build complete!" -ForegroundColor Green
 exit 0

@@ -9,6 +9,8 @@
  * Strict rule: No invented fields. All representations match backend semantics.
  */
 
+import type { ThemeMode } from "./ui";
+
 // ============================================================================
 // 1. Telemetry & Subsystem Status (HTTP 5123 GET /status)
 // ============================================================================
@@ -866,7 +868,7 @@ export interface LlmModelsResponse {
 }
 
 export interface UserPreferencesPayload {
-  theme?: "fluffyDark" | "fluffyLight" | "transparent" | "highContrast" | string;
+  theme?: ThemeMode | string;
   ui_mode?: "dense" | "comfortable";
   autoNormalize?: boolean;
   alertThreshold?: number;
@@ -876,7 +878,7 @@ export interface UserPreferencesPayload {
 }
 
 export interface GeneralSettingsState {
-  theme: "fluffyDark" | "fluffyLight" | "transparent" | "highContrast";
+  theme: ThemeMode;
   autoNormalize: boolean;
   alertThreshold: number;
   voiceSpeed: number;

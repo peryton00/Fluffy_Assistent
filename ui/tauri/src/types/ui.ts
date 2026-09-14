@@ -274,7 +274,27 @@ export type ConnectionState =
   | "REQUEST_FAILED"
   | "STALE";
 
-export type ThemeMode = "fluffyDark" | "fluffyLight" | "transparent" | "highContrast" | "custom";
+export type ThemeMode =
+  | "fluffyDark"
+  | "fluffyLight"
+  | "transparent"
+  | "highContrast"
+  | "minimalism"
+  | "maximalism"
+  | "glassmorphism"
+  | "neumorphism"
+  | "claymorphism"
+  | "brutalism"
+  | "neoBrutalism"
+  | "skeuomorphism"
+  | "flatDesign"
+  | "materialDesign"
+  | "bentoUi"
+  | "y2kDesign"
+  | "retroDesign"
+  | "cyberpunk"
+  | "editorialDesign"
+  | "custom";
 
 export interface CommandPaletteState {
   open: boolean;

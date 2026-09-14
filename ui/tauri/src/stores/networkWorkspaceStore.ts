@@ -90,6 +90,7 @@ class NetworkWorkspaceStoreManager {
   private listeners = new Set<() => void>();
   private eventUnsubscribe: (() => void) | null = null;
   private lagUnsubscribe: (() => void) | null = null;
+  private pollTimer: ReturnType<typeof setInterval> | null = null;
   private eventsService: NetworkEventsService;
 
   constructor(eventsService: NetworkEventsService = networkEventsService) {
@@ -123,10 +124,31 @@ class NetworkWorkspaceStoreManager {
   };
 
   /**
+   * Starts periodic polling of authoritative snapshot.
+   */
+  public startPolling = (intervalMs = 3500): void => {
+    if (this.pollTimer) return;
+    this.pollTimer = setInterval(() => {
+      this.loadSnapshot().catch(() => {});
+    }, intervalMs);
+  };
+
+  /**
+   * Stops periodic polling.
+   */
+  public stopPolling = (): void => {
+    if (this.pollTimer) {
+      clearInterval(this.pollTimer);
+      this.pollTimer = null;
+    }
+  };
+
+  /**
    * Initializes event listeners and loads the initial authoritative snapshot.
    */
   public initialize = async (): Promise<void> => {
     this.bindEventStreams();
+    this.startPolling(3500);
     await Promise.all([this.loadSnapshot(), this.loadCapabilities()]);
   };
 
@@ -153,6 +175,7 @@ class NetworkWorkspaceStoreManager {
    * Unbinds event stream listeners.
    */
   public cleanup = (): void => {
+    this.stopPolling();
     if (this.eventUnsubscribe) {
       this.eventUnsubscribe();
       this.eventUnsubscribe = null;

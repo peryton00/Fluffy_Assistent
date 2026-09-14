@@ -53,7 +53,9 @@ export const NetworkOverview: React.FC = () => {
   const traffic = useNetworkWorkspaceStore((s) => s.traffic);
   const events = useNetworkWorkspaceStore((s) => s.events);
 
-  const availableNodesCount = nodes.filter((n) => n.availability === "available").length;
+  const availableNodesCount = nodes.filter(
+    (n) => n.availability === "available" || n.availability === "connected"
+  ).length;
   const activeConnectionsCount = connections.filter((c) => c.state === "established").length;
   const activeInterfacesCount = interfaces.filter((i) => i.is_up).length;
 
