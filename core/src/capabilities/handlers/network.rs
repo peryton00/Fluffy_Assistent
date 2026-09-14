@@ -129,6 +129,22 @@ impl CapabilityHandler for NetworkGetPacketCaptureStatusHandler {
     }
 }
 
+pub struct NetworkRecordSecurityObservationHandler;
+
+impl CapabilityHandler for NetworkRecordSecurityObservationHandler {
+    fn execute(&self, params: &serde_json::Value) -> Result<serde_json::Value, CapabilityError> {
+        let obs: crate::network::NetworkSecurityObservation = serde_json::from_value(params.clone())
+            .map_err(|e| CapabilityError::new("invalid_parameters", format!("Invalid security observation payload: {}", e)))?;
+
+        crate::network::record_security_observation(obs)
+            .map_err(|e| CapabilityError::new("record_observation_failed", format!("Failed to record security observation: {}", e)))?;
+
+        Ok(json!({
+            "success": true,
+        }))
+    }
+}
+
 
 
 

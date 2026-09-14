@@ -101,9 +101,13 @@ class _DataHandler(BaseHTTPRequestHandler):
         
         # Simple token-based auth
         auth_token = self.headers.get("X-Fluffy-Token")
-        expected_token = os.getenv("FLUFFY_TOKEN", "fluffy_dev_token")
+        expected_token = os.getenv("FLUFFY_TOKEN")
+        if not expected_token:
+            from brain.security.auth_utils import _get_token
+            expected_token = _get_token()
         
-        if auth_token != expected_token:
+        import hmac
+        if not auth_token or not hmac.compare_digest(auth_token, expected_token):
             self._send_json({"error": "Unauthorized"}, 401)
             return
 
@@ -123,22 +127,32 @@ class _DataHandler(BaseHTTPRequestHandler):
                     self._send_json({"error": "Missing pid"}, 400)
                     return
                 
-                # Execute kill
+                # Safety check: protected system processes (PID <= 100) are forbidden
+                try:
+                    pid_int = int(pid)
+                    if pid_int <= 100:
+                        self._send_json({"error": f"Cannot terminate protected system process PID {pid_int}"}, 403)
+                        return
+                except ValueError:
+                    self._send_json({"error": "Invalid PID format"}, 400)
+                    return
+
+                # Execute kill with safe platform checks
                 import subprocess
                 import platform as _platform
                 try:
                     if _platform.system() == "Windows":
                         result = subprocess.run(
-                            ["taskkill", "/PID", str(pid), "/F"],
+                            ["taskkill", "/PID", str(pid_int), "/F"],
                             capture_output=True, text=True
                         )
                     else:
                         result = subprocess.run(
-                            ["kill", "-9", str(pid)],
+                            ["kill", "-9", str(pid_int)],
                             capture_output=True, text=True
                         )
                     if result.returncode == 0:
-                        self._send_json({"ok": True, "message": f"Terminated PID {pid}"})
+                        self._send_json({"ok": True, "message": f"Terminated PID {pid_int}"})
                     else:
                         self._send_json({"error": result.stderr or "Failed to kill process"}, 500)
                 except Exception as e:

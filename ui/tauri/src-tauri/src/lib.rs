@@ -39,6 +39,26 @@ fn read_env_key(key: &str) -> Option<String> {
     None
 }
 
+fn get_or_generate_session_token() -> &'static str {
+    static SESSION_TOKEN: std::sync::OnceLock<String> = std::sync::OnceLock::new();
+    SESSION_TOKEN.get_or_init(|| {
+        if let Ok(tok) = std::env::var("FLUFFY_TOKEN") {
+            if !tok.trim().is_empty() {
+                return tok.trim().to_string();
+            }
+        }
+        if let Some(tok) = read_env_key("FLUFFY_TOKEN") {
+            if !tok.trim().is_empty() {
+                return tok;
+            }
+        }
+        // Cryptographically secure runtime session token (256-bit entropy)
+        let id1 = uuid::Uuid::new_v4().simple().to_string();
+        let id2 = uuid::Uuid::new_v4().simple().to_string();
+        format!("{}{}", id1, id2)
+    })
+}
+
 async fn notify_python_ui_state(connected: bool) {
     let url = if connected {
         "http://127.0.0.1:5123/ui_connected"
@@ -46,7 +66,7 @@ async fn notify_python_ui_state(connected: bool) {
         "http://127.0.0.1:5123/ui_disconnected"
     };
 
-    let token = read_env_key("FLUFFY_TOKEN").unwrap_or_else(|| "fluffy_dev_token".to_string());
+    let token = get_or_generate_session_token();
 
     let client = reqwest::Client::new();
     let _ = client.post(url)

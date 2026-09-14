@@ -28,7 +28,7 @@ pub struct CapabilityMetadata {
 }
 
 /// Structured request to invoke a native capability
-#[derive(Serialize, Deserialize, Debug, Clone)]
+#[derive(Serialize, Deserialize, Debug, Clone, PartialEq)]
 pub struct CapabilityRequest {
     pub id: String,
     #[serde(default)]
@@ -65,7 +65,7 @@ impl CapabilityError {
 }
 
 /// Structured response returned from a capability invocation
-#[derive(Serialize, Deserialize, Debug, Clone)]
+#[derive(Serialize, Deserialize, Debug, Clone, PartialEq)]
 pub struct CapabilityResponse {
     pub request_id: Option<String>,
     pub success: bool,

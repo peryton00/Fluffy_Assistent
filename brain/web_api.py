@@ -30,6 +30,12 @@ app.register_blueprint(terminal_bp)
 app.register_blueprint(local_network_bp)
 
 
+@app.before_request
+def handle_preflight():
+    if request.method == "OPTIONS":
+        return "", 204
+
+
 @app.after_request
 def add_cors_headers(response):
     # Allow CORS from Tauri dev server

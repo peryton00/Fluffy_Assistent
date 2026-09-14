@@ -10,6 +10,7 @@ import type {
   ActiveDomain, 
   ThemeMode, 
   InspectorSelection, 
+  NetworkSection,
   GuardianSection, 
   MemorySection, 
   TerminalSection, 
@@ -68,6 +69,7 @@ function getStoredInspectorWidth(): number {
 export interface UiState {
   activeDomain: ActiveDomain;
   activeSidebarView: string;
+  networkSection: NetworkSection;
   guardianSection: GuardianSection;
   memorySection: MemorySection;
   terminalSection: TerminalSection;
@@ -87,6 +89,7 @@ class UiStoreManager {
   private state: UiState = {
     activeDomain: "operations",
     activeSidebarView: "overview",
+    networkSection: "overview",
     guardianSection: "overview",
     memorySection: "overview",
     terminalSection: "console",
@@ -132,6 +135,7 @@ class UiStoreManager {
       activeDomain,
       activeSidebarView: defaultView,
     };
+    if (activeDomain === "network") updates.networkSection = defaultView as NetworkSection;
     if (activeDomain === "guardian") updates.guardianSection = defaultView as GuardianSection;
     if (activeDomain === "memory") updates.memorySection = defaultView as MemorySection;
     if (activeDomain === "terminal") updates.terminalSection = defaultView as TerminalSection;
@@ -146,11 +150,20 @@ class UiStoreManager {
   public setActiveSidebarView = (activeSidebarView: string): void => {
     const updates: Partial<UiState> = { activeSidebarView };
     const domain = this.state.activeDomain;
+    if (domain === "network") updates.networkSection = activeSidebarView as NetworkSection;
     if (domain === "guardian") updates.guardianSection = activeSidebarView as GuardianSection;
     if (domain === "memory") updates.memorySection = activeSidebarView as MemorySection;
     if (domain === "terminal") updates.terminalSection = activeSidebarView as TerminalSection;
     if (domain === "chat") updates.chatSection = activeSidebarView as ChatSection;
     this.setState(updates);
+  };
+
+  public selectNetworkSection = (networkSection: NetworkSection): void => {
+    this.setState({
+      activeDomain: "network",
+      networkSection,
+      activeSidebarView: networkSection,
+    });
   };
 
   public selectGuardianSection = (guardianSection: GuardianSection): void => {
@@ -326,6 +339,7 @@ export type ExtendedUiState = UiState & {
   setActiveDomain: (domain: ActiveDomain) => void;
   setActiveSidebarView: (view: string) => void;
   setSidebarView: (view: string) => void;
+  selectNetworkSection: (section: NetworkSection) => void;
   selectGuardianSection: (section: GuardianSection) => void;
   selectMemorySection: (section: MemorySection) => void;
   selectTerminalSection: (section: TerminalSection) => void;
@@ -369,6 +383,7 @@ function getEnrichedUiState(): ExtendedUiState {
     setActiveDomain: uiStore.setActiveDomain,
     setActiveSidebarView: uiStore.setActiveSidebarView,
     setSidebarView: uiStore.setSidebarView,
+    selectNetworkSection: uiStore.selectNetworkSection,
     selectGuardianSection: uiStore.selectGuardianSection,
     selectMemorySection: uiStore.selectMemorySection,
     selectTerminalSection: uiStore.selectTerminalSection,

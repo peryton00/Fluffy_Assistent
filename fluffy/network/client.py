@@ -133,7 +133,10 @@ class AdminClient:
         url = f"http://{ip}:{port}/action"
         
         # Add token
-        token = os.getenv("FLUFFY_TOKEN", "fluffy_dev_token")
+        token = os.getenv("FLUFFY_TOKEN")
+        if not token:
+            from brain.security.auth_utils import _get_token
+            token = _get_token()
         headers = {
             "Content-Type": "application/json",
             "X-Fluffy-Token": token

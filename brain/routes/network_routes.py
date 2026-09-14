@@ -412,3 +412,58 @@ def admin_machine_action():
             return jsonify({"error": result}), 400
     except Exception as e:
         return jsonify({"error": str(e)}), 500
+
+
+# ── Authoritative Network State / Capabilities HTTP Fallback (Dev/Web) ──────────
+
+@network_bp.route("/network/snapshot", methods=["GET"])
+@token_required
+def get_network_snapshot():
+    """Get coherent point-in-time snapshot of the authoritative Network state."""
+    try:
+        from brain.runtime.local_network_service import get_local_network_service
+        service = get_local_network_service()
+        local_snap = service.get_observation_snapshot()
+
+        import time
+        now_ms = int(time.time() * 1000)
+
+        # Build standardized NetworkStateSnapshot envelope
+        snapshot = {
+            "revision": 1,
+            "captured_at_epoch_ms": now_ms,
+            "nodes": [],
+            "devices": local_snap.get("devices", []),
+            "connections": local_snap.get("flows", []),
+            "interfaces": local_snap.get("interfaces", []),
+            "traffic": {
+                "bytes_in": 0,
+                "bytes_out": 0,
+                "packets_in": 0,
+                "packets_out": 0,
+                "current_in_rate_bps": 0.0,
+                "current_out_rate_bps": 0.0,
+                "recorded_at_epoch_ms": now_ms,
+            }
+        }
+        return jsonify({"ok": True, "data": snapshot})
+    except Exception as e:
+        return jsonify({"ok": False, "error": str(e)}), 500
+
+
+@network_bp.route("/network/capabilities", methods=["GET"])
+@token_required
+def get_network_capabilities():
+    """Get capabilities metadata for the Network subsystem."""
+    return jsonify({
+        "ok": True,
+        "data": {
+            "supported_versions": ["1.0"],
+            "cluster_enabled": True,
+            "noise_transport_enabled": True,
+            "packet_capture_enabled": True,
+            "max_frame_size": 16777216,
+            "max_concurrent_connections": 128
+        }
+    })
+

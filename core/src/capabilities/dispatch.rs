@@ -336,6 +336,28 @@ mod tests {
     }
 
     #[test]
+    fn test_dispatch_network_record_security_observation() {
+        let req = CapabilityRequest {
+            id: "Network.RecordSecurityObservation".into(),
+            parameters: json!({
+                "observation_id": "cap-sec-test-1",
+                "timestamp_epoch_ms": 1726000000000u64,
+                "risk_level": "high",
+                "anomaly_kind": "unmapped_listener",
+                "affected_interface": "eth0",
+                "affected_ip": "127.0.0.1",
+                "affected_mac": null,
+                "affected_pid": 5432,
+                "description": "Unmapped listening socket observed",
+                "evidence": ["Port 9999 bound without process name"]
+            }),
+            request_id: Some("test-cap-sec-1".into()),
+        };
+        let resp = dispatch_capability(&req);
+        assert!(resp.success);
+    }
+
+    #[test]
     fn test_dispatch_unknown_capability() {
         let req = CapabilityRequest {
             id: "Nonexistent.Capability".into(),

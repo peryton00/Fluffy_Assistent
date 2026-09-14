@@ -354,6 +354,18 @@ impl CapabilityRegistry {
             },
             Box::new(NetworkGetPacketCaptureStatusHandler),
         );
+
+        self.register(
+            CapabilityMetadata {
+                id: "Network.RecordSecurityObservation".into(),
+                description: "Record a structured network security observation from Guardian analysis (N12)".into(),
+                security_tier: SecurityTier::Safe,
+                requires_confirmation: false,
+                supported_platforms: all_platforms.clone(),
+                is_implemented: true,
+            },
+            Box::new(NetworkRecordSecurityObservationHandler),
+        );
     }
 }
 

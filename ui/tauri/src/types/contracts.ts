@@ -1156,6 +1156,399 @@ export interface NetworkIntelligenceSummary {
   freshness: NetworkIntelligenceFreshness;
 }
 
+// ============================================================================
+// 12. Rust-Owned Network Domain Models & API Contracts (Phase N7)
+// ============================================================================
 
+export interface NetworkProtocolVersion {
+  major: number;
+  minor: number;
+}
 
+export interface NetworkApiError {
+  code:
+    | "invalid_request"
+    | "unsupported_version"
+    | "resource_not_found"
+    | "invalid_network_state"
+    | "subsystem_unavailable"
+    | "timeout"
+    | "internal";
+  message?: string;
+  requested?: string;
+  supported?: string;
+  resource_type?: string;
+  id?: string;
+}
+
+export interface NetworkApiResponse<T> {
+  request_id: string;
+  protocol_version: NetworkProtocolVersion;
+  timestamp_epoch_ms: number;
+  success: boolean;
+  data?: T;
+  error?: NetworkApiError;
+}
+
+export type NodeRoleKind = "standalone" | "admin" | "worker" | "peer";
+export type NodeAvailabilityKind =
+  | "available"
+  | "pairing"
+  | "authenticating"
+  | "connected"
+  | "disconnected"
+  | "recovering"
+  | "unknown"
+  | "busy"
+  | "unreachable"
+  | "offline";
+export type AuthStateKind =
+  | "unauthenticated"
+  | "pairing"
+  | "authenticating"
+  | "authenticated"
+  | "failed"
+  | "rejected";
+export type PairingStateKind =
+  | "unpaired"
+  | "pairing_requested"
+  | "pairing_failed"
+  | "requested"
+  | "paired"
+  | "revoked";
+
+export interface NetworkNode {
+  id: string;
+  name: string;
+  hostname?: string | null;
+  os: string;
+  arch: string;
+  role: NodeRoleKind;
+  availability: NodeAvailabilityKind;
+  auth_state: AuthStateKind;
+  pairing_state: PairingStateKind;
+  ip_addresses?: string[];
+  cluster_port?: number;
+  first_seen_epoch?: number;
+  last_seen_epoch?: number;
+  capabilities?: string[];
+}
+
+export type DeviceCategoryKind =
+  | "workstation"
+  | "server"
+  | "mobile"
+  | "router"
+  | "switch"
+  | "printer"
+  | "iot"
+  | "unknown";
+
+export type DeviceStateKind =
+  | "reachable"
+  | "stale"
+  | "delay"
+  | "probe"
+  | "failed"
+  | "incomplete"
+  | "unknown";
+
+export type DiscoverySourceKind =
+  | "arp_table"
+  | "neighbor_discovery"
+  | "passive_dns"
+  | "cluster_announcement"
+  | "manual";
+
+export interface NetworkDevice {
+  id: string;
+  ip_address: string;
+  mac_address?: string | null;
+  hostname?: string | null;
+  vendor?: string | null;
+  category: DeviceCategoryKind;
+  state: DeviceStateKind;
+  source: DiscoverySourceKind;
+  is_gateway: boolean;
+  is_self: boolean;
+  is_fluffy_node: boolean;
+  associated_node_id?: string | null;
+  first_seen_epoch?: number;
+  last_seen_epoch?: number;
+}
+
+export type ConnectionKindType =
+  | "local_socket_flow"
+  | "cluster_transport"
+  | "ipc_stream"
+  | "web_socket_bridge";
+
+export type FlowProtocolType = "tcp" | "udp";
+
+export type FlowStateType =
+  | "listening"
+  | "syn_sent"
+  | "syn_recv"
+  | "established"
+  | "fin_wait_1"
+  | "fin_wait_2"
+  | "close_wait"
+  | "closing"
+  | "last_ack"
+  | "time_wait"
+  | "closed"
+  | "unknown";
+
+export type ConnectionDirectionType = "inbound" | "outbound" | "local" | "unknown";
+
+export interface NetworkConnection {
+  id: string;
+  kind: ConnectionKindType;
+  protocol: FlowProtocolType;
+  local_addr: string;
+  local_port: number;
+  remote_addr?: string | null;
+  remote_port?: number | null;
+  state: FlowStateType;
+  direction: ConnectionDirectionType;
+  associated_node_id?: string | null;
+  pid?: number | null;
+  process_name?: string | null;
+  established_at_epoch?: number | null;
+  last_active_epoch?: number;
+}
+
+export interface NetworkInterfaceInfo {
+  id: string;
+  name: string;
+  description?: string | null;
+  mac_address?: string | null;
+  interface_type: "wifi" | "ethernet" | "loopback" | "virtual" | "vpn" | "bridge" | "other";
+  status: "up" | "down" | "testing" | "dormant" | "not_present" | "lower_layer_down" | "unknown";
+  is_up: boolean;
+  is_physical: boolean;
+  is_loopback: boolean;
+  is_default_gateway: boolean;
+  ipv4_addresses: string[];
+  ipv6_addresses: string[];
+  gateway?: string | null;
+  dns_servers: string[];
+  mtu?: number | null;
+  link_speed_mbps?: number | null;
+  total_received_bytes: number;
+  total_transmitted_bytes: number;
+  rates?: {
+    rx_bytes_per_second?: number;
+    tx_bytes_per_second?: number;
+    rx_bits_per_second?: number;
+    tx_bits_per_second?: number;
+    rx_bytes_per_sec?: number;
+    tx_bytes_per_sec?: number;
+  } | null;
+}
+
+export interface TopTalker {
+  entity_id: string;
+  entity_name: string;
+  rx_bytes: number;
+  tx_bytes: number;
+  rx_rate_bps: number;
+  tx_rate_bps: number;
+}
+
+export interface TrafficMetrics {
+  rx_bytes: number;
+  tx_bytes: number;
+  rx_packets: number;
+  tx_packets: number;
+  rx_errors: number;
+  tx_errors: number;
+  rx_drops: number;
+  tx_drops: number;
+  rates?: {
+    rx_bytes_per_second?: number;
+    tx_bytes_per_second?: number;
+    rx_bits_per_second?: number;
+    tx_bits_per_second?: number;
+    rx_bytes_per_sec?: number;
+    tx_bytes_per_sec?: number;
+  } | null;
+  top_talkers: TopTalker[];
+}
+
+export type EventCategoryKind =
+  | "cluster"
+  | "network"
+  | "discovery"
+  | "telemetry"
+  | "connection"
+  | "security"
+  | "admin"
+  | "system";
+
+export type EventSeverityKind = "info" | "notice" | "warning" | "error" | "critical";
+
+export interface NetworkEvent {
+  event_id: string;
+  sequence: number;
+  state_revision?: number | null;
+  timestamp_epoch_ms: number;
+  category: EventCategoryKind;
+  event_type: string;
+  severity: EventSeverityKind;
+  source_node_id?: string | null;
+  target_node_id?: string | null;
+  target_device_id?: string | null;
+  target_connection_id?: string | null;
+  summary: string;
+  details: Record<string, unknown>;
+}
+
+export interface NetworkStateSnapshot {
+  revision: number;
+  captured_at_epoch_ms: number;
+  nodes: NetworkNode[];
+  devices: NetworkDevice[];
+  connections: NetworkConnection[];
+  interfaces: NetworkInterfaceInfo[];
+  traffic: TrafficMetrics;
+}
+
+export interface NetworkCapabilitiesMetadata {
+  protocol_version: NetworkProtocolVersion;
+  subsystem_available: boolean;
+  supported_read_operations: string[];
+  supported_event_categories: string[];
+  supported_connection_kinds: string[];
+  supported_node_roles: string[];
+  telemetry_supported: boolean;
+  event_buffer_capacity: number;
+}
+
+export type NetworkEntityType =
+  | "node"
+  | "device"
+  | "connection"
+  | "interface"
+  | "external_endpoint";
+
+export interface NetworkEntitySelection {
+  type: NetworkEntityType | "none";
+  id: string | null;
+}
+
+// ============================================================================
+// 15. Availability & Secure Pairing Contracts (N10)
+// ============================================================================
+
+export interface ConnectNodeRequest {
+  request_id?: string;
+  protocol_version?: NetworkProtocolVersion;
+  node_id: string;
+}
+
+export interface ConnectNodeResponse {
+  revision: number;
+  node: NetworkNode;
+  connection?: NetworkConnection | null;
+}
+
+export interface DisconnectNodeRequest {
+  request_id?: string;
+  protocol_version?: NetworkProtocolVersion;
+  node_id: string;
+}
+
+export interface DisconnectNodeResponse {
+  revision: number;
+  node: NetworkNode;
+}
+
+export interface GetConnectionInfoRequest {
+  request_id?: string;
+  protocol_version?: NetworkProtocolVersion;
+  node_id: string;
+}
+
+export interface ConnectionInfo {
+  node_id: string;
+  node_name: string;
+  hostname?: string | null;
+  availability: NodeAvailabilityKind;
+  pairing_state: PairingStateKind;
+  auth_state: AuthStateKind;
+  primary_ip?: string | null;
+  cluster_port?: number | null;
+  transport_mode?: string | null;
+  auth_mode?: string | null;
+  active_connection_id?: string | null;
+  connection_flow_state?: string | null;
+  last_seen_epoch?: number | null;
+}
+
+export interface GetConnectionInfoResponse {
+  revision: number;
+  info: ConnectionInfo;
+}
+
+// ============================================================================
+// 16. Admin Control Plane Contracts (N13)
+// ============================================================================
+
+export interface CapabilityRequestPayload {
+  id: string;
+  parameters?: Record<string, unknown> | null;
+  request_id?: string | null;
+}
+
+export interface CapabilityErrorPayload {
+  code: string;
+  message: string;
+  details?: Record<string, unknown> | null;
+}
+
+export interface AdminCommandRequest {
+  request_id: string;
+  target_node_id: string;
+  capability: CapabilityRequestPayload;
+  timeout_ms?: number | null;
+  confirmed?: boolean;
+}
+
+export interface AdminCommandResult {
+  request_id: string;
+  target_node_id: string;
+  capability_id: string;
+  success: boolean;
+  data?: unknown;
+  error?: CapabilityErrorPayload | null;
+  execution_duration_ms: number;
+  timestamp_epoch_ms: number;
+}
+
+export interface AdminBatchCommandRequest {
+  batch_id: string;
+  target_node_ids: string[];
+  capability: CapabilityRequestPayload;
+  timeout_ms?: number | null;
+  confirmed?: boolean;
+}
+
+export interface AdminBatchCommandResult {
+  batch_id: string;
+  total_targets: number;
+  successful_targets: number;
+  failed_targets: number;
+  results: AdminCommandResult[];
+  total_duration_ms: number;
+  timestamp_epoch_ms: number;
+}
+
+export interface ExecuteAdminCommandResponse {
+  result: AdminCommandResult;
+}
+
+export interface ExecuteBatchAdminCommandResponse {
+  result: AdminBatchCommandResult;
+}
 

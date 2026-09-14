@@ -13,6 +13,9 @@ import { getDomainIcon, RefreshCwIcon } from "../../components/common/Icons";
 const OperationsWorkspace = lazy(() =>
   import("../../features/operations/OperationsWorkspace").then((m) => ({ default: m.OperationsWorkspace }))
 );
+const NetworkWorkspace = lazy(() =>
+  import("../../features/network/NetworkWorkspace").then((m) => ({ default: m.NetworkWorkspace }))
+);
 const SystemsWorkspace = lazy(() =>
   import("../../features/systems/SystemsWorkspace").then((m) => ({ default: m.SystemsWorkspace }))
 );
@@ -40,6 +43,7 @@ const SettingsWorkspace = lazy(() =>
 
 const DOMAIN_PHASE_MAP: Record<string, string> = {
   operations: "Phase 3: Operations Workspace",
+  network: "Phase N8: Network Operations Workspace",
   systems: "Phase 4: Systems Domain",
   guardian: "Phase 5: Guardian & Memory Domain",
   memory: "Phase 5: Guardian & Memory Domain",
@@ -147,6 +151,7 @@ export const Workspace: React.FC = () => {
 
   const isFullBleedDomain =
     activeDomain === "operations" ||
+    activeDomain === "network" ||
     activeDomain === "systems" ||
     activeDomain === "guardian" ||
     activeDomain === "memory" ||
@@ -175,6 +180,8 @@ export const Workspace: React.FC = () => {
       <Suspense fallback={<WorkspaceLoadingFallback />}>
         {activeDomain === "operations" ? (
           <OperationsWorkspace />
+        ) : activeDomain === "network" ? (
+          <NetworkWorkspace />
         ) : activeDomain === "systems" ? (
           <SystemsWorkspace />
         ) : activeDomain === "guardian" ? (

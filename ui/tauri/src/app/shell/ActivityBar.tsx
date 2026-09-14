@@ -12,6 +12,7 @@ import { getDomainIcon } from "../../components/common/Icons";
 
 const DOMAINS: ActiveDomain[] = [
   "operations",
+  "network",
   "chat",
   "agents",
   "guardian",

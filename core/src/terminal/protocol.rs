@@ -1,4 +1,5 @@
 use serde::{Deserialize, Serialize};
+use crate::capabilities::types::{CapabilityRequest, CapabilityResponse};
 use crate::terminal::commands::Command;
 
 /// Sent by the client immediately after TCP connection.
@@ -18,6 +19,13 @@ pub struct AdminCommand {
     pub command: Command,
 }
 
+/// Administrative native capability invocation sent from admin to client over TCP.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct AdminCapabilityInvoke {
+    pub id: u64,
+    pub request: CapabilityRequest,
+}
+
 /// Sent from client back to admin over TCP (newline-delimited JSON).
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ClientResponse {
@@ -26,6 +34,13 @@ pub struct ClientResponse {
     pub tag: String,
     pub output: String,
     pub success: bool,
+}
+
+/// Native capability execution result sent from client back to admin over TCP.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ClientCapabilityResult {
+    pub id: u64,
+    pub response: CapabilityResponse,
 }
 
 /// File transfer response carrying binary data.

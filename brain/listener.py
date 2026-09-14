@@ -323,6 +323,17 @@ def handle_message(raw_msg, monitor):
             for nv in net_verdicts:
                 state.ACTIVE_VERDICTS[nv["id"]] = nv
 
+            # Forward anomalies to native Rust Core Network capability (N12)
+            for anomaly in net_anomalies:
+                try:
+                    from brain.runtime.rust_capability_client import get_capability_client
+                    obs_payload = GUARDIAN_NETWORK_CORRELATOR.to_network_security_observation(anomaly)
+                    client = get_capability_client()
+                    if client.is_core_reachable(timeout=0.2):
+                        client.execute_capability("Network.RecordSecurityObservation", obs_payload, timeout=2.0)
+                except Exception as e:
+                    print(f"[Guardian Listener] Failed to forward security observation to Core: {e}", file=sys.stderr)
+
     # 5-Minute Learning Mode Check
     learning_progress = GUARDIAN_BASELINE.get_learning_progress()
     learning_remaining_secs = GUARDIAN_BASELINE.get_learning_seconds_remaining()
@@ -477,22 +488,21 @@ def _ensure_fluffy_token():
     env_path = os.path.normpath(env_path)
 
     # Check if already set in environment (e.g. from a previous run)
-    if os.environ.get("FLUFFY_TOKEN") and os.environ["FLUFFY_TOKEN"] != "fluffy_dev_token":
+    if os.environ.get("FLUFFY_TOKEN") and os.environ["FLUFFY_TOKEN"].strip():
         return
 
     # Read current .env to see if FLUFFY_TOKEN already exists
-    existing_lines = []
     token_found = False
     if os.path.exists(env_path):
         with open(env_path, "r", encoding="utf-8") as f:
             for line in f:
-                existing_lines.append(line)
                 stripped = line.strip()
                 if stripped.startswith("FLUFFY_TOKEN=") and not stripped.startswith("#"):
                     token_value = stripped.split("=", 1)[1].strip()
-                    if token_value and token_value != "fluffy_dev_token":
+                    if token_value:
                         os.environ["FLUFFY_TOKEN"] = token_value
                         token_found = True
+                        break
 
     if not token_found:
         # Generate a new secure token
@@ -503,7 +513,7 @@ def _ensure_fluffy_token():
         with open(env_path, "a", encoding="utf-8") as f:
             f.write(f"\n# Auto-generated secure API token (do not share)\nFLUFFY_TOKEN={new_token}\n")
 
-        print(f"[Fluffy Brain] 🔐 New secure auth token generated and saved to .env", file=__import__('sys').stderr)
+        print("[Fluffy Brain] [AUTH] New secure auth token generated and saved to .env", file=__import__('sys').stderr)
 
 
 def main():

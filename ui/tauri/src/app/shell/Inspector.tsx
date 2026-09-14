@@ -35,6 +35,9 @@ import {
   BarChartIcon,
   SettingsIcon,
   RefreshCwIcon,
+  GlobeIcon,
+  AlertCircleIcon,
+  ClockIcon,
 } from "../../components/common/Icons";
 import { killProcess, toggleStartupApp, removeStartupApp } from "../../services/api/systems";
 import { networkStore } from "../../stores/networkStore";
@@ -44,12 +47,29 @@ import { guardianStore } from "../../stores/guardianStore";
 import { memoryStore } from "../../stores/memoryStore";
 import { terminalStore } from "../../stores/terminalStore";
 import { extensionsStore } from "../../stores/extensionsStore";
+import {
+  resolveSelectedEntity,
+  resolveAssociatedConnections,
+  resolveRelatedEvents,
+} from "../../features/network/inspector/inspectorModel";
+import { NodeInspectorSection } from "../../features/network/inspector/NodeInspectorSection";
+import { DeviceInspectorSection } from "../../features/network/inspector/DeviceInspectorSection";
+import { ConnectionInspectorSection } from "../../features/network/inspector/ConnectionInspectorSection";
+import { InterfaceInspectorSection } from "../../features/network/inspector/InterfaceInspectorSection";
+import { ExternalEndpointInspectorSection } from "../../features/network/inspector/ExternalEndpointInspectorSection";
+import { useNetworkWorkspaceStore, networkWorkspaceStore } from "../../stores/networkWorkspaceStore";
 
 export const Inspector: React.FC = () => {
   const inspectorOpen = useUiStore((s) => s.inspectorOpen);
   const inspectorWidth = useUiStore((s) => s.inspectorWidth);
   const selectedItem = useUiStore((s) => s.selectedItem);
   const snapshot = useTelemetryStore((s) => s.snapshot);
+  const networkNodes = useNetworkWorkspaceStore((s) => s.nodes);
+  const networkDevices = useNetworkWorkspaceStore((s) => s.devices);
+  const networkConnections = useNetworkWorkspaceStore((s) => s.connections);
+  const networkInterfaces = useNetworkWorkspaceStore((s) => s.interfaces);
+  const networkEvents = useNetworkWorkspaceStore((s) => s.events);
+  const networkIsStale = useNetworkWorkspaceStore((s) => s.isStale);
   const [actionInProgress, setActionInProgress] = useState(false);
   const [actionFeedback, setActionFeedback] = useState<string | null>(null);
   const [isDragging, setIsDragging] = useState(false);
@@ -85,8 +105,61 @@ export const Inspector: React.FC = () => {
     return null;
   }
 
+  const isNetworkEntity = (type?: string) => {
+    if (!type) return false;
+    return (
+      type === "node" ||
+      type === "device" ||
+      type === "connection" ||
+      type === "interface" ||
+      type === "external_endpoint" ||
+      type === "networkNode" ||
+      type === "networkDevice" ||
+      type === "networkConnection" ||
+      type === "networkInterface" ||
+      type === "networkEndpoint"
+    );
+  };
+
+  const normalizeNetworkType = (type?: string): "node" | "device" | "connection" | "interface" | "external_endpoint" => {
+    switch (type) {
+      case "networkNode":
+      case "node":
+        return "node";
+      case "networkDevice":
+      case "device":
+        return "device";
+      case "networkConnection":
+      case "connection":
+        return "connection";
+      case "networkInterface":
+      case "interface":
+        return "interface";
+      case "networkEndpoint":
+      case "external_endpoint":
+        return "external_endpoint";
+      default:
+        return "node";
+    }
+  };
+
   const getItemIcon = (type?: string) => {
     switch (type) {
+      case "node":
+      case "networkNode":
+        return <CpuIcon size={16} style={{ color: "var(--color-accent)" }} />;
+      case "device":
+      case "networkDevice":
+        return <WifiIcon size={16} style={{ color: "var(--color-success)" }} />;
+      case "connection":
+      case "networkConnection":
+        return <ActivityIcon size={16} style={{ color: "var(--color-info, #3b82f6)" }} />;
+      case "interface":
+      case "networkInterface":
+        return <LayersIcon size={16} style={{ color: "var(--color-warning, #eab308)" }} />;
+      case "external_endpoint":
+      case "networkEndpoint":
+        return <GlobeIcon size={16} style={{ color: "var(--color-accent-purple, #a855f7)" }} />;
       case "cpu":
         return <CpuIcon size={16} />;
       case "ram":
@@ -105,7 +178,6 @@ export const Inspector: React.FC = () => {
       case "startup":
         return <LayersIcon size={16} />;
       case "machine":
-      case "networkDevice":
       case "agentNode":
       case "terminalNode":
         return <ServerIcon size={16} />;
@@ -944,9 +1016,170 @@ export const Inspector: React.FC = () => {
     return null;
   };
 
+  const renderNetworkEntityDetails = () => {
+    if (!selectedItem) return null;
+    const normType = normalizeNetworkType(selectedItem.type);
+    const resolved = resolveSelectedEntity(
+      { type: normType, id: selectedItem.id },
+      {
+        nodes: networkNodes,
+        devices: networkDevices,
+        connections: networkConnections,
+        interfaces: networkInterfaces,
+      }
+    );
+
+    const associatedConnections = resolveAssociatedConnections(
+      { type: normType, id: selectedItem.id },
+      networkConnections,
+      networkNodes,
+      networkDevices
+    );
+
+    const relatedEvents = resolveRelatedEvents({ type: normType, id: selectedItem.id }, networkEvents);
+
+    if (resolved) {
+      return (
+        <div style={{ display: "flex", flexDirection: "column", gap: "var(--space-3)" }}>
+          {networkIsStale && (
+            <div
+              style={{
+                display: "flex",
+                alignItems: "center",
+                gap: "var(--space-1)",
+                padding: "4px 8px",
+                borderRadius: "var(--radius-xs)",
+                backgroundColor: "rgba(234, 179, 8, 0.12)",
+                color: "var(--color-warning)",
+                fontSize: "10px",
+                fontWeight: "bold",
+              }}
+            >
+              <ClockIcon size={11} />
+              <span>Stale Network Synchronization</span>
+            </div>
+          )}
+          {resolved.type === "node" && (
+            <NodeInspectorSection
+              node={resolved.data}
+              associatedConnections={associatedConnections}
+              relatedEvents={relatedEvents}
+            />
+          )}
+          {resolved.type === "device" && (
+            <DeviceInspectorSection
+              device={resolved.data}
+              associatedConnections={associatedConnections}
+              relatedEvents={relatedEvents}
+            />
+          )}
+          {resolved.type === "connection" && (
+            <ConnectionInspectorSection
+              connection={resolved.data}
+              relatedEvents={relatedEvents}
+            />
+          )}
+          {resolved.type === "interface" && (
+            <InterfaceInspectorSection
+              iface={resolved.data}
+              relatedEvents={relatedEvents}
+            />
+          )}
+          {resolved.type === "external_endpoint" && (
+            <ExternalEndpointInspectorSection
+              endpoint={resolved.data}
+              relatedEvents={relatedEvents}
+            />
+          )}
+        </div>
+      );
+    }
+
+    if (selectedItem.data && Object.keys(selectedItem.data).length > 0) {
+      return renderDataEntries(selectedItem.data);
+    }
+
+    return (
+      <div
+        style={{
+          padding: "var(--space-6) var(--space-4)",
+          textAlign: "center",
+          display: "flex",
+          flexDirection: "column",
+          alignItems: "center",
+          gap: "var(--space-3)",
+          backgroundColor: "rgba(239, 68, 68, 0.05)",
+          border: "1px dashed var(--color-border)",
+          borderRadius: "var(--radius-sm)",
+          margin: "var(--space-2) 0",
+        }}
+      >
+        <AlertCircleIcon size={28} style={{ color: "var(--color-warning)" }} />
+        <div>
+          <h4 style={{ margin: "0 0 4px 0", fontSize: "13px", fontWeight: "var(--font-weight-semibold)" }}>
+            Entity Unavailable
+          </h4>
+          <p style={{ margin: 0, fontSize: "11px", color: "var(--color-text-muted)" }}>
+            The selected {selectedItem.type.replace(/_/g, " ")} is no longer present in the current authoritative network state snapshot.
+          </p>
+          <div style={{ marginTop: "8px", fontFamily: "var(--font-mono)", fontSize: "10px", color: "var(--color-text-secondary)" }}>
+            ID: {selectedItem.id}
+          </div>
+        </div>
+        <button
+          type="button"
+          onClick={() => {
+            networkWorkspaceStore.clearSelection();
+            uiStore.setSelectedItem(null, false);
+          }}
+          style={{
+            marginTop: "var(--space-2)",
+            padding: "4px 12px",
+            fontSize: "11px",
+            backgroundColor: "var(--color-surface-elevated)",
+            border: "1px solid var(--color-border)",
+            borderRadius: "var(--radius-xs)",
+            color: "var(--color-text)",
+            cursor: "pointer",
+          }}
+        >
+          Clear Selection
+        </button>
+      </div>
+    );
+  };
+
   const resolveLiveInspectorData = (): { type: string; id: string; title: string; data: Record<string, unknown> } | null => {
     if (!selectedItem) return null;
     const { type, id, title, data } = selectedItem;
+
+    // 0. Network Domain Entities
+    if (isNetworkEntity(type)) {
+      const normType = normalizeNetworkType(type);
+      const resolved = resolveSelectedEntity(
+        { type: normType, id },
+        {
+          nodes: networkNodes,
+          devices: networkDevices,
+          connections: networkConnections,
+          interfaces: networkInterfaces,
+        }
+      );
+      let entityTitle = title || id;
+      if (resolved) {
+        if (resolved.type === "node") entityTitle = resolved.data.name;
+        else if (resolved.type === "device") entityTitle = resolved.data.hostname || resolved.data.ip_address;
+        else if (resolved.type === "connection") entityTitle = `${resolved.data.protocol.toUpperCase()} Flow :${resolved.data.local_port}`;
+        else if (resolved.type === "interface") entityTitle = resolved.data.name;
+        else if (resolved.type === "external_endpoint") entityTitle = `Target ${resolved.data.remoteAddress}`;
+      }
+      return {
+        type: normType,
+        id,
+        title: entityTitle,
+        data: (resolved?.data as unknown as Record<string, unknown>) || data || {},
+      };
+    }
 
     // 1. CPU metric or Hardware CPU
     if (type === "cpu" || (type === "hardware" && id?.toLowerCase().includes("cpu"))) {
@@ -1614,7 +1847,9 @@ export const Inspector: React.FC = () => {
           )}
 
           <div style={{ flex: 1, marginTop: "var(--space-1)" }}>
-            {activeItem.type === "runningApplication"
+            {isNetworkEntity(activeItem.type)
+              ? renderNetworkEntityDetails()
+              : activeItem.type === "runningApplication"
               ? renderRunningAppDetails(activeItem.data)
               : renderDataEntries(activeItem.data)}
           </div>

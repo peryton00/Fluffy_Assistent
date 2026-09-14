@@ -7,6 +7,7 @@
 
 export type ActiveDomain =
   | "operations"
+  | "network"
   | "chat"
   | "agents"
   | "guardian"
@@ -16,6 +17,15 @@ export type ActiveDomain =
   | "extensions"
   | "analytics"
   | "settings";
+
+export type NetworkSection =
+  | "overview"
+  | "systems"
+  | "topology"
+  | "traffic"
+  | "events"
+  | "security"
+  | "interfaces";
 
 export type GuardianSection = "overview" | "alerts" | "approvals" | "trusted" | "history";
 export type MemorySection = "overview" | "sessions" | "profile" | "preferences" | "knowledge";
@@ -53,6 +63,22 @@ export const DOMAIN_DEFINITIONS: Record<ActiveDomain, DomainDefinition> = {
       { id: "quick_actions", label: "Quick Actions" },
       { id: "telemetry", label: "Active Telemetry" },
       { id: "logs", label: "Live Logs" },
+    ],
+  },
+  network: {
+    id: "network",
+    label: "Network",
+    icon: "network",
+    description: "Distributed cluster nodes, discovery, flows, and telemetry",
+    defaultView: "overview",
+    views: [
+      { id: "overview", label: "Overview" },
+      { id: "systems", label: "Systems" },
+      { id: "topology", label: "Topology" },
+      { id: "traffic", label: "Traffic" },
+      { id: "events", label: "Events" },
+      { id: "security", label: "Security" },
+      { id: "interfaces", label: "Interfaces" },
     ],
   },
   chat: {
@@ -217,6 +243,15 @@ export type InspectorItemType =
   | "analyticsPoint"
   | "networkDevice"
   | "networkService"
+  | "networkNode"
+  | "networkConnection"
+  | "networkInterface"
+  | "networkEndpoint"
+  | "node"
+  | "device"
+  | "connection"
+  | "interface"
+  | "external_endpoint"
   | "settingItem";
 
 

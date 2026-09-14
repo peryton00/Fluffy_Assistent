@@ -742,6 +742,55 @@ class NetworkCorrelationEngine:
             })
         return verdicts
 
+    def to_network_security_observation(self, anomaly: NetworkAnomaly) -> Dict[str, Any]:
+        """
+        Translates a NetworkAnomaly object into the canonical NetworkSecurityObservation
+        schema expected by the native Rust capability boundary (Network.RecordSecurityObservation).
+        """
+        evidence_list: List[str] = []
+        if anomaly.explanation:
+            evidence_list.append(anomaly.explanation)
+
+        ev = anomaly.evidence or {}
+        if "anomaly_subtype" in ev:
+            evidence_list.append(f"Subtype: {ev['anomaly_subtype']}")
+        if "bound_address" in ev and "port" in ev:
+            evidence_list.append(f"Bound: {ev['bound_address']}:{ev['port']}")
+        if "deviation_ratio" in ev:
+            evidence_list.append(f"Deviation: {ev['deviation_ratio']}x baseline")
+        if "previous_mac" in ev and "new_mac" in ev:
+            evidence_list.append(f"MAC Transition: {ev['previous_mac']} -> {ev['new_mac']}")
+
+        # Extract contextual IP/MAC/PID/Interface
+        affected_iface = ev.get("interface_name")
+        affected_ip = (
+            ev.get("gateway_ip")
+            or ev.get("bound_address")
+            or (anomaly.related_connection.get("remote_address") if anomaly.related_connection else None)
+        )
+        affected_mac = (
+            ev.get("new_mac")
+            or (anomaly.related_connection.get("current_mac") if anomaly.related_connection else None)
+        )
+        affected_pid = (
+            anomaly.related_process.get("pid")
+            if anomaly.related_process
+            else ev.get("pid")
+        )
+
+        return {
+            "observation_id": anomaly.id,
+            "timestamp_epoch_ms": int(anomaly.timestamp * 1000),
+            "risk_level": anomaly.severity.lower(),
+            "anomaly_kind": anomaly.type.lower(),
+            "affected_interface": str(affected_iface) if affected_iface else None,
+            "affected_ip": str(affected_ip) if affected_ip else None,
+            "affected_mac": str(affected_mac) if affected_mac else None,
+            "affected_pid": int(affected_pid) if affected_pid is not None else None,
+            "description": anomaly.summary,
+            "evidence": evidence_list,
+        }
+
 
 # Global singleton instance
 _network_correlation_engine: Optional[NetworkCorrelationEngine] = None
