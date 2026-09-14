@@ -1,23 +1,47 @@
 """
 Network / LAN Distributed Monitoring Blueprint
-Handles: /network/role, /network/availability/*, /network/admin/*
+
+Role and machine management now delegated to Rust core via WS bridge (port 9003).
+Python is a thin HTTP proxy — it translates REST calls to Rust REPL commands and
+reads back IPC telemetry already in state.LATEST_STATE.
 """
 from flask import Blueprint, jsonify, request
 import state
 import os
 import sys
+import asyncio
+import socket as _socket
 from auth_utils import token_required
 
 network_bp = Blueprint('network', __name__)
 
-# FLUFFY_TOKEN removed, using auth_utils instead
+# ── Role state (local cache, mirrors Rust state) ───────────────────────────────
+_current_role = "standalone"
 
 
-def _ensure_network_path():
-    net_path = os.path.join(os.path.dirname(os.path.dirname(__file__)), "..", "fluffy", "network")
-    net_path = os.path.abspath(net_path)
-    if net_path not in sys.path:
-        sys.path.insert(0, net_path)
+def _send_ws(cmd: str) -> bool:
+    """Send a command to Rust core via WS bridge. Synchronous wrapper."""
+    from routes.terminal_routes import send_ws_command
+    loop = asyncio.new_event_loop()
+    asyncio.set_event_loop(loop)
+    try:
+        return loop.run_until_complete(send_ws_command(cmd))
+    except Exception as e:
+        print(f"[NetworkRoute] WS command failed: {e}")
+        return False
+    finally:
+        loop.close()
+
+
+def _local_ip() -> str:
+    try:
+        s = _socket.socket(_socket.AF_INET, _socket.SOCK_DGRAM)
+        s.connect(("8.8.8.8", 80))
+        ip = s.getsockname()[0]
+        s.close()
+        return ip
+    except Exception:
+        return "127.0.0.1"
 
 
 # ── Role endpoints ─────────────────────────────────────────────────────────────
@@ -25,147 +49,83 @@ def _ensure_network_path():
 @network_bp.route("/network/role", methods=["GET"])
 @token_required
 def get_network_role():
-    """Get current network role (standalone/available/admin)"""
-    try:
-        _ensure_network_path()
-        from role_manager import get_role_manager
-        role_manager = get_role_manager()
-        current_role = role_manager.get_current_role()
-        return jsonify({"ok": True, "role": current_role})
-    except Exception as e:
-        return jsonify({"error": str(e)}), 500
+    return jsonify({"ok": True, "role": _current_role})
 
 
 @network_bp.route("/network/role", methods=["POST"])
 @token_required
 def set_network_role():
-    """Set network role (standalone/available/admin)"""
-    try:
-        data = request.get_json(silent=True)
-        if not data or "role" not in data:
-            return jsonify({"error": "Missing role parameter"}), 400
-        
-        role = data["role"]
-        _ensure_network_path()
-        from role_manager import get_role_manager
-        
-        role_manager = get_role_manager()
-        success, message = role_manager.set_role(role)
-        
-        if success:
-            state.add_execution_log(f"Network role changed to: {role}", "system")
-            
-            # Sync with Rust Core Terminal
-            import asyncio
-            from routes.terminal_routes import send_ws_command
-            loop = asyncio.new_event_loop()
-            asyncio.set_event_loop(loop)
-            try:
-                if role == "admin":
-                    loop.run_until_complete(send_ws_command("to --admin"))
-                elif role == "available":
-                    loop.run_until_complete(send_ws_command("to --client"))
-                elif role == "standalone":
-                    loop.run_until_complete(send_ws_command("to --standalone"))
-            except Exception as err:
-                print(f"[Network Route] Failed to sync role to Core: {err}")
-            finally:
-                loop.close()
+    global _current_role
+    data = request.get_json(silent=True)
+    if not data or "role" not in data:
+        return jsonify({"error": "Missing role parameter"}), 400
 
-            return jsonify({"ok": True, "message": message})
-        else:
-            return jsonify({"error": message}), 400
-    except Exception as e:
-        return jsonify({"error": str(e)}), 500
+    role = data["role"]
+    if role not in ("standalone", "available", "admin"):
+        return jsonify({"error": f"Invalid role: {role}"}), 400
+
+    # Tell Rust core to start/stop monitor server + update its mode
+    ok = _send_ws(f"network --role {role}")
+    if ok:
+        _current_role = role
+        state.add_execution_log(f"Network role changed to: {role}", "system")
+        return jsonify({"ok": True, "message": f"Role changed to {role}"})
+    else:
+        return jsonify({"error": "Failed to communicate with Rust core"}), 500
 
 
-# ── Availability endpoints ─────────────────────────────────────────────────────
+# ── Availability status ────────────────────────────────────────────────────────
 
 @network_bp.route("/network/availability/start", methods=["POST"])
 @token_required
 def start_availability():
-    """Start availability mode (HTTP server, no auth required)"""
-    try:
-        data = request.get_json(silent=True) or {}
-        port = int(data.get("port", 9000))
-
-        _ensure_network_path()
-        from server import get_availability_server
-
-        server = get_availability_server(port=port)
-        if not server.start():
-            return jsonify({"error": "Failed to start availability server"}), 500
-
+    """Start availability mode (port 9010 HTTP monitor server in Rust)."""
+    global _current_role
+    data = request.get_json(silent=True) or {}
+    port = int(data.get("port", 9010))
+    ok = _send_ws(f"network --role available")
+    if ok:
+        _current_role = "available"
         state.add_execution_log(f"Availability mode started on port {port}", "system")
-        return jsonify({
-            "ok": True,
-            "message": f"Availability server started on port {port}"
-        })
-    except Exception as e:
-        return jsonify({"error": str(e)}), 500
+        return jsonify({"ok": True, "message": f"Availability server started on port {port}"})
+    return jsonify({"error": "Failed to start availability server"}), 500
 
 
 @network_bp.route("/network/availability/stop", methods=["POST"])
 @token_required
 def stop_availability():
-    """Stop availability mode"""
-    try:
-        _ensure_network_path()
-        from server import get_availability_server
-
-        server = get_availability_server()
-        server.stop()
-
+    global _current_role
+    ok = _send_ws("network --role standalone")
+    if ok:
+        _current_role = "standalone"
         state.add_execution_log("Availability mode stopped", "system")
         return jsonify({"ok": True, "message": "Availability server stopped"})
-    except Exception as e:
-        return jsonify({"error": str(e)}), 500
+    return jsonify({"error": "Failed to stop availability server"}), 500
 
 
 @network_bp.route("/network/availability/status", methods=["GET"])
 @token_required
 def get_availability_status():
-    """Get availability mode status"""
-    try:
-        _ensure_network_path()
-        from server import get_availability_server
-
-        server = get_availability_server()
-        running = server.is_running()
-
-        import socket as _socket
-        local_ip = "127.0.0.1"
-        try:
-            s = _socket.socket(_socket.AF_INET, _socket.SOCK_DGRAM)
-            s.connect(("8.8.8.8", 80))
-            local_ip = s.getsockname()[0]
-            s.close()
-        except Exception:
-            pass
-
-        return jsonify({
-            "ok": True,
-            "running": running,
-            "ip": local_ip,
-            "port": server._port if hasattr(server, "_port") else 9000
-        })
-    except Exception as e:
-        return jsonify({"error": str(e)}), 500
+    running = _current_role == "available"
+    return jsonify({
+        "ok": True,
+        "running": running,
+        "ip": _local_ip(),
+        "port": 9010
+    })
 
 
 @network_bp.route("/network/availability/connections", methods=["GET"])
 @token_required
 def get_availability_connections():
-    """Get list of admin IPs currently connected (polling) this client."""
+    """Connected admins tracked by Rust monitor server (best-effort from LATEST_STATE)."""
+    admins = []
     try:
-        _ensure_network_path()
-        from server import get_availability_server
-
-        server = get_availability_server()
-        admins = server.get_active_admins() if server.is_running() else []
-        return jsonify({"ok": True, "admins": admins})
-    except Exception as e:
-        return jsonify({"error": str(e)}), 500
+        latest = state.LATEST_STATE or {}
+        admins = latest.get("active_admins", [])
+    except Exception:
+        pass
+    return jsonify({"ok": True, "admins": admins})
 
 
 # ── Admin endpoints ────────────────────────────────────────────────────────────
@@ -173,104 +133,82 @@ def get_availability_connections():
 @network_bp.route("/network/admin/add", methods=["POST"])
 @token_required
 def admin_add_machine():
-    """Add a client machine to the admin's watch list."""
-    try:
-        data = request.get_json(silent=True)
-        if not data or "ip" not in data:
-            return jsonify({"error": "Missing ip"}), 400
+    """Tell Rust core to connect to a remote machine's monitor server."""
+    data = request.get_json(silent=True)
+    if not data or "ip" not in data:
+        return jsonify({"error": "Missing ip"}), 400
 
-        ip_raw = str(data["ip"]).strip()
-        port = int(data.get("port", 9000))
-        if "://" in ip_raw:
-            ip_raw = ip_raw.split("://", 1)[1]
-        if "/" in ip_raw:
-            ip_raw = ip_raw.split("/")[0]
-        if ":" in ip_raw:
-            parts = ip_raw.split(":")
-            ip = parts[0].strip()
-            try:
-                port = int(parts[1])
-            except Exception:
-                pass
-        else:
-            ip = ip_raw.strip()
+    ip_raw = str(data["ip"]).strip()
+    port = int(data.get("port", 9010))
 
-        _ensure_network_path()
-        from client import get_admin_client
+    # Sanitize IP: strip scheme, CIDR, embedded port
+    if "://" in ip_raw:
+        ip_raw = ip_raw.split("://", 1)[1]
+    if "/" in ip_raw:
+        ip_raw = ip_raw.split("/")[0]
+    if ":" in ip_raw:
+        parts = ip_raw.split(":")
+        ip = parts[0].strip()
+        try:
+            port = int(parts[1])
+        except Exception:
+            pass
+    else:
+        ip = ip_raw.strip()
 
-        client = get_admin_client()
-        success, result = client.add_machine(ip, port)
+    if not ip:
+        return jsonify({"error": "Invalid IP address"}), 400
 
-        if success:
-            state.add_execution_log(f"Admin: added machine {ip}:{port}", "system")
-            return jsonify({"ok": True, "machine_id": result})
-        else:
-            return jsonify({"error": f"Could not connect to {ip}:{port} - {result}"}), 400
-    except Exception as e:
-        return jsonify({"error": str(e)}), 500
+    cmd = f"network --connect {ip} --port {port}"
+    ok = _send_ws(cmd)
+    if ok:
+        state.add_execution_log(f"Admin: connecting to {ip}:{port}", "system")
+        # machine_id comes back via IPC broadcast — return optimistic OK
+        return jsonify({"ok": True, "message": f"Connection to {ip}:{port} initiated"})
+    else:
+        return jsonify({"error": f"Could not send connect command to Rust core"}), 500
 
 
 @network_bp.route("/network/admin/remove", methods=["POST"])
 @token_required
 def admin_remove_machine():
-    """Remove a machine from the admin's watch list."""
-    try:
-        data = request.get_json(silent=True)
-        if not data or "machine_id" not in data:
-            return jsonify({"error": "Missing machine_id"}), 400
-
-        _ensure_network_path()
-        from client import get_admin_client
-
-        client = get_admin_client()
-        if client.remove_machine(data["machine_id"]):
-            return jsonify({"ok": True})
-        else:
-            return jsonify({"error": "Machine not found"}), 404
-    except Exception as e:
-        return jsonify({"error": str(e)}), 500
+    data = request.get_json(silent=True)
+    if not data or "machine_id" not in data:
+        return jsonify({"error": "Missing machine_id"}), 400
+    ok = _send_ws(f"network --disconnect {data['machine_id']}")
+    return jsonify({"ok": True}) if ok else jsonify({"error": "Rust core unreachable"}), 500
 
 
 @network_bp.route("/network/admin/remove_all", methods=["POST"])
 @token_required
 def admin_remove_all_machines():
-    """Remove all machines and stop polling."""
-    try:
-        _ensure_network_path()
-        from client import get_admin_client
-
-        client = get_admin_client()
-        client.disconnect_all()
-        return jsonify({"ok": True})
-    except Exception as e:
-        return jsonify({"error": str(e)}), 500
+    ok = _send_ws("network --disconnect-all")
+    return jsonify({"ok": True}) if ok else jsonify({"error": "Rust core unreachable"}), 500
 
 
 @network_bp.route("/network/admin/machines", methods=["GET"])
 @token_required
 def get_admin_machines():
-    """Get list of all known machines and their status."""
+    """Return connected machines. Rust pushes list via IPC; read from state cache."""
+    machines = []
     try:
-        _ensure_network_path()
-        from client import get_admin_client
-        import asyncio
+        latest = state.LATEST_STATE or {}
+        machines = latest.get("admin_machines", [])
+    except Exception:
+        pass
+
+    # Also merge TCP terminal clients from WS bridge
+    try:
         from routes.terminal_routes import fetch_ws_clients
-
-        client = get_admin_client()
-        machines = client.get_all_machines()
-
-        # Query active TCP clients from Core Terminal bridge
         loop = asyncio.new_event_loop()
         asyncio.set_event_loop(loop)
         try:
             tcp_clients = loop.run_until_complete(fetch_ws_clients())
-        except Exception as err:
-            print(f"[Network Route] Failed to query Core TCP clients: {err}")
+        except Exception:
             tcp_clients = []
         finally:
             loop.close()
 
-        # Merge them
         for tc in tcp_clients:
             machines.append({
                 "machine_id": f"tcp_{tc['tag']}",
@@ -279,52 +217,37 @@ def get_admin_machines():
                 "name": f"{tc['hostname']} (TCP Terminal)",
                 "online": True
             })
+    except Exception:
+        pass
 
-        return jsonify({
-            "ok": True,
-            "machines": machines,
-            "active_machine": client.get_active_machine_id()
-        })
-    except Exception as e:
-        return jsonify({"error": str(e)}), 500
+    return jsonify({"ok": True, "machines": machines, "active_machine": None})
 
 
 @network_bp.route("/network/admin/switch", methods=["POST"])
 @token_required
 def admin_switch_machine():
-    """Switch the active machine view."""
-    try:
-        data = request.get_json(silent=True)
-        if not data or "machine_id" not in data:
-            return jsonify({"error": "Missing machine_id"}), 400
-
-        machine_id = data["machine_id"]
-        if machine_id.startswith("tcp_"):
-            # Simply report OK for switching to TCP machine in UI
-            return jsonify({"ok": True})
-
-        _ensure_network_path()
-        from client import get_admin_client
-
-        client = get_admin_client()
-        if client.switch_active(machine_id):
-            return jsonify({"ok": True})
-        else:
-            return jsonify({"error": "Machine not found"}), 404
-    except Exception as e:
-        return jsonify({"error": str(e)}), 500
+    data = request.get_json(silent=True)
+    if not data or "machine_id" not in data:
+        return jsonify({"error": "Missing machine_id"}), 400
+    # Purely UI-side selection — no Rust action needed
+    return jsonify({"ok": True})
 
 
 @network_bp.route("/network/admin/data/<machine_id>", methods=["GET"])
 @token_required
 def get_machine_data(machine_id):
-    """Get the latest polled data for a specific machine."""
+    """Get latest polled data for a specific remote machine."""
+    # Rust pushes remote_telemetry into LATEST_STATE.remote_machines keyed by machine_id
     try:
+        latest = state.LATEST_STATE or {}
+        remote_machines = latest.get("remote_machines", {})
+        if machine_id in remote_machines:
+            return jsonify({"ok": True, "data": remote_machines[machine_id]})
+
+        # Fallback: TCP terminal client
         if machine_id.startswith("tcp_"):
             tag = machine_id.replace("tcp_", "")
-            import asyncio
             from routes.terminal_routes import fetch_ws_clients
-
             loop = asyncio.new_event_loop()
             asyncio.set_event_loop(loop)
             try:
@@ -336,16 +259,14 @@ def get_machine_data(machine_id):
 
             client_info = next((c for c in tcp_clients if c["tag"] == tag), None)
             if client_info:
-                # Return standardized metrics dictionary matching Network section
                 return jsonify({
                     "ok": True,
                     "data": {
                         "system": {
                             "hostname": client_info["hostname"],
                             "os": client_info["os"],
-                            "os_version": client_info["os_version"],
-                            "arch": client_info["arch"],
-                            "uptime": "Connected via TCP",
+                            "os_version": client_info.get("os_version", ""),
+                            "arch": client_info.get("arch", ""),
                         },
                         "cpu": {"usage_percent": 0.0},
                         "ram": {"total_mb": 0, "used_mb": 0, "free_mb": 0},
@@ -353,19 +274,8 @@ def get_machine_data(machine_id):
                         "processes": {"top_ram": []}
                     }
                 })
-            else:
-                return jsonify({"error": "TCP client not found or disconnected"}), 404
 
-        _ensure_network_path()
-        from client import get_admin_client
-
-        client = get_admin_client()
-        data = client.get_machine_data(machine_id)
-
-        if data is not None:
-            return jsonify({"ok": True, "data": data})
-        else:
-            return jsonify({"error": "No data available yet"}), 404
+        return jsonify({"error": "No data available yet"}), 404
     except Exception as e:
         return jsonify({"error": str(e)}), 500
 
@@ -373,163 +283,107 @@ def get_machine_data(machine_id):
 @network_bp.route("/network/admin/action", methods=["POST"])
 @token_required
 def admin_machine_action():
-    """Execute an action on a specific machine."""
-    try:
-        data = request.get_json(silent=True)
-        if not data or "machine_id" not in data or "action" not in data:
-            return jsonify({"error": "Missing machine_id or action"}), 400
+    """Execute an action on a remote machine."""
+    data = request.get_json(silent=True)
+    if not data or "machine_id" not in data or "action" not in data:
+        return jsonify({"error": "Missing machine_id or action"}), 400
 
-        machine_id = data["machine_id"]
-        action_payload = data.get("payload", {})
-        action_name = data["action"]
+    machine_id = data["machine_id"]
+    action_name = data["action"]
 
-        if machine_id.startswith("tcp_"):
-            tag = machine_id.replace("tcp_", "")
-            import asyncio
-            from routes.terminal_routes import send_ws_command
+    if machine_id.startswith("tcp_"):
+        tag = machine_id.replace("tcp_", "")
+        cmd_text = f"{tag} {action_name}"
+        ok = _send_ws(cmd_text)
+        if ok:
+            state.add_execution_log(f"Admin: '{action_name}' on TCP machine {tag}", "system")
+            return jsonify({"ok": True, "result": f"Command sent to {tag}"})
+        return jsonify({"error": "Failed to send command"}), 500
 
-            # Route actions directly over WS connection to the terminal
-            cmd_text = f"{tag} {action_name}"
-            
-            loop = asyncio.new_event_loop()
-            asyncio.set_event_loop(loop)
-            try:
-                success = loop.run_until_complete(send_ws_command(cmd_text))
-            except Exception as err:
-                print(f"[Network Route] Action routing failed: {err}")
-                success = False
-            finally:
-                loop.close()
-            
-            if success:
-                state.add_execution_log(f"Admin: executed '{action_name}' on TCP machine {tag}", "system")
-                return jsonify({"ok": True, "result": f"Command '{cmd_text}' sent successfully"})
-            else:
-                return jsonify({"error": "Failed to send command to TCP agent"}), 500
-
-        _ensure_network_path()
-        from client import get_admin_client
-
-        client = get_admin_client()
-        
-        # Build the action data for the client
-        remote_data = {"action": action_name}
-        remote_data.update(action_payload)
-
-        success, result = client.send_action(machine_id, remote_data)
-
-        if success:
-            state.add_execution_log(f"Admin: executed '{action_name}' on machine {machine_id}", "system")
-            return jsonify({"ok": True, "result": result})
-        else:
-            return jsonify({"error": result}), 400
-    except Exception as e:
-        return jsonify({"error": str(e)}), 500
+    # For HTTP-polled machines: forward via Rust (future: action over monitor channel)
+    # For now return not-implemented gracefully
+    return jsonify({"error": "Actions on HTTP-polled machines not yet supported"}), 501
 
 
-# ── Authoritative Network State / Capabilities HTTP Fallback (Dev/Web) ──────────
+# ── Network snapshot (for NetworkSystemsView) ──────────────────────────────────
 
 @network_bp.route("/network/snapshot", methods=["GET"])
 @token_required
 def get_network_snapshot():
-    """Get coherent point-in-time snapshot of the authoritative Network state."""
+    """Coherent snapshot of network state — built from Rust IPC data."""
     try:
         from brain.runtime.local_network_service import get_local_network_service
         service = get_local_network_service()
         local_snap = service.get_observation_snapshot()
+    except Exception:
+        local_snap = {}
 
-        import time
-        now_ms = int(time.time() * 1000)
+    import time
+    now_ms = int(time.time() * 1000)
+    nodes = []
 
-        _ensure_network_path()
-        nodes = []
-        try:
-            from client import get_admin_client
-            admin_client = get_admin_client()
-            for m in admin_client.get_all_machines():
-                nodes.append({
-                    "id": m.get("machine_id", f"node_{m.get('ip')}"),
-                    "name": m.get("name", m.get("ip", "Remote Node")),
-                    "hostname": m.get("name"),
-                    "os": "unknown",
-                    "arch": "unknown",
-                    "role": "worker",
-                    "availability": "connected" if m.get("online") else "available",
-                    "auth_state": "authenticated" if m.get("online") else "unauthenticated",
-                    "pairing_state": "paired" if m.get("online") else "unpaired",
-                    "ip_addresses": [m.get("ip")] if m.get("ip") else [],
-                    "cluster_port": m.get("port", 9000),
-                    "last_seen_epoch": now_ms / 1000,
-                })
-        except Exception:
-            pass
+    # Remote machines from Rust IPC
+    try:
+        latest = state.LATEST_STATE or {}
+        for m in latest.get("admin_machines", []):
+            nodes.append({
+                "id": m.get("machine_id", f"node_{m.get('ip')}"),
+                "name": m.get("name", m.get("ip", "Remote Node")),
+                "hostname": m.get("name"),
+                "os": "unknown",
+                "arch": "unknown",
+                "role": "worker",
+                "availability": "connected" if m.get("online") else "available",
+                "auth_state": "authenticated" if m.get("online") else "unauthenticated",
+                "pairing_state": "paired" if m.get("online") else "unpaired",
+                "ip_addresses": [m["ip"]] if m.get("ip") else [],
+                "cluster_port": m.get("port", 9010),
+                "last_seen_epoch": now_ms / 1000,
+            })
+    except Exception:
+        pass
 
-        try:
-            from server import get_availability_server
-            avail_server = get_availability_server()
-            if avail_server.is_running():
-                import socket
-                local_ip = "127.0.0.1"
-                try:
-                    s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
-                    s.connect(("8.8.8.8", 80))
-                    local_ip = s.getsockname()[0]
-                    s.close()
-                except Exception:
-                    pass
-                nodes.append({
-                    "id": f"local_node_{local_ip.replace('.', '_')}",
-                    "name": f"Local Host ({local_ip})",
-                    "hostname": socket.gethostname(),
-                    "os": sys.platform,
-                    "arch": "x86_64",
-                    "role": "available",
-                    "availability": "available",
-                    "auth_state": "unauthenticated",
-                    "pairing_state": "unpaired",
-                    "ip_addresses": [local_ip],
-                    "cluster_port": getattr(avail_server, "_port", 9000),
-                    "last_seen_epoch": now_ms / 1000,
-                })
-        except Exception:
-            pass
+    # Local node if in available mode
+    if _current_role == "available":
+        nodes.append({
+            "id": f"local_node_{_local_ip().replace('.', '_')}",
+            "name": f"Local Host ({_local_ip()})",
+            "hostname": _socket.gethostname(),
+            "os": sys.platform,
+            "arch": "x86_64",
+            "role": "available",
+            "availability": "available",
+            "auth_state": "unauthenticated",
+            "pairing_state": "unpaired",
+            "ip_addresses": [_local_ip()],
+            "cluster_port": 9010,
+            "last_seen_epoch": now_ms / 1000,
+        })
 
-        # Build standardized NetworkStateSnapshot envelope
-        snapshot = {
-            "revision": 1,
-            "captured_at_epoch_ms": now_ms,
-            "nodes": nodes,
-            "devices": local_snap.get("devices", []),
-            "connections": local_snap.get("flows", []),
-            "interfaces": local_snap.get("interfaces", []),
-            "traffic": {
-                "bytes_in": 0,
-                "bytes_out": 0,
-                "packets_in": 0,
-                "packets_out": 0,
-                "current_in_rate_bps": 0.0,
-                "current_out_rate_bps": 0.0,
-                "recorded_at_epoch_ms": now_ms,
-            }
+    snapshot = {
+        "revision": 1,
+        "captured_at_epoch_ms": now_ms,
+        "nodes": nodes,
+        "devices": local_snap.get("devices", []),
+        "connections": local_snap.get("flows", []),
+        "interfaces": local_snap.get("interfaces", []),
+        "traffic": {
+            "bytes_in": 0, "bytes_out": 0,
+            "packets_in": 0, "packets_out": 0,
+            "current_in_rate_bps": 0.0,
+            "current_out_rate_bps": 0.0,
+            "recorded_at_epoch_ms": now_ms,
         }
-        return jsonify({"ok": True, "data": snapshot})
-    except Exception as e:
-        return jsonify({"ok": False, "error": str(e)}), 500
+    }
+    return jsonify({"ok": True, "data": snapshot})
 
 
 @network_bp.route("/network/capabilities", methods=["GET"])
 @token_required
 def get_network_capabilities():
-    """Get capabilities metadata for the Network subsystem."""
     return jsonify({
         "ok": True,
-        "data": {
-            "supported_versions": ["1.0"],
-            "cluster_enabled": True,
-            "noise_transport_enabled": True,
-            "packet_capture_enabled": True,
-            "max_frame_size": 16777216,
-            "max_concurrent_connections": 128
-        }
+        "capabilities": ["monitor_server", "admin_connect", "tcp_mesh"],
+        "monitor_port": 9010,
+        "mesh_port": 9000
     })
-

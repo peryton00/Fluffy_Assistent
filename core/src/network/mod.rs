@@ -45,6 +45,7 @@ pub mod flows;
 pub mod ids;
 pub mod interfaces;
 pub mod model;
+pub mod monitor_server;
 pub mod state;
 pub mod subsystem;
 pub mod telemetry;

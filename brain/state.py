@@ -31,4 +31,6 @@ from brain.runtime.state import (
     update_security_alerts,
     add_notification,
     get_notifications,
+    set_admin_machines,
+    update_remote_telemetry,
 )

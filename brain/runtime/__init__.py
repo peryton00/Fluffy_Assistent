@@ -11,6 +11,8 @@ from brain.runtime.state import (
     update_security_alerts,
     add_notification,
     get_notifications,
+    set_admin_machines,
+    update_remote_telemetry,
 )
 from brain.runtime.commands import send_command
 from brain.runtime.local_network_service import (
@@ -34,6 +36,8 @@ __all__ = [
     "update_security_alerts",
     "add_notification",
     "get_notifications",
+    "set_admin_machines",
+    "update_remote_telemetry",
     "send_command",
     "LocalNetworkService",
     "get_local_network_service",

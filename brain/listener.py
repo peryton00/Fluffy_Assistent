@@ -659,6 +659,22 @@ def main():
                             Thread(target=delayed_exit, daemon=True).start()
                             continue
 
+                        # --- ADMIN MACHINES LIST FROM RUST ---
+                        if isinstance(msg_data, dict) and msg_data.get("type") == "admin_machines_updated":
+                            from state import set_admin_machines
+                            machines = msg_data.get("machines", [])
+                            set_admin_machines(machines)
+                            continue
+
+                        # --- REMOTE TELEMETRY SNAPSHOT FROM RUST ---
+                        if isinstance(msg_data, dict) and msg_data.get("type") == "remote_telemetry":
+                            from state import update_remote_telemetry
+                            mid = msg_data.get("machine_id")
+                            data = msg_data.get("data")
+                            if mid and data:
+                                update_remote_telemetry(mid, data)
+                            continue
+
                         handle_message(msg_data, monitor)
 
                     except json.JSONDecodeError as e:

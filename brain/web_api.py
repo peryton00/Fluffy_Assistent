@@ -79,20 +79,18 @@ def status():
     
     # Update Active Sessions count based on role
     try:
-        from fluffy.network.role_manager import get_role_manager
-        role = get_role_manager().get_current_role()
+        from routes.network_routes import _current_role
+        role = _current_role
         
         if role == "admin":
-            from fluffy.network.client import get_admin_client
-            machines = get_admin_client().get_all_machines()
-            full_state["active_sessions"] = len([m for m in machines if m.get("status") == "online"])
+            machines = state.LATEST_STATE.get("admin_machines", []) if state.LATEST_STATE else []
+            full_state["active_sessions"] = len([m for m in machines if m.get("online")])
         elif role == "available":
-            from fluffy.network.server import get_availability_server
-            admins = get_availability_server().get_active_admins()
+            admins = state.LATEST_STATE.get("active_admins", []) if state.LATEST_STATE else []
             full_state["active_sessions"] = len(admins)
         else:
             full_state["active_sessions"] = 1 # Standalone/Default
-    except:
+    except Exception:
         full_state["active_sessions"] = full_state.get("active_sessions", 1)
 
     return jsonify(full_state)

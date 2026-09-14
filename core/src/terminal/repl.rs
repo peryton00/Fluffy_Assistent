@@ -19,7 +19,6 @@ pub async fn process_input(state: &SharedState, raw_input: &str) {
         }
     }
 
-    // to --client / to --admin / to --standalone
     if input == "to --client" {
         let mut st = state.lock().await;
         st.mode = TerminalMode::Client;
@@ -39,6 +38,143 @@ pub async fn process_input(state: &SharedState, raw_input: &str) {
         st.add_output("system", "Switched to Standalone mode.", "success");
         return;
     }
+
+    // network --role available|admin|standalone
+    if input.starts_with("network --role ") {
+        let role = input.strip_prefix("network --role ").unwrap().trim();
+        match role {
+            "available" => {
+                if !crate::network::monitor_server::is_running() {
+                    crate::network::monitor_server::start(9010);
+                }
+                let mut st = state.lock().await;
+                st.add_output("system", "Network role: available. Monitor server started on port 9010.", "success");
+            }
+            "admin" => {
+                crate::network::monitor_server::stop();
+                let mut st = state.lock().await;
+                st.mode = TerminalMode::Admin;
+                st.add_output("system", "Network role: admin.", "success");
+            }
+            "standalone" => {
+                crate::network::monitor_server::stop();
+                let mut st = state.lock().await;
+                st.mode = TerminalMode::Standalone;
+                st.client_service_status = ClientServiceStatus::Stopped;
+                st.add_output("system", "Network role: standalone.", "success");
+            }
+            other => {
+                let mut st = state.lock().await;
+                st.add_output("system", &format!("Unknown role '{}'. Use: available | admin | standalone", other), "error");
+            }
+        }
+        return;
+    }
+
+    // network --connect <ip> [--port <port>]
+    if input.starts_with("network --connect ") {
+        let rest = input.strip_prefix("network --connect ").unwrap().trim();
+        let parts: Vec<&str> = rest.split_whitespace().collect();
+        let ip = parts.first().unwrap_or(&"").to_string();
+        let port: u16 = if parts.len() >= 3 && parts[1] == "--port" {
+            parts[2].parse().unwrap_or(9010)
+        } else {
+            9010
+        };
+        {
+            let mut st = state.lock().await;
+            st.add_output("system", &format!("Connecting to {}:{}...", ip, port), "dim");
+        }
+        let (ok, result) = crate::network::monitor_server::admin_connect(ip, port).await;
+        let mut st = state.lock().await;
+        if ok {
+            st.add_output("system", &format!("Connected. machine_id={}", result), "success");
+            // Broadcast updated machine list via IPC
+            drop(st);
+            let machines = crate::network::monitor_server::admin_list_machines().await;
+            crate::ipc::server::IpcServer::broadcast_global(&crate::ipc::protocol::IpcMessage {
+                schema_version: "1.0".to_string(),
+                payload: serde_json::json!({
+                    "type": "admin_machines_updated",
+                    "machines": machines
+                }),
+            });
+        } else {
+            st.add_output("system", &format!("Connection failed: {}", result), "error");
+        }
+        return;
+    }
+
+    // network --disconnect <machine_id>
+    if input.starts_with("network --disconnect ") {
+        let mid = input.strip_prefix("network --disconnect ").unwrap().trim();
+        let removed = crate::network::monitor_server::admin_disconnect(mid).await;
+        let mut st = state.lock().await;
+        if removed {
+            st.add_output("system", &format!("Disconnected machine {}", mid), "success");
+            drop(st);
+            let machines = crate::network::monitor_server::admin_list_machines().await;
+            crate::ipc::server::IpcServer::broadcast_global(&crate::ipc::protocol::IpcMessage {
+                schema_version: "1.0".to_string(),
+                payload: serde_json::json!({
+                    "type": "admin_machines_updated",
+                    "machines": machines
+                }),
+            });
+        } else {
+            st.add_output("system", &format!("Machine {} not found.", mid), "error");
+        }
+        return;
+    }
+
+    // network --disconnect-all
+    if input == "network --disconnect-all" {
+        let count = crate::network::monitor_server::admin_disconnect_all().await;
+        let mut st = state.lock().await;
+        st.add_output("system", &format!("Disconnected {} machines", count), "success");
+        drop(st);
+        let machines = crate::network::monitor_server::admin_list_machines().await;
+        crate::ipc::server::IpcServer::broadcast_global(&crate::ipc::protocol::IpcMessage {
+            schema_version: "1.0".to_string(),
+            payload: serde_json::json!({
+                "type": "admin_machines_updated",
+                "machines": machines
+            }),
+        });
+        return;
+    }
+
+    // network --list
+    if input == "network --list" {
+        let machines = crate::network::monitor_server::admin_list_machines().await;
+        let mut st = state.lock().await;
+        if machines.is_empty() {
+            st.add_output("system", "No remote machines connected.", "dim");
+        } else {
+            for m in &machines {
+                let line = format!(
+                    "  {} | {} | {}:{} | online={}",
+                    m.get("machine_id").and_then(|v| v.as_str()).unwrap_or("?"),
+                    m.get("name").and_then(|v| v.as_str()).unwrap_or("?"),
+                    m.get("ip").and_then(|v| v.as_str()).unwrap_or("?"),
+                    m.get("port").and_then(|v| v.as_u64()).unwrap_or(9010),
+                    m.get("online").and_then(|v| v.as_bool()).unwrap_or(false),
+                );
+                st.add_output("system", &line, "text");
+            }
+            // Also push as IPC message
+            crate::ipc::server::IpcServer::broadcast_global(&crate::ipc::protocol::IpcMessage {
+                schema_version: "1.0".to_string(),
+                payload: serde_json::json!({
+                    "type": "admin_machines_updated",
+                    "machines": machines
+                }),
+            });
+        }
+        return;
+    }
+
+
 
     // client --start <ip> --port <port>
     if input.starts_with("client --start") {

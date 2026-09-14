@@ -974,8 +974,18 @@ fn main() {
 
             ipc.broadcast(&IpcMessage {
                 schema_version: "1.0".to_string(),
-                payload,
+                payload: payload.clone(),
             });
+
+            // Update monitor server snapshot so /data endpoint stays fresh
+            {
+                let snap = payload.clone();
+                tokio::task::block_in_place(|| {
+                    tokio::runtime::Handle::current().block_on(async {
+                        network::monitor_server::update_snapshot(snap).await;
+                    });
+                });
+            }
         }
 
         // 👇 IMPORTANT: sleep in small chunks so shutdown is responsive

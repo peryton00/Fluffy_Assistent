@@ -68,3 +68,22 @@ def get_notifications():
         notifs = list(NOTIFICATIONS)
         NOTIFICATIONS = []
         return notifs
+
+
+def set_admin_machines(machines):
+    global LATEST_STATE
+    with LOCK:
+        if LATEST_STATE is None:
+            LATEST_STATE = {}
+        LATEST_STATE["admin_machines"] = machines
+
+
+def update_remote_telemetry(machine_id, data):
+    global LATEST_STATE
+    with LOCK:
+        if LATEST_STATE is None:
+            LATEST_STATE = {}
+        if "remote_machines" not in LATEST_STATE or not isinstance(LATEST_STATE["remote_machines"], dict):
+            LATEST_STATE["remote_machines"] = {}
+        LATEST_STATE["remote_machines"][machine_id] = data
+
