@@ -74,7 +74,23 @@ export const NetworkSystemsView: React.FC = () => {
       return;
     }
 
-    const portNum = parseInt(nodePort, 10);
+    let cleanIp = nodeIp.trim();
+    if (cleanIp.includes("://")) {
+      cleanIp = cleanIp.split("://")[1];
+    }
+    if (cleanIp.includes("/")) {
+      cleanIp = cleanIp.split("/")[0];
+    }
+    let portNum = parseInt(nodePort, 10);
+    if (cleanIp.includes(":")) {
+      const parts = cleanIp.split(":");
+      cleanIp = parts[0];
+      const parsedPort = parseInt(parts[1], 10);
+      if (!isNaN(parsedPort)) {
+        portNum = parsedPort;
+      }
+    }
+
     if (isNaN(portNum) || portNum < 1 || portNum > 65535) {
       setFormError("Port must be a valid number between 1 and 65535.");
       return;
@@ -83,7 +99,7 @@ export const NetworkSystemsView: React.FC = () => {
     setIsSubmitting(true);
     setFormError(null);
     try {
-      await networkStore.addNode(nodeIp.trim(), portNum, nodeName.trim() || undefined);
+      await networkStore.addNode(cleanIp, portNum, nodeName.trim() || undefined);
       await networkWorkspaceStore.resync();
       setIsAddModalOpen(false);
       setNodeIp("");
@@ -96,6 +112,15 @@ export const NetworkSystemsView: React.FC = () => {
     }
   };
 
+  const handleQuickConnectDevice = (ip: string, name?: string) => {
+    const clean = ip.replace(/\/\d+$/, "").trim();
+    setNodeIp(clean);
+    setNodePort("9000");
+    setNodeName(name || "");
+    setFormError(null);
+    setIsAddModalOpen(true);
+  };
+
   const handleCopy = (text: string, fieldKey: string) => {
     navigator.clipboard.writeText(text);
     setCopiedField(fieldKey);
@@ -104,11 +129,12 @@ export const NetworkSystemsView: React.FC = () => {
     }, 2000);
   };
 
-  // Find active LAN IP address from interfaces
+  // Find active LAN IP address from interfaces (strip subnet mask / CIDR prefix)
   const activeInterface = interfaces.find(
     (i) => i.is_up && !i.is_loopback && i.ipv4_addresses.length > 0
   ) || interfaces.find((i) => i.ipv4_addresses.length > 0);
-  const detectedIp = activeInterface?.ipv4_addresses[0] || "127.0.0.1";
+  const rawIp = activeInterface?.ipv4_addresses[0] || "127.0.0.1";
+  const detectedIp = rawIp.replace(/\/\d+$/, "").trim();
   const broadcastUri = `fluffy://${detectedIp}:9000`;
 
   const toggleSelectAllConnected = () => {
@@ -954,6 +980,7 @@ export const NetworkSystemsView: React.FC = () => {
                   <th style={{ padding: "var(--space-2) var(--space-3)" }}>Category</th>
                   <th style={{ padding: "var(--space-2) var(--space-3)" }}>Discovery Source</th>
                   <th style={{ padding: "var(--space-2) var(--space-3)" }}>State</th>
+                  <th style={{ padding: "var(--space-2) var(--space-3)", textAlign: "right" }}>Actions</th>
                 </tr>
               </thead>
               <tbody>
@@ -1010,6 +1037,29 @@ export const NetworkSystemsView: React.FC = () => {
                         >
                           {d.state.toUpperCase()}
                         </span>
+                      </td>
+                      <td style={{ padding: "var(--space-2) var(--space-3)", textAlign: "right" }}>
+                        {role === "admin" && (
+                          <button
+                            type="button"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              handleQuickConnectDevice(d.ip_address, d.hostname || undefined);
+                            }}
+                            style={{
+                              padding: "3px 8px",
+                              fontSize: "11px",
+                              fontWeight: "var(--font-weight-medium)",
+                              backgroundColor: "rgba(59, 130, 246, 0.15)",
+                              color: "var(--color-info, #3b82f6)",
+                              border: "1px solid rgba(59, 130, 246, 0.3)",
+                              borderRadius: "var(--radius-xs)",
+                              cursor: "pointer",
+                            }}
+                          >
+                            Connect Node
+                          </button>
+                        )}
                       </td>
                     </tr>
                   );

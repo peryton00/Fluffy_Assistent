@@ -179,8 +179,21 @@ def admin_add_machine():
         if not data or "ip" not in data:
             return jsonify({"error": "Missing ip"}), 400
 
-        ip = data["ip"]
+        ip_raw = str(data["ip"]).strip()
         port = int(data.get("port", 9000))
+        if "://" in ip_raw:
+            ip_raw = ip_raw.split("://", 1)[1]
+        if "/" in ip_raw:
+            ip_raw = ip_raw.split("/")[0]
+        if ":" in ip_raw:
+            parts = ip_raw.split(":")
+            ip = parts[0].strip()
+            try:
+                port = int(parts[1])
+            except Exception:
+                pass
+        else:
+            ip = ip_raw.strip()
 
         _ensure_network_path()
         from client import get_admin_client
@@ -192,7 +205,7 @@ def admin_add_machine():
             state.add_execution_log(f"Admin: added machine {ip}:{port}", "system")
             return jsonify({"ok": True, "machine_id": result})
         else:
-            return jsonify({"error": result}), 400
+            return jsonify({"error": f"Could not connect to {ip}:{port} - {result}"}), 400
     except Exception as e:
         return jsonify({"error": str(e)}), 500
 
