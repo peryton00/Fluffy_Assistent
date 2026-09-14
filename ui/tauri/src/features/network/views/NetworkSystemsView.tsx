@@ -38,6 +38,7 @@ export const NetworkSystemsView: React.FC = () => {
   const executingNodeIds = useNetworkWorkspaceStore((s) => s.executingCommandNodeIds);
 
   const role = useNetworkStore((s) => s.role);
+  const connectedAdmins = useNetworkStore((s) => s.connectedAdmins);
   const networkStoreLoading = useNetworkStore((s) => s.loading);
 
   const [selectedBatchNodeIds, setSelectedBatchNodeIds] = useState<Set<string>>(new Set());
@@ -47,7 +48,7 @@ export const NetworkSystemsView: React.FC = () => {
   // Add Node Modal state
   const [isAddModalOpen, setIsAddModalOpen] = useState<boolean>(false);
   const [nodeIp, setNodeIp] = useState<string>("");
-  const [nodePort, setNodePort] = useState<string>("9000");
+  const [nodePort, setNodePort] = useState<string>("9010");
   const [nodeName, setNodeName] = useState<string>("");
   const [formError, setFormError] = useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = useState<boolean>(false);
@@ -104,7 +105,7 @@ export const NetworkSystemsView: React.FC = () => {
       setIsAddModalOpen(false);
       setNodeIp("");
       setNodeName("");
-      setNodePort("9000");
+      setNodePort("9010");
     } catch (err: unknown) {
       setFormError(err instanceof Error ? err.message : "Failed to add network node.");
     } finally {
@@ -115,7 +116,7 @@ export const NetworkSystemsView: React.FC = () => {
   const handleQuickConnectDevice = (ip: string, name?: string) => {
     const clean = ip.replace(/\/\d+$/, "").trim();
     setNodeIp(clean);
-    setNodePort("9000");
+    setNodePort("9010");
     setNodeName(name || "");
     setFormError(null);
     setIsAddModalOpen(true);
@@ -135,7 +136,7 @@ export const NetworkSystemsView: React.FC = () => {
   ) || interfaces.find((i) => i.ipv4_addresses.length > 0);
   const rawIp = activeInterface?.ipv4_addresses[0] || "127.0.0.1";
   const detectedIp = rawIp.replace(/\/\d+$/, "").trim();
-  const broadcastUri = `fluffy://${detectedIp}:9000`;
+  const broadcastUri = `fluffy://${detectedIp}:9010`;
 
   const toggleSelectAllConnected = () => {
     const connectedNodeIds = nodes.filter((n) => n.availability === "connected").map((n) => n.id);
@@ -415,10 +416,10 @@ export const NetworkSystemsView: React.FC = () => {
               <div style={{ backgroundColor: "var(--color-surface)", padding: "var(--space-2) var(--space-3)", borderRadius: "var(--radius-xs)", border: "1px solid var(--color-border)" }}>
                 <span style={{ color: "var(--color-text-muted)", fontSize: "11px" }}>Discovery / RPC Port:</span>
                 <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginTop: "2px" }}>
-                  <strong style={{ fontFamily: "var(--font-mono)" }}>9000 / 5124</strong>
+                  <strong style={{ fontFamily: "var(--font-mono)" }}>9010</strong>
                   <button
                     type="button"
-                    onClick={() => handleCopy("9000", "port")}
+                    onClick={() => handleCopy("9010", "port")}
                     style={{ background: "none", border: "none", color: "var(--color-accent)", cursor: "pointer", padding: "2px" }}
                     title="Copy Port"
                   >
@@ -445,8 +446,38 @@ export const NetworkSystemsView: React.FC = () => {
               </div>
             </div>
 
+            {/* Connected Admins status */}
+            <div
+              style={{
+                padding: "var(--space-2) var(--space-3)",
+                backgroundColor: connectedAdmins.length > 0 ? "rgba(34, 197, 94, 0.1)" : "var(--color-surface)",
+                border: `1px ${connectedAdmins.length > 0 ? "solid rgba(34, 197, 94, 0.3)" : "dashed var(--color-border)"}`,
+                borderRadius: "var(--radius-xs)",
+                fontSize: "12px",
+              }}
+            >
+              <div style={{ display: "flex", alignItems: "center", gap: "var(--space-2)", color: connectedAdmins.length > 0 ? "var(--color-success)" : "var(--color-text-muted)", fontWeight: "var(--font-weight-medium)" }}>
+                <CheckIcon size={14} />
+                <span>
+                  {connectedAdmins.length > 0
+                    ? `Active Admin Connection (${connectedAdmins.length})`
+                    : "No Admin Connected Yet — Waiting for Admin connection"}
+                </span>
+              </div>
+              {connectedAdmins.length > 0 && (
+                <div style={{ marginTop: "4px", fontSize: "11px", fontFamily: "var(--font-mono)", display: "flex", flexDirection: "column", gap: "2px" }}>
+                  {connectedAdmins.map((adminIp) => (
+                    <div key={adminIp} style={{ display: "flex", justifyContent: "space-between", color: "var(--color-text)" }}>
+                      <span>Admin Peer: {adminIp}</span>
+                      <span style={{ color: "var(--color-success)", textTransform: "uppercase", fontSize: "10px" }}>Connected / Polling</span>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+
             <div style={{ fontSize: "11px", color: "var(--color-text-secondary)", lineHeight: "1.4" }}>
-              <strong>Admin Connection Instructions:</strong> To connect from another machine, open Fluffy on that machine, set its role to <strong>Admin</strong>, click <strong>"Add Node Manually"</strong>, and enter IP: <span style={{ fontFamily: "var(--font-mono)" }}>{detectedIp}</span> with Port: <span style={{ fontFamily: "var(--font-mono)" }}>9000</span>.
+              <strong>Admin Connection Instructions:</strong> To connect from another machine, open Fluffy on that machine, set its role to <strong>Admin</strong>, click <strong>"Add Node Manually"</strong>, and enter IP: <span style={{ fontFamily: "var(--font-mono)" }}>{detectedIp}</span> with Port: <span style={{ fontFamily: "var(--font-mono)" }}>9010</span>.
             </div>
           </div>
         )}
@@ -942,7 +973,11 @@ export const NetworkSystemsView: React.FC = () => {
           >
             {status === "loading"
               ? "Loading cluster nodes..."
-              : "No cluster nodes registered in authoritative state."}
+              : role === "available"
+              ? "Available mode active. This node is listening for Admin connections on port 9010 and does not manage remote nodes."
+              : role === "admin"
+              ? "No remote nodes connected yet. Click 'Add Node Manually' or use quick connect below to attach an available node."
+              : "Standalone mode active. Switch to Admin to manage remote cluster nodes."}
           </div>
         )}
       </div>

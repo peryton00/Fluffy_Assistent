@@ -198,11 +198,11 @@ export async function sendAdminMachineAction(
  */
 export async function addAdminMachine(
   ip: string,
-  port: number = 9000,
+  port: number = 9010,
   name?: string,
   options?: RequestOptions
-): Promise<{ ok: boolean }> {
-  return apiClient.post<{ ok: boolean }>("/network/admin/add", { ip, port, name }, options);
+): Promise<{ ok: boolean; message?: string; machine?: string }> {
+  return apiClient.post<{ ok: boolean; message?: string; machine?: string }>("/network/admin/add", { ip, port, name }, options);
 }
 
 /**
@@ -213,4 +213,13 @@ export async function removeAdminMachine(
   options?: RequestOptions
 ): Promise<{ ok: boolean }> {
   return apiClient.post<{ ok: boolean }>("/network/admin/remove", { machine_id: machineId }, options);
+}
+
+/**
+ * Fetches connected admin IPs when in available mode.
+ */
+export async function getAvailabilityConnections(
+  options?: RequestOptions
+): Promise<{ ok: boolean; admins: string[] }> {
+  return apiClient.get<{ ok: boolean; admins: string[] }>("/network/availability/connections", options);
 }

@@ -26,11 +26,12 @@ export const NetworkView: React.FC = () => {
   const machines = useNetworkStore((s) => s.machines);
   const activeMachineId = useNetworkStore((s) => s.activeMachineId);
   const activeMachineData = useNetworkStore((s) => s.activeMachineData);
+  const connectedAdmins = useNetworkStore((s) => s.connectedAdmins);
   const loading = useNetworkStore((s) => s.loading);
 
   const [isAddModalOpen, setIsAddModalOpen] = useState(false);
   const [nodeIp, setNodeIp] = useState("");
-  const [nodePort, setNodePort] = useState("9000");
+  const [nodePort, setNodePort] = useState("9010");
   const [nodeName, setNodeName] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [formError, setFormError] = useState<string | null>(null);
@@ -68,7 +69,7 @@ export const NetworkView: React.FC = () => {
       setIsAddModalOpen(false);
       setNodeIp("");
       setNodeName("");
-      setNodePort("9000");
+      setNodePort("9010");
     } catch (err: unknown) {
       setFormError(err instanceof Error ? err.message : "Failed to add network node.");
     } finally {
@@ -319,7 +320,10 @@ export const NetworkView: React.FC = () => {
                   Broadcasting as Available Node
                 </div>
                 <div style={{ fontSize: "11px", color: "var(--color-text-muted)", fontFamily: "var(--font-mono)" }}>
-                  Listening for LAN discovery and admin requests on port 9000
+                  Listening on port 9010 &bull;{" "}
+                  {connectedAdmins.length > 0
+                    ? `Admin connected: ${connectedAdmins.join(", ")}`
+                    : "No admin connected yet"}
                 </div>
               </div>
             </div>

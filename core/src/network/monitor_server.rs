@@ -237,11 +237,25 @@ pub async fn admin_connect(ip: String, port: u16) -> (bool, String) {
         return (false, "Invalid IP address".to_string());
     }
 
-    // Ping first
-    let ping_url = format!("http://{}:{}/ping", ip, port);
+    // Ping first (with fallback to 9010 if standard 9000 or custom port fails)
+    let mut connect_port = port;
+    let ping_url = format!("http://{}:{}/ping", ip, connect_port);
     let machine_name = match ping_remote(&ping_url).await {
         Ok(name) => name,
-        Err(e) => return (false, format!("Cannot reach {}:{} — {}", ip, port, e)),
+        Err(e) => {
+            if connect_port != 9010 {
+                let fallback_url = format!("http://{}:9010/ping", ip);
+                match ping_remote(&fallback_url).await {
+                    Ok(name) => {
+                        connect_port = 9010;
+                        name
+                    }
+                    Err(_) => return (false, format!("Cannot reach {}:{} or 9010 — {}", ip, port, e)),
+                }
+            } else {
+                return (false, format!("Cannot reach {}:{} — {}", ip, port, e));
+            }
+        }
     };
 
     let machine_id = uuid::Uuid::new_v4().to_string()[..8].to_string();
@@ -253,7 +267,7 @@ pub async fn admin_connect(ip: String, port: u16) -> (bool, String) {
             RemoteMachine {
                 machine_id: machine_id.clone(),
                 ip: ip.clone(),
-                port,
+                port: connect_port,
                 name: machine_name.clone(),
                 online: true,
                 last_seen: unix_secs(),
@@ -266,7 +280,7 @@ pub async fn admin_connect(ip: String, port: u16) -> (bool, String) {
     let mid = machine_id.clone();
     let poll_ip = ip.clone();
     tokio::spawn(async move {
-        let data_url = format!("http://{}:{}/data", poll_ip, port);
+        let data_url = format!("http://{}:{}/data", poll_ip, connect_port);
         loop {
             // Check if still registered
             let still_registered = {

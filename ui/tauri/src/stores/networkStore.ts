@@ -15,6 +15,7 @@ import {
   sendAdminMachineAction,
   addAdminMachine,
   removeAdminMachine,
+  getAvailabilityConnections,
 } from "../services/api/systems";
 import type { NetworkRole, NetworkMachine, RemoteMachineData } from "../types/contracts";
 
@@ -23,6 +24,7 @@ export interface NetworkState {
   machines: NetworkMachine[];
   activeMachineId: string | null;
   activeMachineData: RemoteMachineData | null;
+  connectedAdmins: string[];
   loading: boolean;
   isPolling: boolean;
   error: Error | null;
@@ -37,6 +39,7 @@ class NetworkStoreManager {
     machines: [],
     activeMachineId: null,
     activeMachineData: null,
+    connectedAdmins: [],
     loading: false,
     isPolling: false,
     error: null,
@@ -142,7 +145,16 @@ class NetworkStoreManager {
         }
       }
 
-      // 3. If there is an active remote machine selected, fetch its data
+      // 3. If role is available, fetch connected admins
+      let connectedAdmins: string[] = [];
+      if (role === "available") {
+        const connRes = await getAvailabilityConnections().catch(() => ({ ok: false, admins: [] as string[] }));
+        if (connRes.ok) {
+          connectedAdmins = connRes.admins;
+        }
+      }
+
+      // 4. If there is an active remote machine selected, fetch its data
       let activeMachineData = this.state.activeMachineData;
       if (activeMachineId && role === "admin") {
         const dataRes = await getAdminMachineData(activeMachineId).catch(() => ({ ok: false, data: {} }));
@@ -156,6 +168,7 @@ class NetworkStoreManager {
         machines,
         activeMachineId,
         activeMachineData,
+        connectedAdmins,
         loading: false,
         error: null,
         lastPolled: Date.now(),
@@ -196,7 +209,7 @@ class NetworkStoreManager {
     }
   };
 
-  public addNode = async (ip: string, port: number = 9000, name?: string): Promise<void> => {
+  public addNode = async (ip: string, port: number = 9010, name?: string): Promise<void> => {
     await addAdminMachine(ip, port, name);
     await this.refreshNow();
   };

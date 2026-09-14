@@ -118,14 +118,17 @@ def get_availability_status():
 @network_bp.route("/network/availability/connections", methods=["GET"])
 @token_required
 def get_availability_connections():
-    """Connected admins tracked by Rust monitor server (best-effort from LATEST_STATE)."""
-    admins = []
+    """Connected admins tracked by Rust monitor server."""
+    import urllib.request
+    import json
     try:
-        latest = state.LATEST_STATE or {}
-        admins = latest.get("active_admins", [])
+        req = urllib.request.Request("http://127.0.0.1:9010/connections")
+        with urllib.request.urlopen(req, timeout=1.0) as resp:
+            data = json.loads(resp.read().decode())
+            return jsonify({"ok": True, "admins": data.get("admins", [])})
     except Exception:
-        pass
-    return jsonify({"ok": True, "admins": admins})
+        latest = state.LATEST_STATE or {}
+        return jsonify({"ok": True, "admins": latest.get("active_admins", [])})
 
 
 # ── Admin endpoints ────────────────────────────────────────────────────────────
@@ -159,14 +162,38 @@ def admin_add_machine():
     if not ip:
         return jsonify({"error": "Invalid IP address"}), 400
 
-    cmd = f"network --connect {ip} --port {port}"
+    # Test reachability to target monitor server (port 9010)
+    import urllib.request
+    import json
+    target_port = 9010 if port == 9000 else port
+    machine_name = "Remote Node"
+    ping_ok = False
+
+    for test_port in [target_port] + ([9010] if target_port != 9010 else []):
+        try:
+            req = urllib.request.Request(f"http://{ip}:{test_port}/ping")
+            with urllib.request.urlopen(req, timeout=2.5) as resp:
+                body = json.loads(resp.read().decode())
+                if body.get("ok"):
+                    machine_name = body.get("machine", machine_name)
+                    target_port = test_port
+                    ping_ok = True
+                    break
+        except Exception:
+            continue
+
+    if not ping_ok:
+        return jsonify({
+            "error": f"Cannot reach node at {ip}:{target_port}. Ensure Fluffy is running on that machine and set to Available mode."
+        }), 400
+
+    cmd = f"network --connect {ip} --port {target_port}"
     ok = _send_ws(cmd)
     if ok:
-        state.add_execution_log(f"Admin: connecting to {ip}:{port}", "system")
-        # machine_id comes back via IPC broadcast — return optimistic OK
-        return jsonify({"ok": True, "message": f"Connection to {ip}:{port} initiated"})
+        state.add_execution_log(f"Admin: connected to {machine_name} ({ip}:{target_port})", "system")
+        return jsonify({"ok": True, "message": f"Connected to {machine_name} ({ip}:{target_port})", "machine": machine_name})
     else:
-        return jsonify({"error": f"Could not send connect command to Rust core"}), 500
+        return jsonify({"error": "Could not send connect command to Rust core"}), 500
 
 
 @network_bp.route("/network/admin/remove", methods=["POST"])
@@ -322,43 +349,27 @@ def get_network_snapshot():
     now_ms = int(time.time() * 1000)
     nodes = []
 
-    # Remote machines from Rust IPC
-    try:
-        latest = state.LATEST_STATE or {}
-        for m in latest.get("admin_machines", []):
-            nodes.append({
-                "id": m.get("machine_id", f"node_{m.get('ip')}"),
-                "name": m.get("name", m.get("ip", "Remote Node")),
-                "hostname": m.get("name"),
-                "os": "unknown",
-                "arch": "unknown",
-                "role": "worker",
-                "availability": "connected" if m.get("online") else "available",
-                "auth_state": "authenticated" if m.get("online") else "unauthenticated",
-                "pairing_state": "paired" if m.get("online") else "unpaired",
-                "ip_addresses": [m["ip"]] if m.get("ip") else [],
-                "cluster_port": m.get("port", 9010),
-                "last_seen_epoch": now_ms / 1000,
-            })
-    except Exception:
-        pass
-
-    # Local node if in available mode
-    if _current_role == "available":
-        nodes.append({
-            "id": f"local_node_{_local_ip().replace('.', '_')}",
-            "name": f"Local Host ({_local_ip()})",
-            "hostname": _socket.gethostname(),
-            "os": sys.platform,
-            "arch": "x86_64",
-            "role": "available",
-            "availability": "available",
-            "auth_state": "unauthenticated",
-            "pairing_state": "unpaired",
-            "ip_addresses": [_local_ip()],
-            "cluster_port": 9010,
-            "last_seen_epoch": now_ms / 1000,
-        })
+    # Remote machines from Rust IPC (Admin mode only)
+    if _current_role == "admin":
+        try:
+            latest = state.LATEST_STATE or {}
+            for m in latest.get("admin_machines", []):
+                nodes.append({
+                    "id": m.get("machine_id", f"node_{m.get('ip')}"),
+                    "name": m.get("name", m.get("ip", "Remote Node")),
+                    "hostname": m.get("name"),
+                    "os": "unknown",
+                    "arch": "unknown",
+                    "role": "worker",
+                    "availability": "connected" if m.get("online") else "available",
+                    "auth_state": "authenticated" if m.get("online") else "unauthenticated",
+                    "pairing_state": "paired" if m.get("online") else "unpaired",
+                    "ip_addresses": [m["ip"]] if m.get("ip") else [],
+                    "cluster_port": m.get("port", 9010),
+                    "last_seen_epoch": now_ms / 1000,
+                })
+        except Exception:
+            pass
 
     raw_devices = local_snap.get("devices", [])
     devices = []
