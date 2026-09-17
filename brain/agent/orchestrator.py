@@ -107,6 +107,8 @@ class AgentOrchestrator(AgentOrchestratorInterface):
         elif state.pending_confirmations:
             first_conf_id = list(state.pending_confirmations.keys())[0]
             conf_data = state.resolve_confirmation(first_conf_id)
+        else:
+            raise ValueError(f"No pending confirmations found for task '{task_id}'.")
 
         target_step_id = conf_data.get("step_id") if conf_data else state.current_step_id
         target_step = state.plan.get_step(target_step_id) if state.plan and target_step_id else None
@@ -116,14 +118,17 @@ class AgentOrchestrator(AgentOrchestratorInterface):
             if target_step:
                 target_step.mark_failed("User declined confirmation.")
             task.transition_to(TaskStatus.FAILED, reason="User declined confirmation.")
+            task.error = "User declined confirmation."
             self._emit(AgentEventType.TASK_FAILED, task.task_id, payload={"reason": "User declined confirmation."})
             return AgentResult(
                 task_id=task.task_id,
                 status=task.status,
                 success=False,
                 summary="Task cancelled because user declined confirmation.",
+                observations=state.observations,
                 duration_ms=(time.perf_counter() - start_time) * 1000.0,
                 state=state,
+                error="User declined confirmation.",
             )
 
         # User approved confirmation -> resume execution
@@ -138,6 +143,31 @@ class AgentOrchestrator(AgentOrchestratorInterface):
                 self._emit(AgentEventType.STEP_COMPLETED, task.task_id, target_step.step_id)
             else:
                 self._emit(AgentEventType.STEP_FAILED, task.task_id, target_step.step_id, payload={"error": obs.error})
+                failure_type = FailureClassifier.classify(obs.error, obs.metadata)
+                action = RecoveryManager.determine_action(
+                    failure_type=failure_type,
+                    step=target_step,
+                    total_retries=self._total_retries.get(task_id, 0),
+                    limits=self.limits,
+                )
+                if action == RecoveryAction.RETRY:
+                    self._total_retries[task_id] = self._total_retries.get(task_id, 0) + 1
+                    target_step.status = StepStatus.PENDING
+                    self._emit(AgentEventType.STEP_RETRIED, task.task_id, target_step.step_id, payload={"attempt": target_step.attempt_count})
+                else:
+                    task.transition_to(TaskStatus.FAILED, reason=obs.error or "Step execution failed after confirmation.")
+                    task.error = obs.error
+                    self._emit(AgentEventType.TASK_FAILED, task.task_id, payload={"error": obs.error})
+                    return AgentResult(
+                        task_id=task.task_id,
+                        status=task.status,
+                        success=False,
+                        summary=f"Execution failed after confirmation: {obs.error}",
+                        observations=state.observations,
+                        duration_ms=(time.perf_counter() - start_time) * 1000.0,
+                        state=state,
+                        error=task.error,
+                    )
 
         return self._execution_loop(state, start_time)
 

@@ -49,9 +49,13 @@ class AgentState:
             if getattr(observation, "success", False) or (isinstance(observation, dict) and observation.get("success")):
                 if step_id not in self.completed_steps:
                     self.completed_steps.append(step_id)
+                if step_id in self.failed_steps:
+                    self.failed_steps.remove(step_id)
             else:
                 if step_id not in self.failed_steps:
                     self.failed_steps.append(step_id)
+                if step_id in self.completed_steps:
+                    self.completed_steps.remove(step_id)
         self.updated_at = time.time()
 
     def add_pending_confirmation(self, confirmation_id: str, payload: Dict[str, Any]) -> None:
