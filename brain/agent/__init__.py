@@ -9,7 +9,14 @@ from brain.agent.plan import AgentPlan, PlanValidator
 from brain.agent.observation import StepObservation
 from brain.agent.state import AgentState
 from brain.agent.limits import AgentLimits
-from brain.agent.events import AgentEventType, AgentEvent, EventEmitter
+from brain.agent.events import (
+    AgentEventType,
+    AgentEvent,
+    EventEmitter,
+    ExecutionEventEmitter,
+    get_event_emitter,
+    set_event_emitter,
+)
 from brain.agent.recovery import FailureType, RecoveryAction, FailureClassifier, RecoveryManager
 from brain.agent.evaluator import GoalEvaluator, EvaluationResult
 from brain.agent.execution import StepExecutor
@@ -68,6 +75,9 @@ __all__ = [
     "AgentEventType",
     "AgentEvent",
     "EventEmitter",
+    "ExecutionEventEmitter",
+    "get_event_emitter",
+    "set_event_emitter",
     "FailureType",
     "RecoveryAction",
     "FailureClassifier",

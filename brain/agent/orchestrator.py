@@ -31,9 +31,11 @@ class AgentOrchestrator(AgentOrchestratorInterface):
         limits: Optional[AgentLimits] = None,
         event_emitter: Optional[EventEmitter] = None,
     ):
-        self.executor = executor or StepExecutor()
-        self.limits = limits or AgentLimits()
         self.events = event_emitter or EventEmitter()
+        self.executor = executor or StepExecutor()
+        if getattr(self.executor, "_event_emitter", None) is None:
+            self.executor._event_emitter = self.events
+        self.limits = limits or AgentLimits()
         self._states: Dict[str, AgentState] = {}
         self._total_retries: Dict[str, int] = {}
 
@@ -58,9 +60,16 @@ class AgentOrchestrator(AgentOrchestratorInterface):
             task.transition_to(TaskStatus.PLANNING)
             plan = self._create_default_plan(task)
 
+        self._emit(AgentEventType.PLAN_CREATED, task.task_id, payload={"step_count": len(plan.steps)})
+
         # Validate plan
         is_valid, plan_err = PlanValidator.validate(plan, max_steps=self.limits.max_plan_steps)
         if not is_valid:
+            self._emit(
+                AgentEventType.EXECUTION_ERROR,
+                task.task_id,
+                payload={"error": plan_err, "stage": "plan_validation"},
+            )
             task.transition_to(TaskStatus.FAILED, reason=plan_err or "Invalid plan")
             task.error = plan_err
             self._emit(AgentEventType.TASK_FAILED, task.task_id, payload={"error": plan_err})
@@ -74,12 +83,14 @@ class AgentOrchestrator(AgentOrchestratorInterface):
                 error=plan_err,
             )
 
+        self._emit(AgentEventType.PLAN_VALIDATED, task.task_id, payload={"step_count": len(plan.steps)})
         state.plan = plan
         task.transition_to(TaskStatus.READY)
-        self._emit(AgentEventType.PLAN_CREATED, task.task_id, payload={"step_count": len(plan.steps)})
 
         # 2. Transition to EXECUTING
         task.transition_to(TaskStatus.EXECUTING)
+        self._emit(AgentEventType.TASK_STARTED, task.task_id)
+        self._emit(AgentEventType.PLAN_STARTED, task.task_id, payload={"step_count": len(plan.steps)})
 
         # 3. Enter execution loop
         return self._execution_loop(state, start_time)
@@ -107,11 +118,25 @@ class AgentOrchestrator(AgentOrchestratorInterface):
         elif state.pending_confirmations:
             first_conf_id = list(state.pending_confirmations.keys())[0]
             conf_data = state.resolve_confirmation(first_conf_id)
+            confirmation_id = first_conf_id
         else:
             raise ValueError(f"No pending confirmations found for task '{task_id}'.")
 
         target_step_id = conf_data.get("step_id") if conf_data else state.current_step_id
         target_step = state.plan.get_step(target_step_id) if state.plan and target_step_id else None
+
+        self._emit(
+            AgentEventType.CONFIRMATION_RESOLVED,
+            task.task_id,
+            step_id=target_step_id,
+            correlation_id=target_step.correlation_id if target_step else None,
+            payload={
+                "confirmation_id": confirmation_id,
+                "decision": "approved" if confirmed else "declined",
+                "task_id": task_id,
+                "step_id": target_step_id,
+            },
+        )
 
         if not confirmed:
             # User declined confirmation
@@ -150,11 +175,24 @@ class AgentOrchestrator(AgentOrchestratorInterface):
                     total_retries=self._total_retries.get(task_id, 0),
                     limits=self.limits,
                 )
+                self._emit(
+                    AgentEventType.RECOVERY_STARTED,
+                    task.task_id,
+                    target_step.step_id,
+                    payload={"action": action.value, "failure_type": failure_type.value},
+                )
                 if action == RecoveryAction.RETRY:
                     self._total_retries[task_id] = self._total_retries.get(task_id, 0) + 1
                     target_step.status = StepStatus.PENDING
-                    self._emit(AgentEventType.STEP_RETRIED, task.task_id, target_step.step_id, payload={"attempt": target_step.attempt_count})
+                    self._emit(AgentEventType.RETRY_STARTED, task.task_id, target_step.step_id, payload={"attempt": target_step.attempt_count + 1})
+                    self._emit(AgentEventType.STEP_RETRIED, task.task_id, target_step.step_id, payload={"attempt": target_step.attempt_count + 1})
                 else:
+                    self._emit(
+                        AgentEventType.EXECUTION_ERROR,
+                        task.task_id,
+                        target_step.step_id,
+                        payload={"error": obs.error, "terminal": True},
+                    )
                     task.transition_to(TaskStatus.FAILED, reason=obs.error or "Step execution failed after confirmation.")
                     task.error = obs.error
                     self._emit(AgentEventType.TASK_FAILED, task.task_id, payload={"error": obs.error})
@@ -179,8 +217,19 @@ class AgentOrchestrator(AgentOrchestratorInterface):
 
         task = state.task
         if not task.is_terminal:
+            if state.current_step_id and state.plan:
+                curr_step = state.plan.get_step(state.current_step_id)
+                if curr_step and not curr_step.is_terminal:
+                    curr_step.mark_failed("Cancelled by user/agent request.")
+                    self._emit(
+                        AgentEventType.STEP_CANCELLED,
+                        task.task_id,
+                        curr_step.step_id,
+                        correlation_id=curr_step.correlation_id,
+                        payload={"reason": "Cancelled by user/agent request."},
+                    )
             task.transition_to(TaskStatus.CANCELLED, reason="Cancelled by user/agent request.")
-            self._emit(AgentEventType.TASK_CANCELLED, task.task_id)
+            self._emit(AgentEventType.TASK_CANCELLED, task.task_id, payload={"reason": "Cancelled by user/agent request."})
             return True
         return False
 
@@ -196,6 +245,11 @@ class AgentOrchestrator(AgentOrchestratorInterface):
             if elapsed_sec > self.limits.task_timeout_sec:
                 task.transition_to(TaskStatus.FAILED, reason="Task execution timed out.")
                 task.error = f"Exceeded task timeout limit of {self.limits.task_timeout_sec}s."
+                self._emit(
+                    AgentEventType.EXECUTION_ERROR,
+                    task_id,
+                    payload={"error": task.error, "terminal": True},
+                )
                 self._emit(AgentEventType.TASK_FAILED, task_id, payload={"error": task.error})
                 break
 
@@ -208,13 +262,19 @@ class AgentOrchestrator(AgentOrchestratorInterface):
                 if plan.is_all_completed():
                     eval_res = GoalEvaluator.evaluate(state)
                     if eval_res.is_complete and not task.is_terminal:
+                        self._emit(AgentEventType.PLAN_COMPLETED, task_id, payload={"step_count": len(plan.steps)})
                         task.transition_to(TaskStatus.COMPLETED)
-                        self._emit(AgentEventType.TASK_COMPLETED, task_id, payload={"summary": eval_res.summary})
+                        self._emit(AgentEventType.TASK_COMPLETED, task_id, payload={"status": "completed"})
                     break
                 else:
                     # Stalled or circular deadlock
                     task.transition_to(TaskStatus.FAILED, reason="No remaining steps can be executed.")
                     task.error = "Unmet dependencies or failed prerequisite steps prevented further execution."
+                    self._emit(
+                        AgentEventType.EXECUTION_ERROR,
+                        task_id,
+                        payload={"error": task.error, "terminal": True},
+                    )
                     self._emit(AgentEventType.TASK_FAILED, task_id, payload={"error": task.error})
                     break
 
@@ -223,7 +283,18 @@ class AgentOrchestrator(AgentOrchestratorInterface):
             step.mark_executing()
             state.current_step_id = step.step_id
 
-            self._emit(AgentEventType.STEP_STARTED, task_id, step.step_id, payload={"objective": step.objective})
+            had_prior_retry = (step.attempt_count > 1)
+
+            self._emit(
+                AgentEventType.STEP_STARTED,
+                task_id,
+                step.step_id,
+                correlation_id=step.correlation_id,
+                payload={
+                    "objective": step.objective,
+                    "execution_type": step.execution_type.value if step.execution_type else None,
+                },
+            )
 
             obs = self.executor.execute_step(step, state, confirmed=False)
             state.record_observation(obs)
@@ -235,7 +306,20 @@ class AgentOrchestrator(AgentOrchestratorInterface):
                 msg = obs.metadata.get("message")
                 if conf_id:
                     state.add_pending_confirmation(conf_id, {"step_id": step.step_id, "message": msg})
-                self._emit(AgentEventType.STEP_WAITING_CONFIRMATION, task_id, step.step_id, payload={
+                self._emit(
+                    AgentEventType.CONFIRMATION_REQUIRED,
+                    task_id,
+                    step.step_id,
+                    correlation_id=step.correlation_id,
+                    payload={
+                        "confirmation_id": conf_id,
+                        "message": msg,
+                        "task_id": task_id,
+                        "step_id": step.step_id,
+                        "reason": msg,
+                    },
+                )
+                self._emit(AgentEventType.STEP_WAITING_CONFIRMATION, task_id, step.step_id, correlation_id=step.correlation_id, payload={
                     "confirmation_id": conf_id,
                     "message": msg,
                 })
@@ -254,9 +338,38 @@ class AgentOrchestrator(AgentOrchestratorInterface):
 
             # Check if step execution succeeded or failed
             if obs.success:
-                self._emit(AgentEventType.STEP_COMPLETED, task_id, step.step_id, payload={"output": str(obs.output)[:200]})
+                if had_prior_retry:
+                    self._emit(
+                        AgentEventType.RECOVERY_COMPLETED,
+                        task_id,
+                        step.step_id,
+                        correlation_id=step.correlation_id,
+                        payload={"recovered_after_attempts": step.attempt_count},
+                    )
+                self._emit(
+                    AgentEventType.STEP_COMPLETED,
+                    task_id,
+                    step.step_id,
+                    correlation_id=step.correlation_id,
+                    payload={"duration_ms": obs.duration_ms},
+                )
             else:
-                self._emit(AgentEventType.STEP_FAILED, task_id, step.step_id, payload={"error": obs.error})
+                if obs.metadata.get("security_blocked"):
+                    self._emit(
+                        AgentEventType.STEP_BLOCKED,
+                        task_id,
+                        step.step_id,
+                        correlation_id=step.correlation_id,
+                        payload={"error": obs.error, "tool_used": obs.tool_used},
+                    )
+                self._emit(
+                    AgentEventType.STEP_FAILED,
+                    task_id,
+                    step.step_id,
+                    correlation_id=step.correlation_id,
+                    payload={"error": obs.error},
+                )
+
                 # Handle recovery
                 failure_type = FailureClassifier.classify(obs.error, obs.metadata)
                 action = RecoveryManager.determine_action(
@@ -266,18 +379,35 @@ class AgentOrchestrator(AgentOrchestratorInterface):
                     limits=self.limits,
                 )
 
+                self._emit(
+                    AgentEventType.RECOVERY_STARTED,
+                    task_id,
+                    step.step_id,
+                    correlation_id=step.correlation_id,
+                    payload={"action": action.value, "failure_type": failure_type.value},
+                )
+
                 if action == RecoveryAction.RETRY:
                     self._total_retries[task_id] = self._total_retries.get(task_id, 0) + 1
                     step.status = StepStatus.PENDING
-                    self._emit(AgentEventType.STEP_RETRIED, task_id, step.step_id, payload={"attempt": step.attempt_count})
+                    self._emit(AgentEventType.RETRY_STARTED, task_id, step.step_id, correlation_id=step.correlation_id, payload={"attempt": step.attempt_count + 1})
+                    self._emit(AgentEventType.STEP_RETRIED, task_id, step.step_id, correlation_id=step.correlation_id, payload={"attempt": step.attempt_count + 1})
                     continue
                 elif action == RecoveryAction.FALLBACK_MODEL and step.model_requirement:
                     # Switch to fallback model requirement and retry
                     step.model_requirement["preferred_model"] = None
                     step.status = StepStatus.PENDING
+                    self._emit(AgentEventType.RETRY_STARTED, task_id, step.step_id, correlation_id=step.correlation_id, payload={"strategy": "fallback_model"})
                     continue
                 else:
                     # Non-recoverable failure -> terminate task
+                    self._emit(
+                        AgentEventType.EXECUTION_ERROR,
+                        task_id,
+                        step.step_id,
+                        correlation_id=step.correlation_id,
+                        payload={"error": obs.error, "terminal": True},
+                    )
                     task.transition_to(TaskStatus.FAILED, reason=obs.error or "Step execution failed")
                     task.error = obs.error
                     self._emit(AgentEventType.TASK_FAILED, task_id, payload={"error": obs.error})
@@ -287,8 +417,9 @@ class AgentOrchestrator(AgentOrchestratorInterface):
             eval_result = GoalEvaluator.evaluate(state)
             if eval_result.is_complete:
                 if not task.is_terminal:
+                    self._emit(AgentEventType.PLAN_COMPLETED, task_id, payload={"step_count": len(plan.steps)})
                     task.transition_to(TaskStatus.COMPLETED)
-                    self._emit(AgentEventType.TASK_COMPLETED, task_id, payload={"summary": eval_result.summary})
+                    self._emit(AgentEventType.TASK_COMPLETED, task_id, payload={"status": "completed"})
                 break
 
         duration_ms = (time.perf_counter() - start_time) * 1000.0
@@ -311,12 +442,24 @@ class AgentOrchestrator(AgentOrchestratorInterface):
         """Create a standard plan from the user request using the canonical PlanCompiler."""
         return PlanCompiler(max_steps=self.limits.max_plan_steps).compile_from_task(task)
 
-    def _emit(self, event_type: AgentEventType, task_id: str, step_id: Optional[str] = None, payload: Optional[Dict[str, Any]] = None) -> None:
+    def _emit(
+        self,
+        event_type: AgentEventType,
+        task_id: str,
+        step_id: Optional[str] = None,
+        correlation_id: Optional[str] = None,
+        status: Optional[str] = None,
+        source: str = "agent_orchestrator",
+        payload: Optional[Dict[str, Any]] = None,
+    ) -> None:
         """Helper to emit structured events."""
         event = AgentEvent(
             event_type=event_type,
             task_id=task_id,
             step_id=step_id,
+            correlation_id=correlation_id or "",
+            status=status,
+            source=source,
             payload=payload or {},
         )
         self.events.emit(event)

@@ -201,6 +201,21 @@ class AgentExecutionGateway:
         """List registered tasks from AgentTaskManager."""
         return self.task_manager.list_tasks(status=status)
 
+    def get_events(self, task_id: str) -> List[Any]:
+        """Retrieve canonical execution event history for a task."""
+        orch = self.get_orchestrator(task_id)
+        if orch and hasattr(orch, "events") and orch.events:
+            return orch.events.get_history(task_id)
+        return []
+
+    def get_event_emitter(self, task_id: Optional[str] = None) -> Optional[Any]:
+        """Retrieve the event emitter for a specific task orchestrator."""
+        if task_id:
+            orch = self.get_orchestrator(task_id)
+            if orch and hasattr(orch, "events"):
+                return orch.events
+        return None
+
 
 _GLOBAL_AGENT_GATEWAY: Optional[AgentExecutionGateway] = None
 

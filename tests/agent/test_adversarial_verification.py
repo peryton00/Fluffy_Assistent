@@ -458,8 +458,12 @@ class TestAdversarialIntegration(unittest.TestCase):
         expected_sequence = [
             AgentEventType.TASK_CREATED,
             AgentEventType.PLAN_CREATED,
+            AgentEventType.PLAN_VALIDATED,
+            AgentEventType.TASK_STARTED,
+            AgentEventType.PLAN_STARTED,
             AgentEventType.STEP_STARTED,
             AgentEventType.STEP_COMPLETED,
+            AgentEventType.PLAN_COMPLETED,
             AgentEventType.TASK_COMPLETED,
         ]
         self.assertEqual(event_types, expected_sequence)

@@ -8,6 +8,7 @@ import uuid
 from typing import Dict, Any, Optional
 
 from brain.agent.contracts import ExecutionType
+from brain.agent.events import AgentEvent, AgentEventType, EventEmitter
 from brain.agent.observation import StepObservation
 from brain.agent.state import AgentState
 from brain.agent.step import PlanStep, StepStatus
@@ -47,6 +48,7 @@ class StepExecutor:
         action_validator: Optional[ActionValidator] = None,
         knowledge_runtime: Optional[KnowledgeRuntime] = None,
         artifact_runtime: Optional[ArtifactRuntime] = None,
+        event_emitter: Optional[Any] = None,
     ):
         self._tool_runtime = tool_runtime
         self._rust_client = rust_client
@@ -56,6 +58,7 @@ class StepExecutor:
         self._action_validator = action_validator
         self._knowledge_runtime = knowledge_runtime
         self._artifact_runtime = artifact_runtime
+        self._event_emitter = event_emitter
 
     @property
     def tool_runtime(self) -> UnifiedToolRuntime:
@@ -126,7 +129,8 @@ class StepExecutor:
         Routes canonically according to ExecutionType and step requirements.
         """
         start_time = time.perf_counter()
-        step.mark_executing()
+        if step.status != StepStatus.EXECUTING:
+            step.mark_executing()
 
         try:
             # 1. Resolve variable interpolations in input_parameters from state blackboard & observations
@@ -188,6 +192,29 @@ class StepExecutor:
                 correlation_id=step.correlation_id,
             )
 
+    def _emit(
+        self,
+        event_type: AgentEventType,
+        task_id: str,
+        step_id: Optional[str] = None,
+        correlation_id: Optional[str] = None,
+        status: Optional[str] = None,
+        source: str = "step_executor",
+        payload: Optional[Dict[str, Any]] = None,
+    ) -> None:
+        """Helper to emit structured events from StepExecutor."""
+        if self._event_emitter:
+            event = AgentEvent(
+                event_type=event_type,
+                task_id=task_id,
+                step_id=step_id,
+                correlation_id=correlation_id or "",
+                status=status,
+                source=source,
+                payload=payload or {},
+            )
+            self._event_emitter.emit(event)
+
     def _execute_via_tool_runtime(
         self,
         step: PlanStep,
@@ -197,6 +224,17 @@ class StepExecutor:
         start_time: float,
     ) -> StepObservation:
         """Execute tool capability through the Unified Tool Runtime."""
+        self._emit(
+            event_type=AgentEventType.TOOL_STARTED,
+            task_id=state.task.task_id,
+            step_id=step.step_id,
+            correlation_id=step.correlation_id,
+            payload={
+                "tool_id": step.tool_requirement,
+                "parameters_keys": list(parameters.keys()) if isinstance(parameters, dict) else [],
+            },
+        )
+
         tool_req = ToolRequest(
             tool_id=step.tool_requirement,
             parameters=parameters,
@@ -233,6 +271,31 @@ class StepExecutor:
                 tool_used=step.tool_requirement,
                 correlation_id=step.correlation_id,
                 metadata={"waiting_confirmation": True, "confirmation_id": conf_id, "message": msg},
+            )
+
+        if res.success:
+            self._emit(
+                event_type=AgentEventType.TOOL_COMPLETED,
+                task_id=state.task.task_id,
+                step_id=step.step_id,
+                correlation_id=step.correlation_id,
+                payload={
+                    "tool_id": step.tool_requirement,
+                    "duration_ms": duration_ms,
+                    "success": True,
+                },
+            )
+        else:
+            self._emit(
+                event_type=AgentEventType.TOOL_FAILED,
+                task_id=state.task.task_id,
+                step_id=step.step_id,
+                correlation_id=step.correlation_id,
+                payload={
+                    "tool_id": step.tool_requirement,
+                    "error": res.error or "Tool execution failed",
+                    "error_type": res.error_type.value if res.error_type else None,
+                },
             )
 
         is_sec_blocked = (res.error_type in (ToolErrorType.SECURITY_DENIED, ToolErrorType.OFFLINE_VIOLATION))
@@ -281,6 +344,20 @@ class StepExecutor:
         document_ids = parameters.get("document_ids") or req_spec.get("document_ids")
         paths = parameters.get("paths") or req_spec.get("paths")
         identity = parameters.get("identity") or req_spec.get("identity")
+
+        self._emit(
+            event_type=AgentEventType.KNOWLEDGE_STARTED,
+            task_id=state.task.task_id,
+            step_id=step.step_id,
+            correlation_id=step.correlation_id,
+            payload={
+                "query": query,
+                "top_k": top_k,
+                "minimum_score": minimum_score,
+                "document_ids": document_ids,
+                "paths": paths,
+            },
+        )
 
         try:
             results = self.knowledge_runtime.search(
@@ -331,6 +408,20 @@ class StepExecutor:
                 "document_ids": doc_ids,
             }
 
+            self._emit(
+                event_type=AgentEventType.KNOWLEDGE_COMPLETED,
+                task_id=state.task.task_id,
+                step_id=step.step_id,
+                correlation_id=step.correlation_id,
+                payload={
+                    "query": query,
+                    "result_count": len(results),
+                    "document_ids": doc_ids,
+                    "citation_count": len(citations),
+                    "duration_ms": duration_ms,
+                },
+            )
+
             return StepObservation(
                 step_id=step.step_id,
                 task_id=state.task.task_id,
@@ -346,6 +437,17 @@ class StepExecutor:
             )
         except Exception as e:
             duration_ms = (time.perf_counter() - start_time) * 1000.0
+            self._emit(
+                event_type=AgentEventType.KNOWLEDGE_FAILED,
+                task_id=state.task.task_id,
+                step_id=step.step_id,
+                correlation_id=step.correlation_id,
+                payload={
+                    "query": query,
+                    "error": str(e),
+                    "duration_ms": duration_ms,
+                },
+            )
             return StepObservation(
                 step_id=step.step_id,
                 task_id=state.task.task_id,
@@ -400,6 +502,20 @@ class StepExecutor:
         custom_opts = parameters.get("custom_options") or req_spec.get("custom_options", {})
         classification = parameters.get("classification") or req_spec.get("classification")
 
+        self._emit(
+            event_type=AgentEventType.ARTIFACT_STARTED,
+            task_id=state.task.task_id,
+            step_id=step.step_id,
+            correlation_id=step.correlation_id,
+            payload={
+                "artifact_type": art_type.value,
+                "name": name,
+                "destination_dir": dest_dir,
+                "sources_count": len(sources),
+                "classification": classification,
+            },
+        )
+
         try:
             art_req = ArtifactRequest(
                 artifact_type=art_type,
@@ -417,6 +533,38 @@ class StepExecutor:
 
             if art_res.success:
                 res_dict = art_res.to_dict()
+                size_bytes = 0
+                if hasattr(art_res, "metadata") and art_res.metadata and "size_bytes" in art_res.metadata:
+                    size_bytes = art_res.metadata["size_bytes"]
+                elif isinstance(content, str):
+                    size_bytes = len(content.encode("utf-8"))
+
+                content_hash = None
+                if hasattr(art_res, "metadata") and art_res.metadata and "sha256" in art_res.metadata:
+                    content_hash = art_res.metadata["sha256"]
+                elif hasattr(art_res, "content_hash"):
+                    content_hash = art_res.content_hash
+
+                val_status = "valid"
+                if hasattr(art_res, "validation_status"):
+                    val_status = getattr(art_res.validation_status, "value", str(art_res.validation_status))
+
+                self._emit(
+                    event_type=AgentEventType.ARTIFACT_COMPLETED,
+                    task_id=state.task.task_id,
+                    step_id=step.step_id,
+                    correlation_id=step.correlation_id,
+                    payload={
+                        "artifact_id": art_res.artifact_id,
+                        "filename": art_res.filename,
+                        "file_path": art_res.file_path,
+                        "size_bytes": size_bytes,
+                        "content_hash": content_hash,
+                        "validation_status": val_status,
+                        "duration_ms": duration_ms,
+                    },
+                )
+
                 return StepObservation(
                     step_id=step.step_id,
                     task_id=state.task.task_id,
@@ -433,6 +581,17 @@ class StepExecutor:
                     },
                 )
             else:
+                self._emit(
+                    event_type=AgentEventType.ARTIFACT_FAILED,
+                    task_id=state.task.task_id,
+                    step_id=step.step_id,
+                    correlation_id=step.correlation_id,
+                    payload={
+                        "name": name,
+                        "error": art_res.error or "Artifact generation failed",
+                        "duration_ms": duration_ms,
+                    },
+                )
                 return StepObservation(
                     step_id=step.step_id,
                     task_id=state.task.task_id,
@@ -447,6 +606,17 @@ class StepExecutor:
                 )
         except Exception as e:
             duration_ms = (time.perf_counter() - start_time) * 1000.0
+            self._emit(
+                event_type=AgentEventType.ARTIFACT_FAILED,
+                task_id=state.task.task_id,
+                step_id=step.step_id,
+                correlation_id=step.correlation_id,
+                payload={
+                    "name": name,
+                    "error": str(e),
+                    "duration_ms": duration_ms,
+                },
+            )
             return StepObservation(
                 step_id=step.step_id,
                 task_id=state.task.task_id,
@@ -475,6 +645,18 @@ class StepExecutor:
         prompt = parameters.get("prompt") or step.objective
         context_str = parameters.get("context")
 
+        self._emit(
+            event_type=AgentEventType.MODEL_STARTED,
+            task_id=state.task.task_id,
+            step_id=step.step_id,
+            correlation_id=step.correlation_id,
+            payload={
+                "task_type": task_type.value,
+                "quality": quality.value,
+                "preferred_model": model_req_spec.get("preferred_model"),
+            },
+        )
+
         ai_req = AIRequest(
             prompt=prompt,
             context=context_str,
@@ -493,6 +675,19 @@ class StepExecutor:
         duration_ms = (time.perf_counter() - start_time) * 1000.0
 
         if ai_res.success:
+            self._emit(
+                event_type=AgentEventType.MODEL_COMPLETED,
+                task_id=state.task.task_id,
+                step_id=step.step_id,
+                correlation_id=step.correlation_id,
+                payload={
+                    "model_id": ai_res.model_id,
+                    "latency_ms": ai_res.latency_ms,
+                    "finish_reason": ai_res.finish_reason,
+                    "token_usage": ai_res.usage,
+                    "duration_ms": duration_ms,
+                },
+            )
             return StepObservation(
                 step_id=step.step_id,
                 task_id=state.task.task_id,
@@ -507,6 +702,18 @@ class StepExecutor:
                 },
             )
         else:
+            self._emit(
+                event_type=AgentEventType.MODEL_FAILED,
+                task_id=state.task.task_id,
+                step_id=step.step_id,
+                correlation_id=step.correlation_id,
+                payload={
+                    "model_id": ai_res.model_id,
+                    "error": ai_res.error,
+                    "error_category": ai_res.error_category.value if ai_res.error_category else None,
+                    "duration_ms": duration_ms,
+                },
+            )
             return StepObservation(
                 step_id=step.step_id,
                 task_id=state.task.task_id,
