@@ -16,6 +16,15 @@ from brain.agent.execution import StepExecutor
 from brain.agent.interface import AgentResult, AgentOrchestratorInterface
 from brain.agent.orchestrator import AgentOrchestrator
 from brain.agent.compiler import PlanCompiler, PlanCompilationError
+from brain.agent.manager import (
+    AgentTaskManager,
+    TaskRecord,
+    TaskManagerError,
+    TaskNotFoundError,
+    TaskLifecycleError,
+    get_task_manager,
+    set_task_manager,
+)
 from brain.agent.contracts import (
     ExecutionStatus,
     ExecutionType,
@@ -63,6 +72,13 @@ __all__ = [
     "AgentOrchestrator",
     "PlanCompiler",
     "PlanCompilationError",
+    "AgentTaskManager",
+    "TaskRecord",
+    "TaskManagerError",
+    "TaskNotFoundError",
+    "TaskLifecycleError",
+    "get_task_manager",
+    "set_task_manager",
     # Canonical Execution Contracts
     "ExecutionStatus",
     "ExecutionType",

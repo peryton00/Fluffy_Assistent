@@ -203,6 +203,8 @@ class AgentOrchestrator(AgentOrchestratorInterface):
                 task.transition_to(TaskStatus.WAITING_CONFIRMATION)
                 conf_id = obs.metadata.get("confirmation_id")
                 msg = obs.metadata.get("message")
+                if conf_id:
+                    state.add_pending_confirmation(conf_id, {"step_id": step.step_id, "message": msg})
                 self._emit(AgentEventType.STEP_WAITING_CONFIRMATION, task_id, step.step_id, payload={
                     "confirmation_id": conf_id,
                     "message": msg,
