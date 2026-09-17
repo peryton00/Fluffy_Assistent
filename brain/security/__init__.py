@@ -6,6 +6,13 @@ from brain.security.action_validator import (
     SafetyLevel,
     ValidationResult,
 )
+from brain.security.gate import (
+    SecurityDecisionType,
+    SecurityDecision,
+    ExecutionSecurityGate,
+    get_security_gate,
+    set_security_gate,
+)
 from brain.security.security_monitor import SecurityMonitor
 from brain.security.auth_utils import token_required, _get_token, _check_token
 from brain.security.guardian_manager import (
@@ -39,6 +46,11 @@ __all__ = [
     "ActionValidator",
     "SafetyLevel",
     "ValidationResult",
+    "SecurityDecisionType",
+    "SecurityDecision",
+    "ExecutionSecurityGate",
+    "get_security_gate",
+    "set_security_gate",
     "SecurityMonitor",
     "token_required",
     "_get_token",

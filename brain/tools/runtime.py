@@ -19,6 +19,12 @@ from brain.tools.policies.policy import (
     ToolPolicyDecision,
     get_security_policy,
 )
+from brain.security.gate import (
+    ExecutionSecurityGate,
+    SecurityDecision,
+    SecurityDecisionType,
+    get_security_gate,
+)
 from brain.tools.health import ToolHealth, ToolHealthStatus
 from brain.tools.lifecycle import ToolEventEmitter, ToolEvent, ToolEventType
 
@@ -33,12 +39,18 @@ class UnifiedToolRuntime:
         self,
         registry: Optional[ToolRegistry] = None,
         security_policy: Optional[ToolSecurityPolicy] = None,
+        security_gate: Optional[ExecutionSecurityGate] = None,
         event_emitter: Optional[ToolEventEmitter] = None,
         default_timeout: float = 30.0,
     ):
         self._registry = registry or get_tool_registry()
         self._resolver = ToolResolver(registry=self._registry)
-        self._security_policy = security_policy or get_security_policy()
+        if security_gate is not None:
+            self._security_gate = security_gate
+        elif security_policy is not None:
+            self._security_gate = ExecutionSecurityGate(security_policy=security_policy)
+        else:
+            self._security_gate = get_security_gate()
         self._events = event_emitter or ToolEventEmitter()
         self._default_timeout = default_timeout
         self._active_requests: Dict[str, ToolRequest] = {}
@@ -52,8 +64,12 @@ class UnifiedToolRuntime:
         return self._resolver
 
     @property
+    def security_gate(self) -> ExecutionSecurityGate:
+        return self._security_gate
+
+    @property
     def security_policy(self) -> ToolSecurityPolicy:
-        return self._security_policy
+        return self._security_gate.security_policy
 
     @property
     def events(self) -> ToolEventEmitter:
@@ -104,11 +120,11 @@ class UnifiedToolRuntime:
 
             # 3. Security Policy Gate (Skip if confirmed by user)
             if not confirmed:
-                policy_res = self._security_policy.evaluate(tool_def, request)
-                if policy_res.is_denied:
+                sec_res = self._security_gate.evaluate(tool_def, request)
+                if sec_res.is_denied:
                     duration_ms = (time.perf_counter() - start_time) * 1000.0
-                    err_msg = f"Security policy blocked execution of '{request.tool_id}': {policy_res.message}"
-                    error_type = ToolErrorType.OFFLINE_VIOLATION if policy_res.reason == "offline_violation" else ToolErrorType.SECURITY_DENIED
+                    err_msg = f"Security policy blocked execution of '{request.tool_id}': {sec_res.message}"
+                    error_type = ToolErrorType.OFFLINE_VIOLATION if sec_res.reason == "offline_violation" else ToolErrorType.SECURITY_DENIED
                     self._emit(ToolEventType.TOOL_EXECUTION_FAILED, tool_id=request.tool_id, request_id=req_id, payload={"error": err_msg})
                     return ToolResult.fail(
                         request_id=req_id,
@@ -116,26 +132,28 @@ class UnifiedToolRuntime:
                         error=err_msg,
                         error_type=error_type,
                         duration_ms=duration_ms,
+                        metadata={"security_decision": sec_res.to_dict()},
                     )
-                elif policy_res.requires_confirmation:
+                elif sec_res.requires_confirmation:
                     duration_ms = (time.perf_counter() - start_time) * 1000.0
                     conf_id = f"conf_{uuid.uuid4().hex[:8]}"
                     self._emit(
                         ToolEventType.TOOL_CONFIRMATION_REQUIRED,
                         tool_id=request.tool_id,
                         request_id=req_id,
-                        payload={"confirmation_id": conf_id, "message": policy_res.message},
+                        payload={"confirmation_id": conf_id, "message": sec_res.message},
                     )
                     return ToolResult.fail(
                         request_id=req_id,
                         tool_id=request.tool_id,
-                        error=policy_res.message or "Action requires user confirmation",
+                        error=sec_res.message or "Action requires user confirmation",
                         error_type=ToolErrorType.CONFIRMATION_REQUIRED,
                         duration_ms=duration_ms,
                         metadata={
                             "confirmation_id": conf_id,
                             "confirmation_required": True,
-                            "message": policy_res.message,
+                            "message": sec_res.message,
+                            "security_decision": sec_res.to_dict(),
                         },
                     )
 
