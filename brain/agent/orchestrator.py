@@ -6,6 +6,7 @@ Coordinates task planning, dependency scheduling, safe step execution, confirmat
 import time
 from typing import Dict, Any, Optional, Set
 
+from brain.agent.compiler import PlanCompiler
 from brain.agent.evaluator import GoalEvaluator
 from brain.agent.events import AgentEvent, AgentEventType, EventEmitter
 from brain.agent.execution import StepExecutor
@@ -275,28 +276,8 @@ class AgentOrchestrator(AgentOrchestratorInterface):
         )
 
     def _create_default_plan(self, task: AgentTask) -> AgentPlan:
-        """Create a standard plan from the user request."""
-        # Check if task specifies Rust capability or local tool directly
-        tool_req = (
-            task.context.get("tool_requirement") or
-            task.context.get("parameters", {}).get("tool_requirement")
-        )
-        model_req = (
-            task.context.get("model_requirement") or
-            task.context.get("parameters", {}).get("model_requirement")
-        )
-
-        step = PlanStep(
-            objective=task.goal or task.user_request,
-            tool_requirement=tool_req,
-            model_requirement=model_req,
-            input_parameters=task.context.get("parameters", {}),
-        )
-        return AgentPlan(
-            task_id=task.task_id,
-            goal=task.goal or task.user_request,
-            steps=[step],
-        )
+        """Create a standard plan from the user request using the canonical PlanCompiler."""
+        return PlanCompiler(max_steps=self.limits.max_plan_steps).compile_from_task(task)
 
     def _emit(self, event_type: AgentEventType, task_id: str, step_id: Optional[str] = None, payload: Optional[Dict[str, Any]] = None) -> None:
         """Helper to emit structured events."""

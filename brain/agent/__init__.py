@@ -15,6 +15,7 @@ from brain.agent.evaluator import GoalEvaluator, EvaluationResult
 from brain.agent.execution import StepExecutor
 from brain.agent.interface import AgentResult, AgentOrchestratorInterface
 from brain.agent.orchestrator import AgentOrchestrator
+from brain.agent.compiler import PlanCompiler, PlanCompilationError
 from brain.agent.contracts import (
     ExecutionStatus,
     ExecutionType,
@@ -60,6 +61,8 @@ __all__ = [
     "AgentResult",
     "AgentOrchestratorInterface",
     "AgentOrchestrator",
+    "PlanCompiler",
+    "PlanCompilationError",
     # Canonical Execution Contracts
     "ExecutionStatus",
     "ExecutionType",
