@@ -15,6 +15,15 @@ from brain.agent.evaluator import GoalEvaluator, EvaluationResult
 from brain.agent.execution import StepExecutor
 from brain.agent.interface import AgentResult, AgentOrchestratorInterface
 from brain.agent.orchestrator import AgentOrchestrator
+from brain.agent.contracts import (
+    ExecutionStatus,
+    ExecutionType,
+    ExecutionErrorCategory,
+    ExecutionError,
+    ExecutionRequest,
+    ExecutionContext,
+    ExecutionResult,
+)
 
 # Legacy & Parser Compatibility Exports
 from brain.agent.command_parser import Intent, Command, CommandParser
@@ -51,6 +60,14 @@ __all__ = [
     "AgentResult",
     "AgentOrchestratorInterface",
     "AgentOrchestrator",
+    # Canonical Execution Contracts
+    "ExecutionStatus",
+    "ExecutionType",
+    "ExecutionErrorCategory",
+    "ExecutionError",
+    "ExecutionRequest",
+    "ExecutionContext",
+    "ExecutionResult",
     # Legacy & Parser
     "Intent",
     "Command",
