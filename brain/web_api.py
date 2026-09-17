@@ -19,6 +19,7 @@ from routes.network_routes import network_bp
 from routes.extension_routes import extension_bp
 from routes.terminal_routes import terminal_bp
 from routes.local_network_routes import local_network_bp
+from routes.agent_routes import agent_bp
 
 app.register_blueprint(voice_bp)
 app.register_blueprint(ftp_bp)
@@ -26,6 +27,7 @@ app.register_blueprint(network_bp)
 app.register_blueprint(extension_bp)
 app.register_blueprint(terminal_bp)
 app.register_blueprint(local_network_bp)
+app.register_blueprint(agent_bp)
 
 
 

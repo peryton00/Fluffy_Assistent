@@ -277,7 +277,10 @@ class AgentTaskManager:
                 raise TaskNotFoundError(task_id)
 
             orchestrator = rec.orchestrator
-            cancelled = orchestrator.cancel(task_id)
+            cancelled = orchestrator.cancel(task_id) if orchestrator else False
+            if not cancelled and not rec.task.is_terminal:
+                rec.task.transition_to(TaskStatus.CANCELLED, reason="Cancelled by user/agent request.")
+                cancelled = True
             rec.updated_at = time.time()
             return cancelled
 

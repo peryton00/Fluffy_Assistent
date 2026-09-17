@@ -40,6 +40,9 @@ const AnalyticsWorkspace = lazy(() =>
 const SettingsWorkspace = lazy(() =>
   import("../../features/settings/SettingsWorkspace").then((m) => ({ default: m.SettingsWorkspace }))
 );
+const AgentWorkspace = lazy(() =>
+  import("../../features/agents/AgentWorkspace").then((m) => ({ default: m.AgentWorkspace }))
+);
 
 const DOMAIN_PHASE_MAP: Record<string, string> = {
   operations: "Phase 3: Operations Workspace",
@@ -52,7 +55,7 @@ const DOMAIN_PHASE_MAP: Record<string, string> = {
   extensions: "Phase 8: Extensions Domain",
   analytics: "Phase 8: Analytics Domain",
   settings: "Phase 8: Settings Domain",
-  agents: "Future Agent Workspace",
+  agents: "Phase 11: Agent Execution Workspace",
 };
 
 const WorkspaceLoadingFallback: React.FC = () => (
@@ -159,7 +162,8 @@ export const Workspace: React.FC = () => {
     activeDomain === "chat" ||
     activeDomain === "extensions" ||
     activeDomain === "analytics" ||
-    activeDomain === "settings";
+    activeDomain === "settings" ||
+    activeDomain === "agents";
 
   return (
     <main
@@ -198,6 +202,8 @@ export const Workspace: React.FC = () => {
           <AnalyticsWorkspace />
         ) : activeDomain === "settings" ? (
           <SettingsWorkspace />
+        ) : activeDomain === "agents" ? (
+          <AgentWorkspace />
         ) : (
 
 
