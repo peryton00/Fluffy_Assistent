@@ -152,7 +152,7 @@ class StepExecutor:
             task_id=state.task.task_id,
             step_id=step.step_id,
             timeout=step.timeout,
-            metadata={"objective": step.objective},
+            metadata={"objective": step.objective, **step.metadata},
         )
 
         res: ToolResult = self.tool_runtime.execute(tool_req, confirmed=confirmed)
