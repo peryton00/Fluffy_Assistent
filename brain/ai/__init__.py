@@ -64,6 +64,13 @@ from brain.ai.router import (
     get_router,
     set_router,
 )
+from brain.ai.gateway import (
+    AIGateway,
+    AIRequest,
+    AIResult,
+    get_ai_gateway,
+    set_ai_gateway,
+)
 
 # Legacy compatibility exports
 from brain.ai.llm_config import LLMConfig, get_config
@@ -136,6 +143,12 @@ __all__ = [
     "DeterministicModelRouter",
     "get_router",
     "set_router",
+    # Canonical AI Gateway
+    "AIGateway",
+    "AIRequest",
+    "AIResult",
+    "get_ai_gateway",
+    "set_ai_gateway",
     # Legacy / Compatibility
     "LLMConfig",
     "get_config",

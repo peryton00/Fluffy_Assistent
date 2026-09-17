@@ -10,6 +10,7 @@ from typing import Dict, Any, Optional
 from brain.agent.observation import StepObservation
 from brain.agent.state import AgentState
 from brain.agent.step import PlanStep, StepStatus
+from brain.ai.gateway import AIGateway, AIRequest, AIResult, get_ai_gateway
 from brain.ai.router.interface import ModelRouter
 from brain.ai.router.request import RoutingRequest, TaskType, QualityRequirement
 from brain.ai.router.router import get_router
@@ -36,12 +37,14 @@ class StepExecutor:
         rust_client: Optional[RustCapabilityClient] = None,
         model_router: Optional[ModelRouter] = None,
         ai_runtime: Optional[AIModelRuntime] = None,
+        ai_gateway: Optional[AIGateway] = None,
         action_validator: Optional[ActionValidator] = None,
     ):
         self._tool_runtime = tool_runtime
         self._rust_client = rust_client
         self._model_router = model_router
         self._ai_runtime = ai_runtime
+        self._ai_gateway = ai_gateway
         self._action_validator = action_validator
 
     @property
@@ -68,16 +71,21 @@ class StepExecutor:
         return self._rust_client
 
     @property
+    def ai_gateway(self) -> AIGateway:
+        if self._ai_gateway is None:
+            self._ai_gateway = AIGateway(
+                model_router=self._model_router,
+                runtime=self._ai_runtime,
+            )
+        return self._ai_gateway
+
+    @property
     def model_router(self) -> ModelRouter:
-        if self._model_router is None:
-            self._model_router = get_router()
-        return self._model_router
+        return self.ai_gateway.model_router
 
     @property
     def ai_runtime(self) -> AIModelRuntime:
-        if self._ai_runtime is None:
-            self._ai_runtime = get_runtime()
-        return self._ai_runtime
+        return self.ai_gateway.runtime
 
     @property
     def action_validator(self) -> ActionValidator:
@@ -216,7 +224,7 @@ class StepExecutor:
         state: AgentState,
         start_time: float,
     ) -> StepObservation:
-        """Route and execute AI model inference for reasoning/generation."""
+        """Route and execute AI model inference for reasoning/generation via AIGateway."""
         model_req_spec = step.model_requirement or {}
         task_type_str = model_req_spec.get("task_type", "general_chat")
         task_type = TaskType(task_type_str) if task_type_str in TaskType._value2member_map_ else TaskType.GENERAL_CHAT
@@ -224,45 +232,54 @@ class StepExecutor:
         qual_str = model_req_spec.get("quality", "medium")
         quality = QualityRequirement(qual_str) if qual_str in QualityRequirement._value2member_map_ else QualityRequirement.MEDIUM
 
-        # 1. Query Model Router
-        router_req = RoutingRequest(
-            task_type=task_type,
-            minimum_quality=quality,
-            minimum_context_length=model_req_spec.get("min_context", 2048),
-            preferred_model=model_req_spec.get("preferred_model"),
-            request_id=step.correlation_id,
-        )
-        decision = self.model_router.route(router_req)
-
-        # 2. Build prompt from parameters or objective
         prompt = parameters.get("prompt") or step.objective
-        if "context" in parameters:
-            prompt = f"Context:\n{parameters['context']}\n\nTask:\n{prompt}"
+        context_str = parameters.get("context")
 
-        # 3. Call AI Runtime
-        gen_req = GenerationRequest(
-            model_id=decision.selected_model_id,
+        ai_req = AIRequest(
             prompt=prompt,
+            context=context_str,
+            task_type=task_type,
+            quality=quality,
+            min_context=model_req_spec.get("min_context", 2048),
+            preferred_model=model_req_spec.get("preferred_model"),
             max_tokens=parameters.get("max_tokens", 2048),
             temperature=parameters.get("temperature", 0.7),
-            task_id=step.correlation_id,
+            task_id=state.task.task_id,
+            step_id=step.step_id,
+            correlation_id=step.correlation_id,
         )
-        gen_resp = self.ai_runtime.generate(gen_req)
+
+        ai_res = self.ai_gateway.generate(ai_req)
         duration_ms = (time.perf_counter() - start_time) * 1000.0
 
-        return StepObservation(
-            step_id=step.step_id,
-            task_id=state.task.task_id,
-            success=True,
-            output=gen_resp.text,
-            duration_ms=duration_ms,
-            model_used=decision.selected_model_id,
-            correlation_id=step.correlation_id,
-            metadata={
-                "routing_decision": decision.to_dict(),
-                "latency_ms": gen_resp.latency_ms,
-            },
-        )
+        if ai_res.success:
+            return StepObservation(
+                step_id=step.step_id,
+                task_id=state.task.task_id,
+                success=True,
+                output=ai_res.text,
+                duration_ms=duration_ms,
+                model_used=ai_res.model_id,
+                correlation_id=step.correlation_id,
+                metadata={
+                    "routing_decision": ai_res.routing_decision,
+                    "latency_ms": ai_res.latency_ms,
+                },
+            )
+        else:
+            return StepObservation(
+                step_id=step.step_id,
+                task_id=state.task.task_id,
+                success=False,
+                error=ai_res.error or "AI inference failed",
+                duration_ms=duration_ms,
+                model_used=ai_res.model_id,
+                correlation_id=step.correlation_id,
+                metadata={
+                    "routing_decision": ai_res.routing_decision,
+                    "error_category": ai_res.error_category.value if ai_res.error_category else None,
+                },
+            )
 
     def _resolve_parameters(self, params: Dict[str, Any], state: AgentState) -> Dict[str, Any]:
         """Resolve ${var_name} or ${step_id.output} references from blackboard."""

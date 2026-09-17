@@ -104,8 +104,8 @@ class ConstraintEvaluator:
         # 7. Hardware compatibility (RAM & VRAM)
         req = model.requirements
 
-        # System RAM (skip for reference test models)
-        if model.provider != "reference" and hardware.memory.available_gb < req.min_ram_gb:
+        # System RAM
+        if req.min_ram_gb > 0 and hardware.memory.available_gb < req.min_ram_gb:
             return False, CandidateRejection(
                 model_id=model.model_id,
                 reason=(
@@ -115,8 +115,8 @@ class ConstraintEvaluator:
                 constraint_failed="insufficient_ram",
             )
 
-        # GPU VRAM (when GPU is required and not reference model)
-        if model.provider != "reference" and req.min_vram_gb > 0:
+        # GPU VRAM (when GPU is required)
+        if req.min_vram_gb > 0:
             if not hardware.has_gpu:
                 return False, CandidateRejection(
                     model_id=model.model_id,
