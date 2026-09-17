@@ -25,6 +25,14 @@ from brain.agent.manager import (
     get_task_manager,
     set_task_manager,
 )
+from brain.agent.gateway import (
+    AgentExecutionGateway,
+    GatewayError,
+    GatewayIdentityError,
+    GatewayValidationError,
+    get_agent_gateway,
+    set_agent_gateway,
+)
 from brain.agent.contracts import (
     ExecutionStatus,
     ExecutionType,
@@ -79,6 +87,12 @@ __all__ = [
     "TaskLifecycleError",
     "get_task_manager",
     "set_task_manager",
+    "AgentExecutionGateway",
+    "GatewayError",
+    "GatewayIdentityError",
+    "GatewayValidationError",
+    "get_agent_gateway",
+    "set_agent_gateway",
     # Canonical Execution Contracts
     "ExecutionStatus",
     "ExecutionType",
