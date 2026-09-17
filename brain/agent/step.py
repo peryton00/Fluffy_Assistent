@@ -9,6 +9,8 @@ from dataclasses import dataclass, field
 from enum import Enum
 from typing import Dict, Any, Optional, List
 
+from brain.agent.contracts import ExecutionType
+
 
 class StepStatus(str, Enum):
     """Lifecycle state of an individual plan step."""
@@ -33,8 +35,11 @@ class PlanStep:
     description: Optional[str] = None
     dependencies: List[str] = field(default_factory=list)
     status: StepStatus = StepStatus.PENDING
+    execution_type: Optional[ExecutionType] = None
     tool_requirement: Optional[str] = None       # e.g., "rust:System.GetHardware", "tool:web_search"
     model_requirement: Optional[Dict[str, Any]] = None  # e.g., {"task_type": "reasoning", "quality": "high"}
+    knowledge_requirement: Optional[Dict[str, Any]] = None  # e.g., {"query": "incident report", "top_k": 5}
+    artifact_requirement: Optional[Dict[str, Any]] = None   # e.g., {"artifact_type": "markdown", "name": "report.md"}
     input_parameters: Dict[str, Any] = field(default_factory=dict)
     output: Optional[Any] = None
     attempt_count: int = 0
@@ -90,8 +95,11 @@ class PlanStep:
             "description": self.description,
             "dependencies": list(self.dependencies),
             "status": self.status.value,
+            "execution_type": self.execution_type.value if self.execution_type else None,
             "tool_requirement": self.tool_requirement,
             "model_requirement": self.model_requirement,
+            "knowledge_requirement": self.knowledge_requirement,
+            "artifact_requirement": self.artifact_requirement,
             "input_parameters": self.input_parameters,
             "output": self.output,
             "attempt_count": self.attempt_count,
@@ -106,14 +114,24 @@ class PlanStep:
     @classmethod
     def from_dict(cls, data: Dict[str, Any]) -> "PlanStep":
         """Reconstruct PlanStep from dictionary."""
+        exec_type = None
+        if data.get("execution_type"):
+            try:
+                exec_type = ExecutionType(data["execution_type"])
+            except ValueError:
+                exec_type = None
+
         return cls(
             objective=data["objective"],
             step_id=data["step_id"],
             description=data.get("description"),
             dependencies=list(data.get("dependencies", [])),
             status=StepStatus(data.get("status", StepStatus.PENDING.value)),
+            execution_type=exec_type,
             tool_requirement=data.get("tool_requirement"),
             model_requirement=data.get("model_requirement"),
+            knowledge_requirement=data.get("knowledge_requirement"),
+            artifact_requirement=data.get("artifact_requirement"),
             input_parameters=data.get("input_parameters", {}),
             output=data.get("output"),
             attempt_count=data.get("attempt_count", 0),

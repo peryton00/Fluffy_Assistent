@@ -7,6 +7,7 @@ import time
 import uuid
 from typing import Dict, Any, Optional
 
+from brain.agent.contracts import ExecutionType
 from brain.agent.observation import StepObservation
 from brain.agent.state import AgentState
 from brain.agent.step import PlanStep, StepStatus
@@ -16,6 +17,10 @@ from brain.ai.router.request import RoutingRequest, TaskType, QualityRequirement
 from brain.ai.router.router import get_router
 from brain.ai.runtime.interface import AIModelRuntime, GenerationRequest
 from brain.ai.runtime.manager import get_runtime
+from brain.artifacts.definitions import ArtifactType
+from brain.artifacts.requests import ArtifactRequest
+from brain.artifacts.runtime import ArtifactRuntime, get_artifact_runtime
+from brain.knowledge.runtime import KnowledgeRuntime, get_knowledge_runtime
 from brain.runtime.rust_capability_client import RustCapabilityClient, get_capability_client
 from brain.security.action_validator import ActionValidator, SafetyLevel
 from brain.tools.runtime import UnifiedToolRuntime, get_tool_runtime
@@ -27,7 +32,8 @@ from brain.tools.results import ToolResult, ToolErrorType
 
 class StepExecutor:
     """
-    Executes an individual PlanStep through canonical Tool Runtime and Model Router boundaries.
+    Executes an individual PlanStep through canonical Tool Runtime, Model Router,
+    Knowledge Runtime, and Artifact Runtime boundaries.
     Decoupled from orchestrator lifecycle and state loops.
     """
 
@@ -39,6 +45,8 @@ class StepExecutor:
         ai_runtime: Optional[AIModelRuntime] = None,
         ai_gateway: Optional[AIGateway] = None,
         action_validator: Optional[ActionValidator] = None,
+        knowledge_runtime: Optional[KnowledgeRuntime] = None,
+        artifact_runtime: Optional[ArtifactRuntime] = None,
     ):
         self._tool_runtime = tool_runtime
         self._rust_client = rust_client
@@ -46,6 +54,8 @@ class StepExecutor:
         self._ai_runtime = ai_runtime
         self._ai_gateway = ai_gateway
         self._action_validator = action_validator
+        self._knowledge_runtime = knowledge_runtime
+        self._artifact_runtime = artifact_runtime
 
     @property
     def tool_runtime(self) -> UnifiedToolRuntime:
@@ -93,6 +103,18 @@ class StepExecutor:
             self._action_validator = ActionValidator()
         return self._action_validator
 
+    @property
+    def knowledge_runtime(self) -> KnowledgeRuntime:
+        if self._knowledge_runtime is None:
+            self._knowledge_runtime = get_knowledge_runtime()
+        return self._knowledge_runtime
+
+    @property
+    def artifact_runtime(self) -> ArtifactRuntime:
+        if self._artifact_runtime is None:
+            self._artifact_runtime = get_artifact_runtime()
+        return self._artifact_runtime
+
     def execute_step(
         self,
         step: PlanStep,
@@ -101,28 +123,49 @@ class StepExecutor:
     ) -> StepObservation:
         """
         Execute a plan step with security validation and produce a StepObservation.
+        Routes canonically according to ExecutionType and step requirements.
         """
         start_time = time.perf_counter()
         step.mark_executing()
 
         try:
-            # 1. Resolve variable interpolations in input_parameters from state blackboard
+            # 1. Resolve variable interpolations in input_parameters from state blackboard & observations
             resolved_params = self._resolve_parameters(step.input_parameters, state)
 
-            # 2. Route AI Model reasoning if step is model-driven
-            if step.model_requirement or (step.tool_requirement and step.tool_requirement.startswith("model:")):
+            # 2. Canonical capability dispatch based on ExecutionType or explicit requirements
+            if (
+                step.execution_type == ExecutionType.KNOWLEDGE
+                or step.knowledge_requirement is not None
+                or (step.tool_requirement and step.tool_requirement.startswith("knowledge:"))
+            ):
+                obs = self._execute_knowledge_retrieval(resolved_params, step, state, start_time)
+            elif (
+                step.execution_type == ExecutionType.ARTIFACT
+                or step.artifact_requirement is not None
+                or (step.tool_requirement and step.tool_requirement.startswith("artifact:"))
+            ):
+                obs = self._execute_artifact_generation(resolved_params, step, state, start_time)
+            elif (
+                step.execution_type == ExecutionType.MODEL
+                or step.model_requirement is not None
+                or (step.tool_requirement and step.tool_requirement.startswith("model:"))
+            ):
                 obs = self._execute_model_inference(resolved_params, step, state, start_time)
-            elif step.tool_requirement:
-                # 3. Route executable capabilities through Unified Tool Runtime
+            elif (
+                step.execution_type == ExecutionType.TOOL
+                or step.tool_requirement is not None
+            ):
                 obs = self._execute_via_tool_runtime(step, resolved_params, state, confirmed, start_time)
             else:
-                # 4. Default observation if step is a pure data/blackboard step
+                # Default observation if step is a pure data/blackboard step (ExecutionType.DATA or unresolved)
                 obs = StepObservation(
                     step_id=step.step_id,
                     task_id=state.task.task_id,
                     success=True,
                     output=resolved_params,
                     duration_ms=(time.perf_counter() - start_time) * 1000.0,
+                    correlation_id=step.correlation_id,
+                    metadata={"execution_type": (step.execution_type.value if step.execution_type else ExecutionType.DATA.value)},
                 )
 
             # Update step status based on observation
@@ -142,6 +185,7 @@ class StepExecutor:
                 success=False,
                 error=err_msg,
                 duration_ms=(time.perf_counter() - start_time) * 1000.0,
+                correlation_id=step.correlation_id,
             )
 
     def _execute_via_tool_runtime(
@@ -217,6 +261,202 @@ class StepExecutor:
             },
         )
 
+    def _execute_knowledge_retrieval(
+        self,
+        parameters: Dict[str, Any],
+        step: PlanStep,
+        state: AgentState,
+        start_time: float,
+    ) -> StepObservation:
+        """Route and execute knowledge retrieval via KnowledgeRuntime."""
+        req_spec = step.knowledge_requirement or {}
+        query = (
+            parameters.get("query")
+            or parameters.get("query_text")
+            or req_spec.get("query")
+            or step.objective
+        )
+        top_k = parameters.get("top_k") or req_spec.get("top_k")
+        minimum_score = parameters.get("minimum_score") if "minimum_score" in parameters else req_spec.get("minimum_score")
+        document_ids = parameters.get("document_ids") or req_spec.get("document_ids")
+        paths = parameters.get("paths") or req_spec.get("paths")
+        identity = parameters.get("identity") or req_spec.get("identity")
+
+        try:
+            results = self.knowledge_runtime.search(
+                query=query,
+                top_k=top_k,
+                minimum_score=minimum_score,
+                document_ids=document_ids,
+                paths=paths,
+                identity=identity,
+            )
+            duration_ms = (time.perf_counter() - start_time) * 1000.0
+
+            results_serialized = []
+            combined_texts = []
+            citations = []
+            doc_ids = []
+
+            for r in results:
+                if hasattr(r, "to_dict"):
+                    results_serialized.append(r.to_dict())
+                elif isinstance(r, dict):
+                    results_serialized.append(r)
+                else:
+                    results_serialized.append({"text": str(r)})
+
+                if hasattr(r, "text"):
+                    combined_texts.append(r.text)
+                elif isinstance(r, dict) and "text" in r:
+                    combined_texts.append(r["text"])
+
+                if hasattr(r, "citation"):
+                    citations.append(r.citation)
+                elif isinstance(r, dict) and "citation" in r:
+                    citations.append(r["citation"])
+
+                if hasattr(r, "document_id"):
+                    doc_ids.append(r.document_id)
+                elif isinstance(r, dict) and "document_id" in r:
+                    doc_ids.append(r["document_id"])
+
+            combined_text = "\n\n".join(combined_texts)
+            output_payload = {
+                "query": query,
+                "count": len(results),
+                "results": results_serialized,
+                "combined_text": combined_text,
+                "citations": citations,
+                "document_ids": doc_ids,
+            }
+
+            return StepObservation(
+                step_id=step.step_id,
+                task_id=state.task.task_id,
+                success=True,
+                output=output_payload,
+                duration_ms=duration_ms,
+                correlation_id=step.correlation_id,
+                metadata={
+                    "execution_type": ExecutionType.KNOWLEDGE.value,
+                    "query": query,
+                    "result_count": len(results),
+                },
+            )
+        except Exception as e:
+            duration_ms = (time.perf_counter() - start_time) * 1000.0
+            return StepObservation(
+                step_id=step.step_id,
+                task_id=state.task.task_id,
+                success=False,
+                error=str(e),
+                duration_ms=duration_ms,
+                correlation_id=step.correlation_id,
+                metadata={"execution_type": ExecutionType.KNOWLEDGE.value},
+            )
+
+    def _execute_artifact_generation(
+        self,
+        parameters: Dict[str, Any],
+        step: PlanStep,
+        state: AgentState,
+        start_time: float,
+    ) -> StepObservation:
+        """Route and execute deliverable generation via ArtifactRuntime."""
+        req_spec = step.artifact_requirement or {}
+
+        art_type_raw = parameters.get("artifact_type") or req_spec.get("artifact_type") or "markdown"
+        if isinstance(art_type_raw, str):
+            try:
+                art_type = ArtifactType(art_type_raw.lower())
+            except ValueError:
+                art_type = ArtifactType.MARKDOWN
+        elif isinstance(art_type_raw, ArtifactType):
+            art_type = art_type_raw
+        else:
+            art_type = ArtifactType.MARKDOWN
+
+        name = parameters.get("name") or req_spec.get("name") or parameters.get("filename") or f"{step.step_id}_output"
+        content = parameters.get("content")
+        if content is None:
+            content = parameters.get("text") or req_spec.get("content") or step.objective
+
+        dest_dir = parameters.get("destination_dir") or req_spec.get("destination_dir")
+        sources_raw = parameters.get("sources") or req_spec.get("sources", [])
+        if isinstance(sources_raw, str):
+            sources = [sources_raw]
+        elif isinstance(sources_raw, list):
+            sources = []
+            for s in sources_raw:
+                if isinstance(s, list):
+                    sources.extend([str(item) for item in s if item])
+                elif s:
+                    sources.append(str(s))
+        else:
+            sources = []
+
+        language = parameters.get("language") or req_spec.get("language")
+        custom_opts = parameters.get("custom_options") or req_spec.get("custom_options", {})
+        classification = parameters.get("classification") or req_spec.get("classification")
+
+        try:
+            art_req = ArtifactRequest(
+                artifact_type=art_type,
+                name=name,
+                destination_dir=dest_dir,
+                content=content,
+                sources=sources,
+                classification=classification,
+                language=language,
+                custom_options=custom_opts,
+            )
+
+            art_res = self.artifact_runtime.generate_artifact(art_req)
+            duration_ms = (time.perf_counter() - start_time) * 1000.0
+
+            if art_res.success:
+                res_dict = art_res.to_dict()
+                return StepObservation(
+                    step_id=step.step_id,
+                    task_id=state.task.task_id,
+                    success=True,
+                    output=res_dict,
+                    duration_ms=duration_ms,
+                    correlation_id=step.correlation_id,
+                    metadata={
+                        "execution_type": ExecutionType.ARTIFACT.value,
+                        "artifact_id": art_res.artifact_id,
+                        "file_path": art_res.file_path,
+                        "filename": art_res.filename,
+                        "artifact_result": res_dict,
+                    },
+                )
+            else:
+                return StepObservation(
+                    step_id=step.step_id,
+                    task_id=state.task.task_id,
+                    success=False,
+                    error=art_res.error or "Artifact generation failed",
+                    duration_ms=duration_ms,
+                    correlation_id=step.correlation_id,
+                    metadata={
+                        "execution_type": ExecutionType.ARTIFACT.value,
+                        "artifact_result": art_res.to_dict() if hasattr(art_res, "to_dict") else None,
+                    },
+                )
+        except Exception as e:
+            duration_ms = (time.perf_counter() - start_time) * 1000.0
+            return StepObservation(
+                step_id=step.step_id,
+                task_id=state.task.task_id,
+                success=False,
+                error=str(e),
+                duration_ms=duration_ms,
+                correlation_id=step.correlation_id,
+                metadata={"execution_type": ExecutionType.ARTIFACT.value},
+            )
+
     def _execute_model_inference(
         self,
         parameters: Dict[str, Any],
@@ -228,7 +468,7 @@ class StepExecutor:
         model_req_spec = step.model_requirement or {}
         task_type_str = model_req_spec.get("task_type", "general_chat")
         task_type = TaskType(task_type_str) if task_type_str in TaskType._value2member_map_ else TaskType.GENERAL_CHAT
-        
+
         qual_str = model_req_spec.get("quality", "medium")
         quality = QualityRequirement(qual_str) if qual_str in QualityRequirement._value2member_map_ else QualityRequirement.MEDIUM
 
@@ -282,21 +522,53 @@ class StepExecutor:
             )
 
     def _resolve_parameters(self, params: Dict[str, Any], state: AgentState) -> Dict[str, Any]:
-        """Resolve ${var_name} or ${step_id.output} references from blackboard."""
-        resolved: Dict[str, Any] = {}
-        for k, v in params.items():
-            if isinstance(v, str) and v.startswith("${") and v.endswith("}"):
-                var_key = v[2:-1].strip()
-                if "." in var_key:
-                    parts = var_key.split(".", 1)
-                    s_id, attr = parts[0], parts[1]
-                    obs = state.observations.get(s_id)
-                    if obs:
-                        resolved[k] = getattr(obs, attr, obs.get(attr) if isinstance(obs, dict) else None)
+        """Resolve ${var_name} or ${step_id.output.attr} references from blackboard and observations."""
+        if not isinstance(params, dict):
+            return params
+        return {k: self._resolve_single_value(v, state) for k, v in params.items()}
+
+    def _resolve_single_value(self, val: Any, state: AgentState) -> Any:
+        if isinstance(val, str) and "${" in val and "}" in val:
+            if val.startswith("${") and val.endswith("}") and val.count("${") == 1:
+                var_key = val[2:-1].strip()
+                return self._evaluate_var_path(var_key, state, default=val)
+            import re
+            def replacer(match):
+                key = match.group(1).strip()
+                res = self._evaluate_var_path(key, state, default=match.group(0))
+                return str(res) if res is not None else ""
+            return re.sub(r"\$\{([^}]+)\}", replacer, val)
+        elif isinstance(val, dict):
+            return {k: self._resolve_single_value(v, state) for k, v in val.items()}
+        elif isinstance(val, list):
+            return [self._resolve_single_value(v, state) for v in val]
+        return val
+
+    def _evaluate_var_path(self, var_key: str, state: AgentState, default: Any = None) -> Any:
+        if "." in var_key:
+            parts = var_key.split(".")
+            root_key = parts[0]
+            curr = None
+            if root_key in state.observations:
+                curr = state.observations[root_key]
+            elif root_key in state.blackboard:
+                curr = state.blackboard[root_key]
+            elif root_key in state.variables:
+                curr = state.variables[root_key]
+
+            if curr is not None:
+                for segment in parts[1:]:
+                    if curr is None:
+                        break
+                    if isinstance(curr, dict):
+                        curr = curr.get(segment)
+                    elif hasattr(curr, segment):
+                        curr = getattr(curr, segment)
                     else:
-                        resolved[k] = v
-                else:
-                    resolved[k] = state.get_variable(var_key, v)
-            else:
-                resolved[k] = v
-        return resolved
+                        curr = None
+                return curr if curr is not None else default
+
+        if var_key in state.observations:
+            obs = state.observations[var_key]
+            return getattr(obs, "output", obs)
+        return state.get_variable(var_key, default)
