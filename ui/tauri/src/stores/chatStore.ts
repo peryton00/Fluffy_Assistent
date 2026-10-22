@@ -17,6 +17,7 @@ import {
   fetchChatSession,
   deleteChatSession,
   fetchCurrentSessionId,
+  setCurrentSessionId,
   startStt,
   stopStt,
   fetchSttStatus,
@@ -79,6 +80,7 @@ class ChatStoreManager {
   private listeners = new Set<() => void>();
   private activeAbortController: AbortController | null = null;
   private sttPollInterval: ReturnType<typeof setInterval> | null = null;
+  private messageLoadRequestId = 0;
 
   public getState(): ChatState {
     return this.state;
@@ -120,9 +122,14 @@ class ChatStoreManager {
         fetchCurrentSessionId().catch(() => ({ ok: false, session_id: "" })),
       ]);
 
-      const activeId = currentSess.ok && currentSess.session_id
-        ? currentSess.session_id
-        : (sessions.length > 0 ? sessions[0].id : null);
+      const currentActiveId = this.state.activeSessionId;
+      const activeStillValid = currentActiveId && sessions.some((s) => s.id === currentActiveId);
+
+      const activeId = activeStillValid
+        ? currentActiveId
+        : (currentSess.ok && currentSess.session_id && sessions.some((s) => s.id === currentSess.session_id)
+            ? currentSess.session_id
+            : (sessions.length > 0 ? sessions[0].id : null));
 
       this.setState({
         sessions,
@@ -130,7 +137,7 @@ class ChatStoreManager {
         loading: false,
       });
 
-      if (activeId) {
+      if (activeId && (!this.state.messages.length || !activeStillValid)) {
         await this.loadSessionMessages(activeId);
       }
     } catch (err) {
@@ -145,8 +152,12 @@ class ChatStoreManager {
    * Load message history for a specific session.
    */
   public loadSessionMessages = async (sessionId: string): Promise<void> => {
+    const reqId = ++this.messageLoadRequestId;
     try {
       const detail = await fetchChatSession(sessionId);
+      if (reqId !== this.messageLoadRequestId || this.state.activeSessionId !== sessionId) {
+        return;
+      }
       if (detail && Array.isArray(detail.messages)) {
         // Normalize messages to standard ChatMessage structure
         const normalized: ChatMessage[] = detail.messages.map((m, idx) => {
@@ -176,7 +187,12 @@ class ChatStoreManager {
    */
   public switchSession = async (sessionId: string): Promise<void> => {
     this.stopGeneration();
-    this.setState({ activeSessionId: sessionId });
+    this.setState({ activeSessionId: sessionId, messages: [] });
+    try {
+      void Promise.resolve(setCurrentSessionId(sessionId)).catch(() => {});
+    } catch {
+      // Ignore
+    }
     await this.loadSessionMessages(sessionId);
   };
 

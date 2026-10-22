@@ -169,7 +169,7 @@
     "aliases": [],
     "description": "Sample tool v2 updated",
     "directory": "sample_tool",
-    "created": "2026-09-14T04:51:23.368081",
+    "created": "2026-09-18T03:50:20.756922",
     "version": "1.0.1",
     "enabled": true,
     "language": "python",
@@ -197,5 +197,66 @@
     "has_ui": false,
     "logo": "",
     "author": "User"
+  },
+  "sing_song": {
+    "name": "sing_song",
+    "intent": "sing_song",
+    "patterns": [
+      "r'sing song'",
+      "(?i)sing.*song"
+    ],
+    "triggers": [
+      "sing song"
+    ],
+    "aliases": [],
+    "description": "Sing a cheerful song for the user",
+    "directory": "sing_song",
+    "created": "2026-09-18T03:19:26.149467",
+    "version": "1.0.1",
+    "enabled": true,
+    "language": "python",
+    "has_ui": false,
+    "logo": "logo.png",
+    "author": "Fluffy AI"
+  },
+  "custom_test_skill": {
+    "name": "custom_test_skill",
+    "intent": "custom_test_skill",
+    "patterns": [
+      "(?i)custom test skill"
+    ],
+    "triggers": [
+      "custom test skill"
+    ],
+    "aliases": [],
+    "description": "Custom test skill for logs",
+    "directory": "custom_test_skill",
+    "created": "2026-09-18T03:50:20.647148",
+    "version": "1.0.0",
+    "enabled": true,
+    "language": "python",
+    "has_ui": false,
+    "logo": "logo.png",
+    "author": "Fluffy AI"
+  },
+  "internet_speed_test": {
+    "name": "internet_speed_test",
+    "intent": "internet_speed_test",
+    "patterns": [
+      "\\b(speed test|internet speed)\\b"
+    ],
+    "triggers": [
+      "internet speed test"
+    ],
+    "aliases": [],
+    "description": "Execute an internet speed test using a reliable online service (e.g., speedtest.net API) or a system utility, then report the download and upload speeds to the user.",
+    "directory": "internet_speed_test",
+    "created": "2026-09-18T03:41:09.508533",
+    "version": "1.0.0",
+    "enabled": true,
+    "language": "python",
+    "has_ui": false,
+    "logo": "logo.png",
+    "author": "Fluffy AI"
   }
 }

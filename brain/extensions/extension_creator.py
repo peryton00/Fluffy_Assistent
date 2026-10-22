@@ -201,12 +201,23 @@ def get_validator():
             except Exception as e:
                 print(f"[ExtensionCreator] [WARN] Auto-registration failed: {e}")
 
+            try:
+                from brain.runtime import state
+                state.add_execution_log(f"Extension '{intent_name}' created", "action")
+            except Exception:
+                pass
+
             return intent_name
             
         except Exception as e:
             import traceback
             print(f"[ExtensionCreator] [ERROR] Failed to create extension: {e}")
             print(traceback.format_exc())
+            try:
+                from brain.runtime import state
+                state.add_execution_log(f"Extension creation failed: {e}", "error")
+            except Exception:
+                pass
             # Clean up on failure
             if ext_dir.exists():
                 try:
@@ -238,7 +249,7 @@ def get_validator():
             class_name = self._to_class_name(intent_name)
             # Wrap the method in the class if not already a full module
             if "def get_handler" not in new_handler_code:
-                full_code = f'"""{intent_name} Handler — auto-fixed by Fluffy AI"""\n\nfrom typing import Dict, Any\n\nclass {class_name}Handler:\n{self._indent_code(new_handler_code, 1)}\n\ndef get_handler():\n    return {class_name}Handler()\n'
+                full_code = f'"""{intent_name} Handler - auto-fixed by Fluffy AI"""\n\nfrom typing import Dict, Any\n\nclass {class_name}Handler:\n{self._indent_code(new_handler_code, 1)}\n\ndef get_handler():\n    return {class_name}Handler()\n'
             else:
                 full_code = new_handler_code
             (ext_dir / "handler.py").write_text(full_code, encoding="utf-8")
@@ -320,9 +331,19 @@ def get_validator():
         try:
             shutil.rmtree(ext_dir)
             print(f"[ExtensionCreator] [OK] Deleted extension: {intent_name}")
+            try:
+                from brain.runtime import state
+                state.add_execution_log(f"Extension '{intent_name}' deleted", "warning")
+            except Exception:
+                pass
             return True
         except Exception as e:
             print(f"[ExtensionCreator] [ERROR] Failed to delete extension: {e}")
+            try:
+                from brain.runtime import state
+                state.add_execution_log(f"Failed to delete extension '{intent_name}': {e}", "error")
+            except Exception:
+                pass
             return False
 
 

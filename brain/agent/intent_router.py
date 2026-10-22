@@ -54,7 +54,7 @@ class IntentRouter:
         # ── Priority 1: Pending safety validation ─────────────────────────
         if session.has_pending_validation():
             if _is_confirmation(original_message):
-                print("[IntentRouter] ✅ Safety validation confirmed, executing...")
+                print("[IntentRouter] [OK] Safety validation confirmed, executing...")
                 pending_cmd, pending_validation = session.get_pending_validation()
                 session.clear_pending_validation()
                 return self._execute_command(pending_cmd, pending_validation)
@@ -67,7 +67,7 @@ class IntentRouter:
         pending_improvement = session.get_pending_improvement()
         if pending_improvement:
             if _is_confirmation(original_message):
-                print(f"[IntentRouter] 🚀 Running self-improvement: {pending_improvement.get('intent')}")
+                print(f"[IntentRouter] [START] Running self-improvement: {pending_improvement.get('intent')}")
                 session.clear_pending_improvement()
                 return self._execute_self_improvement(pending_improvement, original_message)
             else:
@@ -118,8 +118,8 @@ class IntentRouter:
         if intent_value == "multi_step" and understanding.steps:
             return self._execute_multi_step(understanding)
 
-        # ── Priority 6: Genuinely New Functionality Request ───────────────
-        if understanding.requires_new_functionality:
+        # ── Priority 6: Genuinely New Functionality or Missing Extension Capability ───
+        if understanding.requires_new_functionality or (intent_value not in _SYSTEM_COMMAND_INTENTS and intent_value not in ("chat", "confirm", "cancel", "unknown", "none")):
             return self._handle_new_functionality(understanding, session)
 
         # ── Priority 7: Fallback to chat ──────────────────────────────────

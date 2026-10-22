@@ -48,6 +48,33 @@ describe("ChatStoreManager", () => {
     expect(state.messages).toHaveLength(2);
   });
 
+  it("loadSessions preserves activeSessionId if already active and valid", async () => {
+    vi.mocked(chatApi.fetchChatSessions).mockResolvedValue([
+      { id: "sess-1", title: "Session 1", created: 1000, last_updated: 1000, message_count: 2 },
+      { id: "sess-2", title: "Session 2", created: 2000, last_updated: 2000, message_count: 1 },
+    ]);
+    vi.mocked(chatApi.fetchCurrentSessionId).mockResolvedValue({
+      ok: true,
+      session_id: "sess-1",
+    });
+    vi.mocked(chatApi.fetchChatSession).mockResolvedValue({
+      id: "sess-2",
+      messages: [
+        { id: "msg-2", role: "user", content: "Session 2 msg", timestamp: 2000 },
+      ],
+    });
+
+    // Manually switch to sess-2
+    await chatStore.switchSession("sess-2");
+    expect(chatStore.getState().activeSessionId).toBe("sess-2");
+
+    // Re-load sessions (e.g. background refresh)
+    await chatStore.loadSessions();
+
+    // Should NOT be clobbered back to sess-1
+    expect(chatStore.getState().activeSessionId).toBe("sess-2");
+  });
+
   it("newSession creates a session and resets message buffer", async () => {
     vi.mocked(chatApi.createChatSession).mockResolvedValue({
       ok: true,
@@ -62,7 +89,8 @@ describe("ChatStoreManager", () => {
     expect(state.messages).toEqual([]);
   });
 
-  it("switchSession updates active session and loads messages", async () => {
+  it("switchSession updates active session, notifies backend, and loads messages", async () => {
+    vi.mocked(chatApi.setCurrentSessionId).mockResolvedValue({ ok: true, session_id: "sess-switch-789" });
     vi.mocked(chatApi.fetchChatSession).mockResolvedValue({
       id: "sess-switch-789",
       messages: [
@@ -76,6 +104,7 @@ describe("ChatStoreManager", () => {
     expect(state.activeSessionId).toBe("sess-switch-789");
     expect(state.messages).toHaveLength(1);
     expect(state.messages[0].content).toBe("Status report");
+    expect(chatApi.setCurrentSessionId).toHaveBeenCalledWith("sess-switch-789");
   });
 
   it("deleteSession calls API and removes session from state", async () => {

@@ -261,6 +261,12 @@ def get_validator():
         loader.register_extension(intent, registry_meta)
         loader.load_all_extensions()
 
+        try:
+            from brain.runtime import state
+            state.add_execution_log(f"Extension '{name}' ({intent}) created", "action")
+        except Exception:
+            pass
+
         return jsonify({
             "ok": True,
             "success": True,
@@ -270,6 +276,11 @@ def get_validator():
         }), 201
 
     except Exception as e:
+        try:
+            from brain.runtime import state
+            state.add_execution_log(f"Extension creation failed: {e}", "error")
+        except Exception:
+            pass
         return jsonify({"ok": False, "success": False, "error": f"Failed to create extension: {e}"}), 500
 
 
@@ -364,6 +375,11 @@ def save_extension_code(intent):
     try:
         loader = _get_loader()
         reloaded = loader.reload_extension(intent)
+        try:
+            from brain.runtime import state
+            state.add_execution_log(f"Extension '{intent}' code updated", "action")
+        except Exception:
+            pass
         return jsonify({
             "ok": True,
             "success": True,
@@ -380,6 +396,11 @@ def save_extension_code(intent):
 def reload_extension(intent):
     loader = _get_loader()
     ok = loader.reload_extension(intent)
+    try:
+        from brain.runtime import state
+        state.add_execution_log(f"Extension '{intent}' reloaded", "info")
+    except Exception:
+        pass
     return jsonify({"ok": ok, "success": ok, "message": "Reloaded" if ok else "Reload failed"})
 
 
@@ -388,17 +409,12 @@ def reload_extension(intent):
 @extension_bp.route("/extensions/<intent>", methods=["DELETE"])
 def delete_extension(intent):
     loader = _get_loader()
-    creator = _get_creator()
-
-    # Remove from registry
-    registry = loader.load_registry()
-    directory = registry.pop(intent, {}).get("directory", intent)
-    loader.save_registry(registry)
-    loader.extensions.pop(intent, None)
-
-    # Delete files
-    ext_dir = loader.extensions_dir / directory
-    ok = creator.delete_extension(directory) if ext_dir.exists() else False
+    ok = loader.delete_extension(intent)
+    try:
+        from brain.runtime import state
+        state.add_execution_log(f"Extension '{intent}' deleted", "warning")
+    except Exception:
+        pass
 
     return jsonify({"ok": True, "success": True, "message": f"Extension '{intent}' removed"})
 
@@ -414,8 +430,13 @@ def toggle_extension(intent):
 
     registry[intent]["enabled"] = not registry[intent].get("enabled", True)
     loader.save_registry(registry)
-    state = "enabled" if registry[intent]["enabled"] else "disabled"
-    return jsonify({"ok": True, "success": True, "enabled": registry[intent]["enabled"], "message": f"Extension {state}"})
+    state_str = "enabled" if registry[intent]["enabled"] else "disabled"
+    try:
+        from brain.runtime import state
+        state.add_execution_log(f"Extension '{intent}' {state_str}", "info")
+    except Exception:
+        pass
+    return jsonify({"ok": True, "success": True, "enabled": registry[intent]["enabled"], "message": f"Extension {state_str}"})
 
 
 # ── Serve extension web UI ────────────────────────────────────────────────────

@@ -106,10 +106,19 @@ class ExtensionLoader:
     def has_extension(self, intent: str) -> bool:
         """Check if extension exists for intent"""
         return intent in self.extensions
-    
-    def execute(self, command, validation) -> Dict[str, Any]:
+
+    def execute(self, command, validation=None) -> Dict[str, Any]:
         """Execute extension handler"""
-        intent = command.intent.value if hasattr(command.intent, 'value') else str(command.intent)
+        if isinstance(command, str):
+            intent = command
+            class _SimpleCmd:
+                def __init__(self, i, p):
+                    self.intent = i
+                    self.parameters = p if isinstance(p, dict) else {}
+            params = validation if isinstance(validation, dict) else {}
+            command = _SimpleCmd(intent, params)
+        else:
+            intent = command.intent.value if hasattr(command.intent, 'value') else str(command.intent)
         
         if intent not in self.extensions:
             return {
@@ -351,6 +360,62 @@ class ExtensionLoader:
             self.save_registry(registry)
         return updated
     
+    def unregister_extension(self, intent: str) -> bool:
+        """Unregister and unload an extension completely from memory and registry."""
+        registry = self.load_registry()
+        entry = registry.pop(intent, None)
+        directory = intent
+        if entry:
+            directory = entry.get("directory", intent)
+        else:
+            for k, v in list(registry.items()):
+                if v.get("directory") == intent or k == intent:
+                    entry = registry.pop(k, None)
+                    directory = v.get("directory", k)
+                    break
+        
+        self.save_registry(registry)
+        self.extensions.pop(intent, None)
+        if directory != intent:
+            self.extensions.pop(directory, None)
+            
+        self.load_errors.pop(intent, None)
+        self.load_errors.pop(directory, None)
+        
+        for key in [
+            f"extensions.{directory}.handler",
+            f"extensions.{directory}.validator",
+            f"brain.extensions.{directory}.handler",
+            f"brain.extensions.{directory}.validator",
+            f"extensions.{directory}",
+            f"brain.extensions.{directory}",
+        ]:
+            sys.modules.pop(key, None)
+            
+        self._registry_cache = None
+        self._registry_mtime = None
+        return True
+
+    def delete_extension(self, intent: str) -> bool:
+        """Unregister and delete extension directory from disk."""
+        registry = self.load_registry()
+        entry = registry.get(intent, {})
+        directory = entry.get("directory", intent)
+        
+        self.unregister_extension(intent)
+        
+        ext_dir = self.extensions_dir / directory
+        if ext_dir.exists() and ext_dir.is_dir():
+            import shutil
+            try:
+                shutil.rmtree(ext_dir)
+                print(f"[ExtensionLoader] [OK] Deleted extension directory: {directory}")
+                return True
+            except Exception as e:
+                print(f"[ExtensionLoader] [ERROR] Failed to delete directory {directory}: {e}")
+                return False
+        return True
+
     def list_extensions(self) -> list:
         """List all loaded extensions"""
         extensions_list = []

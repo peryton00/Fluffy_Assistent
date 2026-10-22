@@ -3,12 +3,15 @@ Authentication and Authorization Utilities for Fluffy Web API
 Enforces loopback execution and secure token verification.
 """
 
+from __future__ import annotations
+
 import hmac
 import os
 import secrets
+from typing import Optional
 from flask import request, jsonify
 
-_RUNTIME_TOKEN: str | None = None
+_RUNTIME_TOKEN: Optional[str] = None
 
 
 def _get_token() -> str:

@@ -53,6 +53,20 @@ export async function fetchCurrentSessionId(
 }
 
 /**
+ * Sets current active session ID in Python Brain.
+ */
+export async function setCurrentSessionId(
+  sessionId: string,
+  options?: RequestOptions
+): Promise<{ ok: boolean; session_id: string }> {
+  return apiClient.post<{ ok: boolean; session_id: string }>(
+    "/chat/current_session",
+    { session_id: sessionId },
+    options
+  );
+}
+
+/**
  * Lists all conversational chat sessions.
  */
 export async function fetchChatSessions(

@@ -9,7 +9,6 @@ import threading
 import math
 from pathlib import Path
 from typing import List, Optional, Dict, Any, Tuple
-import numpy as np
 
 from brain.ai.config.paths import ApplicationDataPaths
 from brain.knowledge.definitions import DocumentStatus, DocumentMimeType, DocumentClassification
@@ -242,10 +241,11 @@ class LocalKnowledgeIndex(KnowledgeIndex):
         if not query_vector:
             return []
 
-        q_vec = np.array(query_vector, dtype=np.float32)
-        q_norm = np.linalg.norm(q_vec)
-        if q_norm > 1e-9:
-            q_vec = q_vec / q_norm
+        q_norm = math.sqrt(sum(x * x for x in query_vector))
+        if q_norm < 1e-9:
+            return []
+        q_norm_inv = 1.0 / q_norm
+        q_unit = [x * q_norm_inv for x in query_vector]
 
         with self._lock:
             conn = self._get_connection()
@@ -268,13 +268,16 @@ class LocalKnowledgeIndex(KnowledgeIndex):
                 if not emb_str:
                     continue
                 try:
-                    c_vec = np.array(json.loads(emb_str), dtype=np.float32)
-                    c_norm = np.linalg.norm(c_vec)
-                    if c_norm > 1e-9:
-                        c_vec = c_vec / c_norm
-                    sim = float(np.dot(q_vec, c_vec))
+                    c_vec = json.loads(emb_str)
+                    if not isinstance(c_vec, list):
+                        continue
+                    c_norm = math.sqrt(sum(x * x for x in c_vec))
+                    if c_norm < 1e-9:
+                        continue
+                    c_norm_inv = 1.0 / c_norm
+                    sim = sum(a * (b * c_norm_inv) for a, b in zip(q_unit, c_vec))
                     chunk = self._row_to_chunk(r)
-                    scored.append((chunk, sim))
+                    scored.append((chunk, float(sim)))
                 except Exception:
                     continue
 

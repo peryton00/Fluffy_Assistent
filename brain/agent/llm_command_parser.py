@@ -170,17 +170,16 @@ class LLMCommandParser:
           Stage 1 — Fast classify: command | chat | new_feature | confirmation
           Stage 2 — Parameter extraction (only for "command")
         """
-        # Hot-reload extensions
+        # Hot-reload and sync extensions
         loader = self._get_extension_loader()
         if loader:
-            newly = loader.refresh_extensions()
-            if newly:
-                self._load_available_intents()
+            loader.refresh_extensions()
+            self._load_available_intents()
 
         # ── Step 0: Pre-check if command matches an existing active extension ──
         if loader:
             matched_ext = loader.find_extension_for_command(user_command)
-            if matched_ext:
+            if matched_ext and loader.has_extension(matched_ext):
                 print(f"[LLMCommandParser] Pre-resolved to existing extension: '{matched_ext}'")
                 return CommandUnderstanding({
                     "intent": matched_ext,
@@ -320,6 +319,13 @@ Return ONLY valid JSON (no markdown, no extra text):
         try:
             full_response = self._query_llm(prompt)
             understanding = self._parse_json_response(full_response, user_command)
+            loader = self._get_extension_loader()
+            is_active_extension = loader and loader.has_extension(understanding.intent)
+            is_known_system = understanding.intent in self.available_intents or understanding.intent in ("chat", "confirm", "cancel", "multi_step", "agent_task")
+            if not is_known_system and not is_active_extension:
+                understanding.requires_new_functionality = True
+                understanding.suggested_implementation = understanding.suggested_implementation or understanding.text or user_command
+
             if understanding.requires_new_functionality:
                 understanding.intent = self._sanitize_intent_name(understanding.intent, user_command)
             return understanding

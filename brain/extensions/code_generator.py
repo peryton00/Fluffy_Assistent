@@ -115,24 +115,24 @@ class CodeGenerator:
                 )
                 
                 if validation_result["valid"]:
-                    print(f"[CodeGenerator] \u2713 Code validation passed!")
+                    print(f"[CodeGenerator] [OK] Code validation passed")
                     return generated
                 else:
                     # Log validation errors
                     if not validation_result["handler_valid"]:
                         error = validation_result["handler_error"]
-                        print(f"[CodeGenerator] \u2717 Handler error: {error['error']} (line {error['line']})")
+                        print(f"[CodeGenerator] [ERROR] Handler error: {error['error']} (line {error['line']})")
                         print(f"[CodeGenerator]   Suggestion: {error['suggestion']}")
                     
                     if not validation_result["validator_valid"]:
                         error = validation_result["validator_error"]
-                        print(f"[CodeGenerator] \u2717 Validator error: {error['error']} (line {error['line']})")
+                        print(f"[CodeGenerator] [ERROR] Validator error: {error['error']} (line {error['line']})")
                         print(f"[CodeGenerator]   Suggestion: {error['suggestion']}")
                     
                     if attempt < max_retries - 1:
                         print(f"[CodeGenerator] Retrying with LLM fix...")
                     else:
-                        print(f"[CodeGenerator] \u2717 Failed after {max_retries} attempts")
+                        print(f"[CodeGenerator] [ERROR] Failed after {max_retries} attempts")
                         return None
                 
             except Exception as e:
@@ -339,14 +339,14 @@ def get_validator():
 Extension description: "{description}"
 
 Choose ONE of these options:
-- python    → system actions, file ops, subprocess, networking, APIs
-- html      → needs a visual dashboard or interactive UI (charts, forms, controls)
-- js        → pure data transformation, JSON APIs without a persistent UI
+- python    -> system actions, file ops, subprocess, networking, APIs
+- html      -> needs a visual dashboard or interactive UI (charts, forms, controls)
+- js        -> pure data transformation, JSON APIs without a persistent UI
 
 Rules:
-- If the extension interacts with the OS, files, or runs subprocesses → python
-- If the extension displays a rich UI for the user to interact with → html
-- If it just transforms data or calls a web API → python (preferred over js)
+- If the extension interacts with the OS, files, or runs subprocesses -> python
+- If the extension displays a rich UI for the user to interact with -> html
+- If it just transforms data or calls a web API -> python (preferred over js)
 
 Reply with ONLY one word: python, html, or js."""
         response = self._query(prompt).strip().lower()
@@ -367,7 +367,7 @@ Current handler.py code:
 
 Fix ALL problems so the handler runs successfully.
 - Keep the execute(self, command) signature.
-- Return fixed Python code ONLY — no markdown fences, no explanation.
+- Return fixed Python code ONLY -- no markdown fences, no explanation.
 """
         fixed = self._query(prompt, system="You are an expert Python debugger. Output only corrected Python code.")
         if "```" in fixed:

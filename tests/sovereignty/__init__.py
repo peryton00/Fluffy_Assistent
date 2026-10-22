@@ -1,0 +1,1 @@
+# Tests sovereignty package

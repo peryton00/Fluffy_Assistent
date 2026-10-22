@@ -1,0 +1,23 @@
+{
+  "name": "sing_song",
+  "version": "1.0.1",
+  "description": "Sing a cheerful song for the user",
+  "author": "Fluffy AI",
+  "created": "2026-09-18T03:19:26.149467",
+  "updated": "2026-09-18T03:23:51.000582",
+  "intent": "sing_song",
+  "language": "python",
+  "has_ui": false,
+  "logo": "logo.png",
+  "patterns": [
+    "r'sing song'",
+    "(?i)sing.*song"
+  ],
+  "triggers": [
+    "sing song"
+  ],
+  "aliases": [],
+  "parameters": {},
+  "enabled": true,
+  "safety_level": "needs_confirmation"
+}

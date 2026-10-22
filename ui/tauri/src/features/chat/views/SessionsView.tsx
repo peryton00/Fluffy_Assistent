@@ -9,6 +9,7 @@ import React, { useEffect, useState } from "react";
 import { ChatHeader } from "../components/ChatHeader";
 import { useChatStore } from "../../../stores/chatStore";
 import { useUiStore } from "../../../stores/uiStore";
+import { fetchChatSession } from "../../../services/api/chat";
 import { 
   HistoryIcon, 
   PlusIcon, 
@@ -27,10 +28,14 @@ export const SessionsView: React.FC = () => {
   const selectChatSection = useUiStore((state) => state.selectChatSection);
 
   const [selectedSessionId, setSelectedSessionId] = useState<string | null>(activeSessionId || null);
+  const [previewMessages, setPreviewMessages] = useState<Array<{ role: string; content: string }>>([]);
+  const [previewLoading, setPreviewLoading] = useState(false);
 
   useEffect(() => {
-    loadSessions();
-  }, [loadSessions]);
+    if (sessions.length === 0) {
+      loadSessions();
+    }
+  }, [loadSessions, sessions.length]);
 
   useEffect(() => {
     if (activeSessionId && !selectedSessionId) {
@@ -39,6 +44,36 @@ export const SessionsView: React.FC = () => {
   }, [activeSessionId, selectedSessionId]);
 
   const selectedSession = sessions.find((s) => s.id === selectedSessionId) || sessions[0];
+  const effectiveSessionId = selectedSession?.id;
+
+  useEffect(() => {
+    if (!effectiveSessionId) {
+      setPreviewMessages([]);
+      return;
+    }
+    let cancelled = false;
+    setPreviewLoading(true);
+    fetchChatSession(effectiveSessionId)
+      .then((detail) => {
+        if (!cancelled && detail && Array.isArray(detail.messages)) {
+          setPreviewMessages(
+            detail.messages.map((m) => ({
+              role: (m.role || (m.type === "user" ? "user" : "assistant")) as string,
+              content: m.content || (m as { text?: string }).text || "",
+            }))
+          );
+        }
+      })
+      .catch(() => {
+        if (!cancelled) setPreviewMessages([]);
+      })
+      .finally(() => {
+        if (!cancelled) setPreviewLoading(false);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [effectiveSessionId]);
 
   const handleOpenConversation = (sessionId: string) => {
     switchSession(sessionId);
@@ -275,8 +310,12 @@ export const SessionsView: React.FC = () => {
                 <span style={{ fontSize: "10px", color: "var(--color-text-muted)", textTransform: "uppercase", fontWeight: "var(--font-weight-bold)", letterSpacing: "0.5px" }}>
                   Message History
                 </span>
-                {Array.isArray(selectedSession.messages) && selectedSession.messages.length > 0 ? (
-                  (selectedSession.messages as Array<{ role: string; content: string }>).map((m, idx) => (
+                {previewLoading ? (
+                  <div style={{ padding: "var(--space-6)", textAlign: "center", fontSize: "var(--font-size-xs)", color: "var(--color-text-muted)" }}>
+                    Loading messages...
+                  </div>
+                ) : previewMessages.length > 0 ? (
+                  previewMessages.map((m, idx) => (
                     <div
                       key={idx}
                       style={{
@@ -301,7 +340,7 @@ export const SessionsView: React.FC = () => {
                   ))
                 ) : (
                   <div style={{ padding: "var(--space-6)", textAlign: "center", fontSize: "var(--font-size-xs)", color: "var(--color-text-muted)" }}>
-                    No messages cached in this session preview.
+                    No messages in this session preview.
                   </div>
                 )}
               </div>

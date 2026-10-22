@@ -168,9 +168,8 @@ class TestKnowledgeUnit(unittest.TestCase):
         self.assertEqual(vec1, vec2)  # Deterministic
 
         # Dot products
-        import numpy as np
-        sim_identical = float(np.dot(vec1, vec2))
-        sim_unrelated = float(np.dot(vec1, vec3))
+        sim_identical = float(sum(a * b for a, b in zip(vec1, vec2)))
+        sim_unrelated = float(sum(a * b for a, b in zip(vec1, vec3)))
 
         self.assertAlmostEqual(sim_identical, 1.0, places=4)
         self.assertLess(sim_unrelated, sim_identical)

@@ -131,9 +131,14 @@ Say 'yes' to proceed or 'no' to cancel.
             understanding = CommandUnderstanding.from_dict(understanding)
         
         try:
-            print(f"\n[SelfImprover] \U0001f680 Starting self-improvement flow...")
+            print(f"\n[SelfImprover] [START] Starting self-improvement flow...")
+            try:
+                from brain.runtime import state
+                state.add_execution_log(f"Self-improvement started for capability: '{understanding.intent}'", "action")
+            except Exception:
+                pass
             
-            # ── Step 1: Logic & Language ──────────────────────────────────────
+            # -- Step 1: Logic & Language --------------------------------------
             # Decide best engine (python/html/js)
             lang = self.code_generator.decide_language(understanding.suggested_implementation)
             print(f"[SelfImprover] [1/4] Best engine for this: {lang}")
@@ -175,14 +180,14 @@ Say 'yes' to proceed or 'no' to cancel.
                 )
 
             if not generated_code and not js_handler:
-                print(f"[SelfImprover] \u2717 ALL generation attempts failed for: {understanding.intent}")
+                print(f"[SelfImprover] [ERROR] ALL generation attempts failed for: {understanding.intent}")
                 return {
                     "success": False,
-                    "message": "\u274c **Generation Failed** (I couldn't write the code correctly after multiple attempts. This usually happens with complex logic. Try asking for a simpler version first.)",
+                    "message": "[Generation Failed] Could not write the code correctly after multiple attempts.",
                     "action": "error"
                 }
 
-            # ── Step 2: Create extension ──────────────────────────────────────
+            # -- Step 2: Create extension --------------------------------------
             metadata = {
                 "language": lang,
                 "has_ui": lang == "html"
@@ -203,11 +208,11 @@ Say 'yes' to proceed or 'no' to cancel.
             if not actual_intent:
                 return {
                     "success": False,
-                    "message": f"\u274c **Creation Failed**: The extension folder or files could not be initialized.",
+                    "message": "[Creation Failed] The extension folder or files could not be initialized.",
                     "action": "error"
                 }
             
-            print(f"[SelfImprover] \u2713 Extension created: {actual_intent}")
+            print(f"[SelfImprover] [OK] Extension created: {actual_intent}")
             
             # Step 3: Reload extensions
             print(f"[SelfImprover] [3/4] Loading new extension...")
@@ -220,7 +225,7 @@ Say 'yes' to proceed or 'no' to cancel.
                 
                 return {
                     "success": False,
-                    "message": f"\u26a0\ufe0f Extension '{actual_intent}' was created but failed to load.\n\n"
+                    "message": f"[Load Failed] Extension '{actual_intent}' was created but failed to load.\n\n"
                                f"**Error:** {error_details}\n\n"
                                f"**Troubleshooting:**\n"
                                f"1. Check the extension files in: `brain/extensions/{actual_intent}/`\n"
@@ -230,7 +235,7 @@ Say 'yes' to proceed or 'no' to cancel.
                     "action": "error"
                 }
             
-            print(f"[SelfImprover] \u2713 Extension loaded successfully")
+            print(f"[SelfImprover] [OK] Extension loaded successfully")
             
             # Use the actual intent for execution
             final_intent = actual_intent
@@ -259,7 +264,7 @@ Say 'yes' to proceed or 'no' to cancel.
                     last_result = self.extension_loader.execute(cmd, None)
                     
                     if last_result.get("success"):
-                        print(f"[SelfImprover] \u2713 Success on attempt {attempt + 1}!")
+                        print(f"[SelfImprover] [OK] Success on attempt {attempt + 1}!")
                         break
                     
                     # If it failed, check if it's a code error we can fix
@@ -268,7 +273,7 @@ Say 'yes' to proceed or 'no' to cancel.
                     
                     if any(x in error_detail for x in ["NameError", "TypeError", "AttributeError", "SyntaxError", "ImportError", "ModuleNotFoundError"]):
                         if attempt < max_healing_tries - 1:
-                            print(f"[SelfImprover] \U0001f6e0 Runtime error detected. Attempting self-healing fix...")
+                            print(f"[SelfImprover] [FIX] Runtime error detected. Attempting self-healing fix...")
                             handler_path = self.extension_loader.extensions_dir / final_intent / "handler.py"
                             if handler_path.exists():
                                 old_code = handler_path.read_text(encoding="utf-8")
@@ -277,7 +282,7 @@ Say 'yes' to proceed or 'no' to cancel.
                                     self.extension_creator.rewrite_handler(final_intent, fixed_code)
                                     continue # Try again
                         else:
-                            print(f"[SelfImprover] \u2717 Max retries reached.")
+                            print(f"[SelfImprover] [ERROR] Max retries reached.")
                     else:
                         # Probably a logic error or environment issue (like WiFi off), don't retry code fix
                         break
@@ -297,19 +302,29 @@ Say 'yes' to proceed or 'no' to cancel.
                                 self.extension_creator.rewrite_handler(final_intent, fixed_code)
                                 continue
 
-            # ── Final Response Formatting ────────────────────────────────────
+            # -- Final Response Formatting ------------------------------------
             if last_result.get("success"):
+                try:
+                    from brain.runtime import state
+                    state.add_execution_log(f"Self-improvement complete: extension '{final_intent}' active and verified", "action")
+                except Exception:
+                    pass
                 last_result["message"] = (
-                    f"\U0001f389 **Extension '{final_intent}' is now active and working!**\n\n"
+                    f"**Extension '{final_intent}' is now active and working.**\n\n"
                     f"{last_result.get('message', 'Execution successful.')}\n\n"
-                    f"\U0001f4a1 This capability is now permanently part of my skills."
+                    f"This capability is now permanently part of my skills."
                 )
             else:
+                try:
+                    from brain.runtime import state
+                    state.add_execution_log(f"Self-improvement for '{final_intent}' completed with flaws (needs manual review)", "warning")
+                except Exception:
+                    pass
                 # Provide diagnostic report
                 handler_rel_path = f"brain/extensions/{final_intent}/handler.py"
                 last_result["message"] = (
-                    f"\u26a0\ufe0f **Extension Created, but encountered a flaw.**\n\n"
-                    f"I tried to fix it automatically 3 times, but it still has an issue:\n"
+                    f"**Extension Created, but encountered an issue.**\n\n"
+                    f"Attempted automated self-healing 3 times:\n"
                     f"```\n{last_result.get('message', 'Unknown error')}\n```\n\n"
                     f"**How to solve it:**\n"
                     f"1. Open the [Extensions Tab] and click **'Edit'** on `{final_intent}`.\n"
@@ -322,10 +337,10 @@ Say 'yes' to proceed or 'no' to cancel.
         except Exception as e:
             import traceback
             err_detail = traceback.format_exc()
-            print(f"[SelfImprover] \u2717 Error during improvement: {e}\n{err_detail}")
+            print(f"[SelfImprover] [ERROR] Error during improvement: {e}\n{err_detail}")
             return {
                 "success": False,
-                "message": f"\u274c **Self-improvement failed**: {str(e)}",
+                "message": f"**Self-improvement failed**: {str(e)}",
                 "error_detail": err_detail,
                 "action": "error"
             }

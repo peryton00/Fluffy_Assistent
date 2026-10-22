@@ -3,10 +3,9 @@ Local Deterministic Embedding Provider
 Generates normalized dense semantic vector representations completely offline without cloud APIs or network calls.
 """
 
-from typing import List
+from typing import List, Tuple
 import hashlib
 import math
-import numpy as np
 
 from brain.knowledge.embeddings.interface import EmbeddingProvider
 
@@ -15,7 +14,7 @@ class DeterministicLocalEmbeddingProvider(EmbeddingProvider):
     """
     Lightweight, deterministic local semantic embedding generator.
     Maps words and character n-grams through signed feature hashing and L2 normalization.
-    Guarantees 100% offline execution and stable vector spaces.
+    Guarantees 100% offline execution and stable vector spaces using pure Python standard library.
     """
 
     def __init__(self, dimension: int = 256, model_name: str = "fluffy-local-deterministic-256"):
@@ -30,7 +29,7 @@ class DeterministicLocalEmbeddingProvider(EmbeddingProvider):
     def dimension(self) -> int:
         return self._dimension
 
-    def _hash_feature(self, feature: str) -> tuple[int, float]:
+    def _hash_feature(self, feature: str) -> Tuple[int, float]:
         """Hash a token/n-gram to an index in [0, dimension) and a sign in {-1.0, 1.0}."""
         h = int(hashlib.md5(feature.encode("utf-8")).hexdigest(), 16)
         idx = h % self._dimension
@@ -42,7 +41,7 @@ class DeterministicLocalEmbeddingProvider(EmbeddingProvider):
         if not text or not text.strip():
             return [0.0] * self._dimension
 
-        vec = np.zeros(self._dimension, dtype=np.float32)
+        vec = [0.0] * self._dimension
         words = text.lower().split()
 
         for w in words:
@@ -59,13 +58,11 @@ class DeterministicLocalEmbeddingProvider(EmbeddingProvider):
                         vec[n_idx] += n_sign * 0.8
 
         # L2 Normalization
-        norm = float(np.linalg.norm(vec))
+        norm = math.sqrt(sum(x * x for x in vec))
         if norm > 1e-9:
-            vec = vec / norm
-        else:
-            vec = np.zeros(self._dimension, dtype=np.float32)
-
-        return vec.tolist()
+            inv_norm = 1.0 / norm
+            return [x * inv_norm for x in vec]
+        return [0.0] * self._dimension
 
     def embed(self, texts: List[str]) -> List[List[float]]:
         """Batch vector embedding."""

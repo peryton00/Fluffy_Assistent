@@ -14,20 +14,24 @@ import { useChatStore } from "../../../stores/chatStore";
 
 export const ConversationView: React.FC = () => {
   const activeSessionId = useChatStore((state) => state.activeSessionId);
+  const sessions = useChatStore((state) => state.sessions);
+  const messages = useChatStore((state) => state.messages);
   const loadSessions = useChatStore((state) => state.loadSessions);
   const loadSessionMessages = useChatStore((state) => state.loadSessionMessages);
 
-  // Initialize sessions on first mount
+  // Initialize sessions on first mount if empty
   useEffect(() => {
-    loadSessions();
-  }, [loadSessions]);
+    if (sessions.length === 0 && !activeSessionId) {
+      loadSessions();
+    }
+  }, [loadSessions, sessions.length, activeSessionId]);
 
-  // Load messages when active session changes if empty
+  // Load messages when active session changes and message list is empty
   useEffect(() => {
-    if (activeSessionId) {
+    if (activeSessionId && messages.length === 0) {
       loadSessionMessages(activeSessionId);
     }
-  }, [activeSessionId, loadSessionMessages]);
+  }, [activeSessionId, messages.length, loadSessionMessages]);
 
   return (
     <div

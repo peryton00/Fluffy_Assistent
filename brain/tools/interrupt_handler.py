@@ -68,7 +68,7 @@ def handle_interrupt() -> dict:
         "timestamp": time.time()
     })
     
-    state.add_execution_log(f"\U0001f6d1 Interrupt: {message} ({', '.join(actions_cancelled)})", "info")
+    state.add_execution_log(f"[INTERRUPT] Interrupt: {message} ({', '.join(actions_cancelled)})", "info")
     
     return {
         "interrupted": True,
